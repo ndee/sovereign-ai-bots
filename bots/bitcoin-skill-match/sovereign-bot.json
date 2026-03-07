@@ -1,0 +1,66 @@
+{
+  "kind": "sovereign-bot-package",
+  "id": "bitcoin-skill-match",
+  "version": "1.0.0",
+  "displayName": "Bitcoin Skill Match",
+  "description": "Matrix-based community matchmaker that stores local skill profiles, requests, regions, and trust relationships.",
+  "defaultInstall": false,
+  "helloMessage": "Hello from Bitcoin Skill Match. I can capture profiles and suggest trusted matches for your local Bitcoin community.",
+  "matrixIdentity": {
+    "mode": "service-account",
+    "localpartPrefix": "bitcoin-skill-match"
+  },
+  "configDefaults": {
+    "defaultSettlement": "lightning",
+    "introPolicy": "consent-first",
+    "trustSearchDepth": 2,
+    "allowBarter": true,
+    "allowSkillSwap": true
+  },
+  "toolInstances": [],
+  "openclaw": {},
+  "agentTemplate": {
+    "id": "bitcoin-skill-match",
+    "version": "1.0.0",
+    "description": "Matrix-based community matchmaker that stores local skill profiles, requests, regions, and trust relationships.",
+    "matrix": {
+      "localpartPrefix": "bitcoin-skill-match"
+    },
+    "requiredToolTemplates": [],
+    "optionalToolTemplates": [],
+    "workspaceFiles": [
+      {
+        "path": "README.md",
+        "source": "workspace/README.md"
+      },
+      {
+        "path": "AGENTS.md",
+        "source": "workspace/AGENTS.md"
+      },
+      {
+        "path": "TOOLS.md",
+        "source": "workspace/TOOLS.md"
+      },
+      {
+        "path": "skills/bitcoin-skill-match-core/SKILL.md",
+        "source": "workspace/skills/bitcoin-skill-match-core/SKILL.md"
+      },
+      {
+        "path": "data/README.md",
+        "source": "workspace/data/README.md"
+      },
+      {
+        "path": "data/community-state.json",
+        "source": "workspace/data/community-state.json"
+      },
+      {
+        "path": "templates/profile-template.md",
+        "source": "workspace/templates/profile-template.md"
+      },
+      {
+        "path": "templates/intro-template.md",
+        "source": "workspace/templates/intro-template.md"
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "community": {
+    "name": "Local Bitcoin Skill Network",
+    "defaultSettlement": "lightning",
+    "introPolicy": "consent-first",
+    "trustSearchDepth": 2,
+    "lastUpdated": null
+  },
+  "skills": [],
+  "regions": [],
+  "members": [],
+  "requests": [],
+  "trustEdges": [],
+  "introductions": []
+}
