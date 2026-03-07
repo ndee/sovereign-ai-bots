@@ -1,0 +1,94 @@
+{
+  "kind": "sovereign-bot-package",
+  "id": "mail-sentinel",
+  "version": "1.0.0",
+  "displayName": "Mail Sentinel",
+  "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+  "defaultInstall": true,
+  "helloMessage": "Hello from Mail Sentinel. I can summarize your latest 3 inbox mails.",
+  "matrixIdentity": {
+    "mode": "service-account",
+    "localpartPrefix": "mail-sentinel"
+  },
+  "configDefaults": {
+    "pollInterval": "5m",
+    "lookbackWindow": "15m",
+    "e2eeAlertRoom": false
+  },
+  "toolInstances": [
+    {
+      "id": "mail-sentinel-imap",
+      "templateRef": "imap-readonly@1.0.0",
+      "enabledWhen": {
+        "path": "imap.status",
+        "equals": "configured"
+      },
+      "config": {
+        "host": {
+          "from": "imap.host"
+        },
+        "port": {
+          "from": "imap.port",
+          "stringify": true
+        },
+        "tls": {
+          "from": "imap.tls",
+          "stringify": true
+        },
+        "username": {
+          "from": "imap.username"
+        },
+        "mailbox": {
+          "from": "imap.mailbox"
+        }
+      },
+      "secretRefs": {
+        "password": {
+          "from": "imap.secretRef"
+        }
+      }
+    }
+  ],
+  "openclaw": {
+    "cron": {
+      "id": "mail-sentinel-poll",
+      "everyConfigKey": "pollInterval",
+      "defaultEvery": "5m",
+      "session": "isolated",
+      "message": "Summarize the latest 3 emails in INBOX using read-only IMAP tools. The tool instance is already scoped to the configured mailbox, so use --query ALL for the whole mailbox and do not include INBOX in the query string. Highlight urgent or security-relevant items. If IMAP is not configured, report the missing setup clearly."
+    }
+  },
+  "agentTemplate": {
+    "id": "mail-sentinel",
+    "version": "1.0.0",
+    "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+    "matrix": {
+      "localpartPrefix": "mail-sentinel"
+    },
+    "requiredToolTemplates": [],
+    "optionalToolTemplates": [
+      {
+        "id": "imap-readonly",
+        "version": "1.0.0"
+      }
+    ],
+    "workspaceFiles": [
+      {
+        "path": "README.md",
+        "source": "workspace/README.md"
+      },
+      {
+        "path": "AGENTS.md",
+        "source": "workspace/AGENTS.md"
+      },
+      {
+        "path": "TOOLS.md",
+        "source": "workspace/TOOLS.md"
+      },
+      {
+        "path": "skills/mail-sentinel-core/SKILL.md",
+        "source": "workspace/skills/mail-sentinel-core/SKILL.md"
+      }
+    ]
+  }
+}

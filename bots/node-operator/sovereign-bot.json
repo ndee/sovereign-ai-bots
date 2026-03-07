@@ -1,0 +1,61 @@
+{
+  "kind": "sovereign-bot-package",
+  "id": "node-operator",
+  "version": "1.0.0",
+  "displayName": "Node Operator",
+  "description": "Conversational operator that manages Sovereign Node and managed agents.",
+  "defaultInstall": false,
+  "helloMessage": "Hello from Node Operator. Ask me for Sovereign Node and system status.",
+  "matrixIdentity": {
+    "mode": "dedicated-account",
+    "localpartPrefix": "node-operator"
+  },
+  "configDefaults": {},
+  "toolInstances": [
+    {
+      "id": "node-operator-cli",
+      "templateRef": "node-cli-ops@1.0.0",
+      "config": {},
+      "secretRefs": {}
+    }
+  ],
+  "openclaw": {},
+  "agentTemplate": {
+    "id": "node-operator",
+    "version": "1.0.0",
+    "description": "Conversational operator that manages Sovereign Node and managed agents.",
+    "matrix": {
+      "localpartPrefix": "node-operator"
+    },
+    "requiredToolTemplates": [
+      {
+        "id": "node-cli-ops",
+        "version": "1.0.0"
+      }
+    ],
+    "optionalToolTemplates": [
+      {
+        "id": "imap-readonly",
+        "version": "1.0.0"
+      }
+    ],
+    "workspaceFiles": [
+      {
+        "path": "README.md",
+        "source": "workspace/README.md"
+      },
+      {
+        "path": "AGENTS.md",
+        "source": "workspace/AGENTS.md"
+      },
+      {
+        "path": "TOOLS.md",
+        "source": "workspace/TOOLS.md"
+      },
+      {
+        "path": "skills/node-operator-core/SKILL.md",
+        "source": "workspace/skills/node-operator-core/SKILL.md"
+      }
+    ]
+  }
+}
