@@ -7,7 +7,7 @@
   "defaultInstall": false,
   "helloMessage": "Hello from Bitcoin Skill Match. I can capture profiles and suggest trusted matches for your local Bitcoin community.",
   "matrixIdentity": {
-    "mode": "service-account",
+    "mode": "dedicated-account",
     "localpartPrefix": "bitcoin-skill-match"
   },
   "configDefaults": {
