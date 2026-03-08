@@ -10,6 +10,16 @@
     "mode": "dedicated-account",
     "localpartPrefix": "bitcoin-skill-match"
   },
+  "matrixRouting": {
+    "defaultAccount": true,
+    "dm": {
+      "enabled": true
+    },
+    "alertRoom": {
+      "autoReply": true,
+      "requireMention": false
+    }
+  },
   "configDefaults": {
     "defaultSettlement": "lightning",
     "introPolicy": "consent-first",

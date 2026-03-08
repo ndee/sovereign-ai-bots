@@ -10,6 +10,15 @@
     "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
   },
+  "matrixRouting": {
+    "dm": {
+      "enabled": true
+    },
+    "alertRoom": {
+      "autoReply": false,
+      "requireMention": true
+    }
+  },
   "configDefaults": {
     "pollInterval": "5m",
     "lookbackWindow": "15m",
