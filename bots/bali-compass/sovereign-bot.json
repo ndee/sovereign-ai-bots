@@ -1,0 +1,85 @@
+{
+  "kind": "sovereign-bot-package",
+  "id": "bali-compass",
+  "version": "1.0.0",
+  "displayName": "Bali Compass",
+  "description": "Practical guide for travel, relocation, life, business, and Bitcoin in Bali and wider Indonesia.",
+  "defaultInstall": false,
+  "helloMessage": "Hello from Bali Compass. I can help you plan travel, relocation, business, and Bitcoin life in Bali and wider Indonesia.",
+  "matrixIdentity": {
+    "mode": "dedicated-account",
+    "localpartPrefix": "bali-compass"
+  },
+  "matrixRouting": {
+    "dm": {
+      "enabled": true
+    },
+    "alertRoom": {
+      "autoReply": false,
+      "requireMention": true
+    }
+  },
+  "configDefaults": {
+    "focusRegion": "Bali",
+    "planningMode": "practical-checklists",
+    "regulatoryWarnings": true
+  },
+  "toolInstances": [],
+  "openclaw": {},
+  "agentTemplate": {
+    "id": "bali-compass",
+    "version": "1.0.0",
+    "description": "Practical guide for travel, relocation, life, business, and Bitcoin in Bali and wider Indonesia.",
+    "matrix": {
+      "localpartPrefix": "bali-compass"
+    },
+    "requiredToolTemplates": [],
+    "optionalToolTemplates": [],
+    "workspaceFiles": [
+      {
+        "path": "README.md",
+        "source": "workspace/README.md"
+      },
+      {
+        "path": "AGENTS.md",
+        "source": "workspace/AGENTS.md"
+      },
+      {
+        "path": "TOOLS.md",
+        "source": "workspace/TOOLS.md"
+      },
+      {
+        "path": "skills/bali-compass-core/SKILL.md",
+        "source": "workspace/skills/bali-compass-core/SKILL.md"
+      },
+      {
+        "path": "references/intake-checklist.md",
+        "source": "workspace/references/intake-checklist.md"
+      },
+      {
+        "path": "references/travel-and-life-playbook.md",
+        "source": "workspace/references/travel-and-life-playbook.md"
+      },
+      {
+        "path": "references/immigration-and-citizenship-playbook.md",
+        "source": "workspace/references/immigration-and-citizenship-playbook.md"
+      },
+      {
+        "path": "references/business-playbook.md",
+        "source": "workspace/references/business-playbook.md"
+      },
+      {
+        "path": "references/bitcoin-playbook.md",
+        "source": "workspace/references/bitcoin-playbook.md"
+      },
+      {
+        "path": "templates/relocation-plan-template.md",
+        "source": "workspace/templates/relocation-plan-template.md"
+      },
+      {
+        "path": "templates/due-diligence-template.md",
+        "source": "workspace/templates/due-diligence-template.md"
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ Each package lives under `bots/<id>/` and contains:
 
 Current packages:
 
+- `bali-compass`
 - `bitcoin-skill-match`
 - `mail-sentinel`
 - `node-operator`
