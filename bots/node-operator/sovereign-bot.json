@@ -10,6 +10,15 @@
     "mode": "dedicated-account",
     "localpartPrefix": "node-operator"
   },
+  "matrixRouting": {
+    "dm": {
+      "enabled": true
+    },
+    "alertRoom": {
+      "autoReply": false,
+      "requireMention": true
+    }
+  },
   "configDefaults": {},
   "toolInstances": [
     {
