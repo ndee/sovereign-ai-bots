@@ -7,7 +7,7 @@
   "defaultInstall": true,
   "helloMessage": "Hello from Mail Sentinel. I can summarize your latest 3 inbox mails.",
   "matrixIdentity": {
-    "mode": "service-account",
+    "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
   },
   "configDefaults": {
