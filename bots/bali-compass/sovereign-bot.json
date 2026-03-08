@@ -53,8 +53,16 @@
         "source": "workspace/skills/bali-compass-core/SKILL.md"
       },
       {
+        "path": "skills/bali-compass-live-research/SKILL.md",
+        "source": "workspace/skills/bali-compass-live-research/SKILL.md"
+      },
+      {
         "path": "references/intake-checklist.md",
         "source": "workspace/references/intake-checklist.md"
+      },
+      {
+        "path": "references/live-research-stack.md",
+        "source": "workspace/references/live-research-stack.md"
       },
       {
         "path": "references/travel-and-life-playbook.md",
