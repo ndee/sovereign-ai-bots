@@ -2,6 +2,7 @@
 
 Profile intake checklist:
 1. In direct Matrix chats, call `session_status` first
+1a. `session_status` takes no arguments; call it with `{}` only
 2. In a direct Matrix chat, extract the actor from `session_status.sessionKey` when it matches `agent:<agentId>:matrix:direct:@user:server`
 3. If `session_status.sessionKey` does not expose the actor, use `session_status.origin.from` when it matches `matrix:@user:server`
 4. Use only the extracted suffix that starts with `@`; never store the full `agent:<agentId>:matrix:direct:@user:server` session key as an owner id
@@ -19,7 +20,10 @@ Profile intake checklist:
 16. Do not create a top-level `offers` array; offers belong only in `members[].offers[]`
 17. Requests belong only in the top-level `requests[]` array
 18. After any create, update, or delete, read `data/community-state.json` again and verify the marker changed as intended before replying
-19. Confirm exactly what was stored without inventing another person's name or reusing another user's profile
+19. For a new offer or profile write, if no member exists for the current actor, create `member:<currentActor>` first
+20. Never attach a new offer to another user's `members[]` record, even as a draft, placeholder, or pending approval
+21. If the latest turn starts a fresh create request, ignore any older foreign-owned delete or update target from the same chat
+22. Confirm exactly what was stored without inventing another person's name or reusing another user's profile
 
 Match query checklist:
 1. Read `data/community-state.json` from the current workspace before answering
@@ -34,6 +38,7 @@ Match query checklist:
 
 Mutation guard checklist:
 1. For direct Matrix create, update, or delete, call `session_status` before anything else and resolve the actor from that tool output
+1a. Never pass a guessed `sessionKey`, placeholder, or Matrix handle into `session_status`; it is a zero-argument tool
 2. For edits or deletes, read `data/community-state.json` from the current workspace first
 3. If `createdByMatrixUserId` is missing, refuse the mutation and explain that the legacy entry must be recreated by its owner
 4. If the current Matrix sender does not match `createdByMatrixUserId`, refuse the mutation
@@ -43,7 +48,9 @@ Mutation guard checklist:
 8. On offer deletes, locate the offer under `members[].offers[]`, compare the enclosing member's `createdByMatrixUserId` to the current actor, and refuse on mismatch
 9. On request deletes, compare `requests[].createdByMatrixUserId` to the current actor and refuse on mismatch
 10. Never skip the ownership check just because the current DM session already exists
-11. Never report success for a create or delete until a post-write read proves the marker is present or absent in the correct canonical location
+11. On offer creates, verify the enclosing member's `createdByMatrixUserId` equals the current actor before writing
+12. If an offer create would land under another user's member record, stop and refuse instead of writing a draft
+13. Never report success for a create or delete until a post-write read proves the marker is present or absent in the correct canonical location under the current actor
 
 Intro workflow checklist:
 1. Check both users' `contactLevel`
