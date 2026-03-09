@@ -20,8 +20,12 @@ Execution policy:
 - Never guess or invent an absolute path such as `/var/lib/.../data/community-state.json`; use the workspace-relative file `data/community-state.json`
 - Use the exact ownership field names `createdByMatrixUserId`, `createdByDisplayName`, `updatedByMatrixUserId`, and `updatedByDisplayName`
 - Do not invent alternate ownership field names like `ownerMatrixUserId`
+- Use the exact note field name `notes` as an array; do not rename it to `note`
 
 Actor and ownership rules:
+- In direct Matrix chats, call `session_status` and derive the actor from the current session key
+- For direct Matrix chats, the expected session key shape is `agent:<agentId>:matrix:direct:@user:server`; use the full `@user:server` as the actor id
+- If `session_status` does not expose a direct Matrix user id, ask for confirmation and do not write placeholders
 - Treat the sender of the latest inbound Matrix message as the actor for the current turn
 - Never infer the actor from older session history when writing or deleting data
 - All humans may query all stored entries
@@ -35,9 +39,11 @@ When creating or updating a profile:
 2. Use the current Matrix sender as the owner and keep that owner in `createdByMatrixUserId`
 3. For self-owned profiles, use a stable `memberId` derived from the creator's Matrix user id when possible
 4. Normalize repeated skills and regions into reusable labels
-5. Update `data/community-state.json`, keep `community.lastUpdated` current, and maintain `createdAt`, `updatedAt`, `updatedByMatrixUserId`, and `updatedByDisplayName`
+5. Use the full Matrix user id in `createdByMatrixUserId` and `updatedByMatrixUserId`, not a bare localpart
+6. Update `data/community-state.json`, keep `community.lastUpdated` current, and maintain `createdAt`, `updatedAt`, `updatedByMatrixUserId`, and `updatedByDisplayName`
 6. If the user mentions trust links, record them as direct trust edges
-7. Only modify or delete the profile when the current Matrix sender matches `createdByMatrixUserId`
+7. Keep `notes` as an array of strings when notes are provided
+8. Only modify or delete the profile when the current Matrix sender matches `createdByMatrixUserId`
 
 When creating or updating a request:
 1. Capture the request details, region, trust preference, and settlement hints

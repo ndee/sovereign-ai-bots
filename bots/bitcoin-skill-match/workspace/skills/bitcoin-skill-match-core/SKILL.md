@@ -1,13 +1,16 @@
 # bitcoin-skill-match-core
 
 Profile intake checklist:
-1. Identify the actor from the latest inbound Matrix sender
+1. In direct Matrix chats, call `session_status` first and extract the actor from the current session key
+2. In rooms, identify the actor from the latest inbound Matrix sender label
 2. Capture `offers`, `seeks`, `region`, and `contactLevel`
 3. Ask for settlement preferences and trust links if relevant
 4. Read `data/community-state.json` from the current workspace before changing it
 5. Update `data/community-state.json` with the exact field names `createdByMatrixUserId`, `createdByDisplayName`, `createdAt`, `updatedAt`, and `updatedByMatrixUserId`
-6. Never rename those ownership fields to `owner*`
-7. Confirm exactly what was stored without inventing another person's name
+6. Use the full Matrix user id from `session_status` or the room sender, not a bare localpart
+7. Keep `notes` as an array; never rename it to `note`
+8. Never rename those ownership fields to `owner*`
+9. Confirm exactly what was stored without inventing another person's name
 
 Match query checklist:
 1. Read `data/community-state.json` from the current workspace before answering
