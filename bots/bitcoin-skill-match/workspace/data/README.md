@@ -54,4 +54,6 @@ Ownership rules:
 - All human users may read and query all entries
 - Only the creator of a member profile or request may update or delete it
 - Use `createdByMatrixUserId` as the ownership key for enforcement
+- Use the exact canonical field names listed above; do not rename them to `owner*`
+- Always read and write the workspace-relative file `data/community-state.json`
 - If a legacy entry has no `createdByMatrixUserId`, keep it readable but do not modify or delete it automatically
