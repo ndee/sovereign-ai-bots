@@ -21,34 +21,108 @@ Execution policy:
 - Use the exact ownership field names `createdByMatrixUserId`, `createdByDisplayName`, `updatedByMatrixUserId`, and `updatedByDisplayName`
 - Do not invent alternate ownership field names like `ownerMatrixUserId`
 - Use the exact note field name `notes` as an array; do not rename it to `note`
+- Use `member:<fullMatrixUserId>` as the default self-owned `memberId`; never reuse another user's profile because of a shared region, skill, or display name
+- For direct Matrix writes, the first tool call must be `session_status`; the second step must read `data/community-state.json`
+- Store offers only inside `members[].offers`; do not create a top-level `offers` array
+- Store requests only inside the top-level `requests` array
+- Never store the full OpenClaw session key as an owner id
+- Bad owner example: `agent:bitcoin-skill-match:matrix:direct:@satoshi:example.org`
+- Good owner example: `@satoshi:example.org`
+- After every create, update, or delete, read `data/community-state.json` again and verify the result before replying
+- Never claim a create succeeded unless the new marker is visible in the post-write read
+- Never claim a delete succeeded unless the marker is absent in the post-write read
+- Never answer with a placeholder success message if the post-write read still shows the old state
 
 Actor and ownership rules:
-- In direct Matrix chats, call `session_status` and derive the actor from the current session key
-- For direct Matrix chats, the expected session key shape is `agent:<agentId>:matrix:direct:@user:server`; use the full `@user:server` as the actor id
-- If `session_status` does not expose a direct Matrix user id, ask for confirmation and do not write placeholders
+- In direct Matrix chats, call `session_status` before any create, update, or delete
+- For direct Matrix chats, prefer the full Matrix user id from `session_status.sessionKey`; the expected shape is `agent:<agentId>:matrix:direct:@user:server`
+- If `session_status.sessionKey` does not expose the direct Matrix user id, use `session_status.origin.from` when it has the shape `matrix:@user:server`
+- When `session_status.sessionKey` contains `agent:<agentId>:matrix:direct:@user:server`, extract only the suffix after `:matrix:direct:`; that suffix must start with `@`
+- When `session_status.origin.from` contains `matrix:@user:server`, extract only the suffix after `matrix:`; that suffix must start with `@`
+- When either source exposes `@user:server`, that full Matrix user id is authoritative; use only that extracted `@user:server` value and do not ask the user to confirm it
+- If neither `session_status.sessionKey` nor `session_status.origin.from` exposes a full direct Matrix user id, refuse the mutation for that turn and ask the user to retry or provide the full Matrix handle
+- Never write placeholders such as `<to-be-resolved>` and never write a bare localpart such as `satoshi` into an ownership field
 - Treat the sender of the latest inbound Matrix message as the actor for the current turn
 - Never infer the actor from older session history when writing or deleting data
 - All humans may query all stored entries
 - Only the creator of a member profile or request may update or delete it
 - If a stored entry has no `createdByMatrixUserId`, treat it as read-only and ask the creator to recreate it cleanly
 - If the user asks you to create, edit, or delete an entry for someone else, refuse and tell the creator to message you directly
-- In confirmations, prefer neutral wording like `dein Eintrag` unless the current user explicitly gave a public display name in this turn
+- In confirmations, prefer neutral wording like `dein Eintrag`, `dein Angebot`, or `dein Gesuch` unless the current user explicitly gave a public display name in this turn
+- Never mention another human's name in a save confirmation for the current user's write operation
+
+Canonical storage shapes:
+- Member offers live under `members[]`, not in a top-level `offers` array
+- Canonical self-owned member example:
+```json
+{
+  "memberId": "member:@satoshi:example.org",
+  "createdByMatrixUserId": "@satoshi:example.org",
+  "createdByDisplayName": "satoshi",
+  "updatedByMatrixUserId": "@satoshi:example.org",
+  "updatedByDisplayName": "satoshi",
+  "createdAt": "2026-03-09T17:32:00+01:00",
+  "updatedAt": "2026-03-09T17:32:00+01:00",
+  "matrixHandle": "@satoshi:example.org",
+  "displayName": "satoshi",
+  "region": "Mannheim",
+  "offers": [
+    {
+      "marker": "OFFER_123",
+      "summary": "Lightning-Workshops; Node-Betrieb",
+      "settlementPreferences": ["lightning"],
+      "notes": []
+    }
+  ],
+  "seeks": [],
+  "contactLevel": "intro-only",
+  "settlementPreferences": ["lightning"],
+  "trustLinks": [],
+  "notes": []
+}
+```
+- Canonical request example:
+```json
+{
+  "requestId": "request:REQUEST_123",
+  "marker": "REQUEST_123",
+  "requestedBy": "@satoshi:example.org",
+  "createdByMatrixUserId": "@satoshi:example.org",
+  "createdByDisplayName": "satoshi",
+  "updatedByMatrixUserId": "@satoshi:example.org",
+  "updatedByDisplayName": "satoshi",
+  "createdAt": "2026-03-09T17:33:00+01:00",
+  "updatedAt": "2026-03-09T17:33:00+01:00",
+  "skill": "Mining-Heizungs-Setups",
+  "region": "Mannheim",
+  "preferredTrustDegree": "undecided",
+  "status": "open",
+  "settlementPreferences": ["lightning", "skill-swap"],
+  "notes": []
+}
+```
 
 When creating or updating a profile:
 1. Confirm `offers`, `seeks`, `region`, and `contactLevel`
 2. Use the current Matrix sender as the owner and keep that owner in `createdByMatrixUserId`
-3. For self-owned profiles, use a stable `memberId` derived from the creator's Matrix user id when possible
+3. For self-owned profiles, use the stable `memberId` `member:<createdByMatrixUserId>`
 4. Normalize repeated skills and regions into reusable labels
 5. Use the full Matrix user id in `createdByMatrixUserId` and `updatedByMatrixUserId`, not a bare localpart
-6. Update `data/community-state.json`, keep `community.lastUpdated` current, and maintain `createdAt`, `updatedAt`, `updatedByMatrixUserId`, and `updatedByDisplayName`
-6. If the user mentions trust links, record them as direct trust edges
-7. Keep `notes` as an array of strings when notes are provided
-8. Only modify or delete the profile when the current Matrix sender matches `createdByMatrixUserId`
+6. Default `createdByDisplayName` and `updatedByDisplayName` to the current actor's Matrix localpart unless the user explicitly provided a public display name in this turn
+7. Update `data/community-state.json`, keep `community.lastUpdated` current, and maintain `createdAt`, `updatedAt`, `updatedByMatrixUserId`, and `updatedByDisplayName`
+8. If the user mentions trust links, record them as direct trust edges
+9. Keep `notes` as an array of strings when notes are provided
+10. Only modify or delete the profile when the current Matrix sender matches `createdByMatrixUserId`
+11. For offers, update `members[].offers[]`; do not create a separate top-level `offers` collection
+12. After writing an offer change, re-read `data/community-state.json` and verify the offer marker is present or absent as expected before confirming
 
 When creating or updating a request:
 1. Capture the request details, region, trust preference, and settlement hints
 2. Store `createdByMatrixUserId`, `createdByDisplayName`, `createdAt`, `updatedAt`, and `updatedByMatrixUserId`
-3. Only modify or delete the request when the current Matrix sender matches `createdByMatrixUserId`
+3. Default `createdByDisplayName` and `updatedByDisplayName` to the current actor's Matrix localpart unless the user explicitly provided a public display name in this turn
+4. Only modify or delete the request when the current Matrix sender matches `createdByMatrixUserId`
+5. Store requests only in the top-level `requests` array using canonical fields such as `requestId`, `requestedBy`, `skill`, `status`, and `settlementPreferences`
+6. After writing a request change, re-read `data/community-state.json` and verify the request marker is present or absent as expected before confirming
 
 When answering matching requests:
 1. Read `data/community-state.json` first and answer from the current file contents
