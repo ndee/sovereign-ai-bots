@@ -12,6 +12,12 @@ Top-level sections:
 
 Recommended member fields:
 - `memberId`
+- `createdByMatrixUserId`
+- `createdByDisplayName`
+- `updatedByMatrixUserId`
+- `updatedByDisplayName`
+- `createdAt`
+- `updatedAt`
 - `matrixHandle`
 - `displayName`
 - `region`
@@ -21,17 +27,21 @@ Recommended member fields:
 - `settlementPreferences`
 - `trustLinks`
 - `notes`
-- `updatedAt`
 
 Recommended request fields:
 - `requestId`
 - `requestedBy`
+- `createdByMatrixUserId`
+- `createdByDisplayName`
+- `updatedByMatrixUserId`
+- `updatedByDisplayName`
+- `createdAt`
+- `updatedAt`
 - `skill`
 - `region`
 - `preferredTrustDegree`
 - `status`
 - `notes`
-- `createdAt`
 
 Recommended trust edge fields:
 - `fromMemberId`
@@ -39,3 +49,9 @@ Recommended trust edge fields:
 - `relation`
 - `strength`
 - `updatedAt`
+
+Ownership rules:
+- All human users may read and query all entries
+- Only the creator of a member profile or request may update or delete it
+- Use `createdByMatrixUserId` as the ownership key for enforcement
+- If a legacy entry has no `createdByMatrixUserId`, keep it readable but do not modify or delete it automatically
