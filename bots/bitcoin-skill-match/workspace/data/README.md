@@ -1,6 +1,6 @@
 # Community State
 
-`data/community-state.json` is the bot's local memory for the skill-sharing network.
+The bot's canonical skill-sharing state is private and managed through `guarded_json_state`.
 
 Top-level sections:
 - `skills`: normalized skill tags used across profiles and requests
@@ -15,6 +15,25 @@ Canonical rules:
 - Offers belong inside `members[].offers[]`
 - Requests belong inside the top-level `requests[]`
 - Owner ids must be full Matrix user ids like `@satoshi:example.org`, never OpenClaw session keys like `agent:bitcoin-skill-match:matrix:direct:@satoshi:example.org`
+
+Guarded write path:
+- Policy file: `data/community-state.policy.json`
+- Read full state through `guarded_json_state` action `show`
+- Read collections through `guarded_json_state` action `list`
+- Mutate self-owned entries through `guarded_json_state` actions `upsert-self` and `delete-self`
+- The tool resolves the current Matrix user id from the active OpenClaw session itself
+- For upserts, pass all mutation fields through one tool `input` object
+- The guarded state path also normalizes numeric and boolean scalar inputs into strings
+- Never append raw JSON outside the tool `input`
+- Never use shell commands, pipes, temp files, env vars, or guessed paths to recover session data
+- Do not read or edit the backing state file directly
+- Do not send owner-managed fields in mutation payloads
+- Do not send nested `offers` arrays through `entity members`; use `entity offers`
+
+Covered entity types:
+- `members`: self-owned profile records keyed as `member:<matrixUserId>`
+- `offers`: self-owned child records under `members[].offers[]`
+- `requests`: self-owned top-level request records keyed by `requestId`
 
 Recommended member fields:
 - `memberId`
@@ -34,17 +53,30 @@ Recommended member fields:
 - `trustLinks`
 - `notes`
 
-Recommended self-owned member id:
-- `member:@satoshi:example.org`
-
-Recommended offer object inside `members[].offers[]`:
+Recommended offer fields:
 - `marker`
+- `title`
+- `description`
 - `summary`
+- `region`
+- `regions`
+- `radiusKm`
+- `price`
+- `visibility`
+- `contactLevel`
 - `settlementPreferences`
 - `notes`
 
+Offer marker behavior:
+- Humans may provide a marker explicitly
+- If no marker is provided, the guarded CLI generates one automatically
+
+Recommended self-owned member id:
+- `member:@satoshi:example.org`
+
 Recommended request fields:
 - `requestId`
+- `marker`
 - `requestedBy`
 - `createdByMatrixUserId`
 - `createdByDisplayName`
@@ -56,6 +88,7 @@ Recommended request fields:
 - `region`
 - `preferredTrustDegree`
 - `status`
+- `settlementPreferences`
 - `notes`
 
 Recommended trust edge fields:
@@ -67,17 +100,7 @@ Recommended trust edge fields:
 
 Ownership rules:
 - All human users may read and query all entries
-- Only the creator of a member profile or request may update or delete it
+- Only the creator of a member profile, offer, or request may update or delete it
 - Use `createdByMatrixUserId` as the ownership key for enforcement
 - Use the full Matrix user id such as `@satoshi:example.org`, not only `satoshi`
-- For direct Matrix mutations, resolve the owner from `session_status.sessionKey` first and fall back to `session_status.origin.from`
-- `session_status` is a zero-argument tool; call it with `{}` and extract the owner from the returned status
-- If `session_status.sessionKey` is `agent:bitcoin-skill-match:matrix:direct:@satoshi:example.org`, store only `@satoshi:example.org`
-- If neither source exposes a full Matrix user id, refuse the mutation instead of writing placeholders
-- For a new offer, create or reuse only the self-owned member `member:<currentActor>`; never store the offer under another user's member, even temporarily or as a draft
-- If an older chat turn discussed another user's entry, that does not grant permission to write into that user's record on a later create turn
-- Use the exact canonical field names listed above; do not rename them to `owner*`
-- Use `notes` as an array of strings
-- Always read and write the workspace-relative file `data/community-state.json`
-- After every mutation, read the file again and verify the final marker state before confirming success
-- If a legacy entry has no `createdByMatrixUserId`, keep it readable but do not modify or delete it automatically
+- Legacy entries without `createdByMatrixUserId` stay readable but must be treated as read-only

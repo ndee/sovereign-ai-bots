@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "lastUpdatedPath": "community.lastUpdated",
+  "entities": {
+    "members": {
+      "kind": "owner-root-array",
+      "collection": "members",
+      "ownerField": "createdByMatrixUserId",
+      "keyField": "memberId",
+      "selfKeyTemplate": "member:{actor}",
+      "createdAtField": "createdAt",
+      "updatedAtField": "updatedAt",
+      "updatedByField": "updatedByMatrixUserId",
+      "createdByDisplayField": "createdByDisplayName",
+      "updatedByDisplayField": "updatedByDisplayName",
+      "defaults": {
+        "matrixHandle": "{actor}",
+        "displayName": "{actorLocalpart}",
+        "offers": [],
+        "seeks": [],
+        "contactLevel": "intro-only",
+        "settlementPreferences": [
+          "lightning"
+        ],
+        "trustLinks": [],
+        "notes": []
+      },
+      "inputFields": {
+        "region": "string",
+        "displayName": "string",
+        "contactLevel": "string",
+        "settlementPreferences": "string[]",
+        "seeks": "string[]",
+        "trustLinks": "string[]",
+        "notes": "string[]"
+      }
+    },
+    "offers": {
+      "kind": "owner-child-array",
+      "parentCollection": "members",
+      "parentOwnerField": "createdByMatrixUserId",
+      "parentKeyField": "memberId",
+      "parentSelfKeyTemplate": "member:{actor}",
+      "ensureParentEntity": "members",
+      "childArrayField": "offers",
+      "keyField": "marker",
+      "selfKeyTemplate": "OFFER_{actorLocalpart}_{nowCompact}",
+      "updatedAtField": "updatedAt",
+      "defaults": {
+        "notes": [],
+        "settlementPreferences": [
+          "lightning"
+        ]
+      },
+      "inputFields": {
+        "marker": "string",
+        "title": "string",
+        "description": "string",
+        "summary": "string",
+        "region": "string",
+        "regions": "string[]",
+        "radiusKm": "string",
+        "price": "string",
+        "visibility": "string",
+        "contactLevel": "string",
+        "settlementPreferences": "string[]",
+        "notes": "string[]"
+      }
+    },
+    "requests": {
+      "kind": "owner-root-array",
+      "collection": "requests",
+      "ownerField": "createdByMatrixUserId",
+      "keyField": "requestId",
+      "createdAtField": "createdAt",
+      "updatedAtField": "updatedAt",
+      "updatedByField": "updatedByMatrixUserId",
+      "createdByDisplayField": "createdByDisplayName",
+      "updatedByDisplayField": "updatedByDisplayName",
+      "defaults": {
+        "requestedBy": "{actor}",
+        "marker": "{input.requestId}",
+        "status": "open",
+        "settlementPreferences": [
+          "lightning"
+        ],
+        "notes": []
+      },
+      "inputFields": {
+        "requestId": "string",
+        "skill": "string",
+        "region": "string",
+        "preferredTrustDegree": "string",
+        "status": "string",
+        "settlementPreferences": "string[]",
+        "notes": "string[]"
+      }
+    }
+  }
+}

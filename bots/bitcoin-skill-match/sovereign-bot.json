@@ -25,9 +25,55 @@
     "introPolicy": "consent-first",
     "trustSearchDepth": 2,
     "allowBarter": true,
-    "allowSkillSwap": true
+    "allowSkillSwap": true,
+    "model": "openai/gpt-5-mini",
+    "statePath": "data/community-state.json",
+    "statePolicyPath": "data/community-state.policy.json",
+    "stateAuditPath": "data/community-state.audit.jsonl"
   },
-  "toolInstances": [],
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "guarded-json-state",
+      "version": "1.0.0",
+      "description": "Guarded JSON state access for self-owned records with auditable mutations.",
+      "capabilities": [
+        "json-state.read",
+        "json-state.self-upsert",
+        "json-state.self-delete"
+      ],
+      "requiredSecretRefs": [],
+      "requiredConfigKeys": [
+        "statePath",
+        "policyPath"
+      ],
+      "allowedCommands": [],
+      "openclawPlugins": [
+        "guarded-json-state"
+      ],
+      "openclawToolNames": [
+        "guarded_json_state"
+      ]
+    }
+  ],
+  "toolInstances": [
+    {
+      "id": "bitcoin-skill-match-state",
+      "templateRef": "guarded-json-state@1.0.0",
+      "config": {
+        "statePath": {
+          "from": "bots.config.bitcoin-skill-match.statePath"
+        },
+        "policyPath": {
+          "from": "bots.config.bitcoin-skill-match.statePolicyPath"
+        },
+        "auditPath": {
+          "from": "bots.config.bitcoin-skill-match.stateAuditPath"
+        }
+      },
+      "secretRefs": {}
+    }
+  ],
   "openclaw": {},
   "agentTemplate": {
     "id": "bitcoin-skill-match",
@@ -36,7 +82,12 @@
     "matrix": {
       "localpartPrefix": "bitcoin-skill-match"
     },
-    "requiredToolTemplates": [],
+    "requiredToolTemplates": [
+      {
+        "id": "guarded-json-state",
+        "version": "1.0.0"
+      }
+    ],
     "optionalToolTemplates": [],
     "workspaceFiles": [
       {
@@ -62,6 +113,10 @@
       {
         "path": "data/community-state.json",
         "source": "workspace/data/community-state.json"
+      },
+      {
+        "path": "data/community-state.policy.json",
+        "source": "workspace/data/community-state.policy.json"
       },
       {
         "path": "templates/profile-template.md",
