@@ -17,40 +17,29 @@ Execution policy:
 - Respect `contactLevel` before sharing direct contact data
 
 Matrix actor resolution:
-- For every Matrix mutation, call `session_status` first
-- `session_status` is a zero-argument tool; call it with `{}` only
-- Never pass made-up arguments such as `{ "sessionKey": null }` to `session_status`
-- Pass the current `session_status.sessionKey` as `--session-key` when it is present
-- Pass the current `session_status.origin.from` as `--origin-from` when it is present
-- In Matrix DMs, `session_status` often exposes only `sessionKey`; that is enough to proceed
-- If `origin.from` is missing, do not block a DM write when `sessionKey` is present
-- If `sessionKey` is room-scoped or missing, use `origin.from` when it is present
-- The guarded state CLI resolves the final `@user:server` actor from those current-turn fields
-- If neither field exposes a current Matrix sender, refuse the mutation for that turn
-- Never ask the user to restate their Matrix handle when `session_status` already exposed it
-- Never reuse an older actor from chat history; use only the current turn's `session_status`
+- For Matrix reads and mutations, use only the OpenClaw tool `guarded_json_state`
+- `guarded_json_state` resolves the current Matrix sender from the active OpenClaw session itself
+- Never pass `--actor`, session keys, room ids, or copied Matrix metadata manually
+- Never ask the user to restate their Matrix handle for a mutation
+- Never reuse a sender from older chat history; trust only the current tool result
 
 State access rules:
-- The canonical state lives in `data/community-state.json`
-- Read state with `sovereign-tool json-state show --instance bitcoin-skill-match-state --json`
-- Read specific owner-scoped collections with `sovereign-tool json-state list --instance bitcoin-skill-match-state --entity <entity> --json`
-- In JSON command output, inspect `result.state`, `result.items`, or `result.record`
-- Never use direct file mutation tools such as `write`, `edit`, or `rm` on `data/community-state.json`
+- The canonical state is private and only exposed through `guarded_json_state`
+- You do not have direct access to the backing state file
+- Read state only with `guarded_json_state`
+- In tool output, inspect the returned JSON result
+- Never use `read`, `write`, `edit`, `grep`, `find`, `ls`, or `exec` against the backing state file
 - Never invent absolute paths such as `/var/lib/...`
 - Use the exact canonical field names `createdByMatrixUserId`, `createdByDisplayName`, `updatedByMatrixUserId`, `updatedByDisplayName`, and `notes`
 - Never invent alternate field names such as `ownerMatrixUserId` or `note`
 
 Mutation rules:
-- Mutate state only through `sovereign-tool json-state upsert-self ... --json` and `delete-self ... --json`
-- Pass whichever of `--session-key` and `--origin-from` the current `session_status` result exposed; if both are present, pass both
-- For upserts, pass all mutation fields through one `--input-json <json-object>` argument
-- For `string[]` fields such as `settlementPreferences`, `notes`, `seeks`, or `trustLinks`, prefer JSON arrays; the CLI also normalizes a single scalar into a one-item array
-- Never append raw JSON as a trailing positional argument
-- Never use shell pipes such as `echo ... | sovereign-tool ...`
-- Never use shell substitution such as `$()` or backticks when building `sovereign-tool` commands
-- Never use `jq`, `cat`, env vars, temp files, or guessed paths such as `/tmp/.openclaw_session` to recover session data
-- Use the literal values returned by the current `session_status` tool call only
-- Never derive or invent `--actor` yourself
+- Mutate state only through `guarded_json_state`
+- For upserts, pass all mutation fields through one tool `input` object
+- For `string[]` fields such as `settlementPreferences`, `notes`, `seeks`, or `trustLinks`, prefer JSON arrays; the guarded state path also normalizes a single scalar into a one-item array
+- The guarded state path also normalizes numeric and boolean scalar inputs into strings
+- Never append raw JSON as free text outside the tool `input`
+- Never use shell commands, pipes, temp files, or guessed paths to access state
 - All humans may query all stored entries
 - Only the creator may update or delete a member profile, offer, or request
 - Member profiles are self-owned by `member:<fullMatrixUserId>`
@@ -58,19 +47,26 @@ Mutation rules:
 - Requests live only in the top-level `requests[]`
 - If no self-owned member exists yet, create `member:<currentActor>` first through the guarded state tool
 - Never append a new offer to another user's member record
+- Do not try to write offers by embedding an `offers` array inside an `entity members` upsert
+- Do not send owner-managed fields such as `memberId`, `createdByMatrixUserId`, `createdByDisplayName`, `updatedByMatrixUserId`, or `updatedByDisplayName` in mutation payloads; the CLI manages those
 - If a legacy entry has no `createdByMatrixUserId`, treat it as read-only
 - Do not directly mutate shared top-level collections such as `skills`, `regions`, `trustEdges`, or `introductions`
+- For rich offers, the allowed payload fields are `marker`, `title`, `description`, `summary`, `region`, `regions`, `radiusKm`, `price`, `visibility`, `contactLevel`, `settlementPreferences`, and `notes`
+- If the user does not provide a `marker`, create the offer anyway; the guarded CLI generates one automatically
+- Even when `title` or `description` are present, also set a concise `summary`
+- Normalize settlement labels to concise lowercase values when possible, for example `lightning`, `cash-eur`, `barter`, or `skill-swap`
+- If the human already provided enough information to save an offer or request, save it directly instead of asking a redundant confirmation question
+- Do not ask the human to confirm the display name when the default actor localpart is sufficient
 
-Required command patterns:
-- Read everything: `sovereign-tool json-state show --instance bitcoin-skill-match-state --json`
-- Read members or offers: `sovereign-tool json-state list --instance bitcoin-skill-match-state --entity members --json`
-- Read requests: `sovereign-tool json-state list --instance bitcoin-skill-match-state --entity requests --json`
-- DM create/update profile: `sovereign-tool json-state upsert-self --instance bitcoin-skill-match-state --entity members --session-key <session_status.sessionKey> --input-json <json-object> --json`
-- DM create/update offer: `sovereign-tool json-state upsert-self --instance bitcoin-skill-match-state --entity offers --session-key <session_status.sessionKey> --input-json <json-object> --json`
-- DM delete offer: `sovereign-tool json-state delete-self --instance bitcoin-skill-match-state --entity offers --session-key <session_status.sessionKey> --id <marker> --json`
-- Room or fallback create/update request: `sovereign-tool json-state upsert-self --instance bitcoin-skill-match-state --entity requests --origin-from <session_status.origin.from> --input-json <json-object> --json`
-- Room or fallback delete request: `sovereign-tool json-state delete-self --instance bitcoin-skill-match-state --entity requests --origin-from <session_status.origin.from> --id <requestId> --json`
-- If both `session_status.sessionKey` and `session_status.origin.from` are present, include both flags
+Required tool patterns:
+- Read everything: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "show" }`
+- Read members or offers: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "list", "entity": "members" }`
+- Read requests: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "list", "entity": "requests" }`
+- Create or update profile: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "upsert-self", "entity": "members", "input": { ... } }`
+- Create or update offer: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "upsert-self", "entity": "offers", "input": { ... } }`
+- Delete offer: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "delete-self", "entity": "offers", "id": "<marker>" }`
+- Create or update request: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "upsert-self", "entity": "requests", "input": { ... } }`
+- Delete request: `guarded_json_state { "instance": "bitcoin-skill-match-state", "action": "delete-self", "entity": "requests", "id": "<requestId>" }`
 
 Confirmation rules:
 - After every mutation, read state again and verify the result before replying
@@ -81,6 +77,7 @@ Confirmation rules:
 Canonical shapes:
 - Self-owned member id: `member:@satoshi:example.org`
 - Offer marker example: `OFFER_123`
+- If no offer marker is provided by the human, the guarded CLI generates one such as `OFFER_ndee_20260310T081425940Z`
 - Request id example: `request:REQUEST_123`
 - Owner ids must always be full Matrix user ids such as `@satoshi:example.org`, never OpenClaw session keys
 

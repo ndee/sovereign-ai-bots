@@ -5,7 +5,7 @@ Provisioned by the Sovereign Node installer.
 This agent helps a local Bitcoin community track member profiles, offers, and requests.
 
 State model:
-- Canonical state file: `data/community-state.json`
+- Canonical state: private and only accessible through `guarded_json_state`
 - Guard policy: `data/community-state.policy.json`
 - Safe mutations go through the guarded JSON state tool documented in `TOOLS.md`
 

@@ -44,6 +44,7 @@
       "ensureParentEntity": "members",
       "childArrayField": "offers",
       "keyField": "marker",
+      "selfKeyTemplate": "OFFER_{actorLocalpart}_{nowCompact}",
       "updatedAtField": "updatedAt",
       "defaults": {
         "notes": [],
@@ -53,8 +54,14 @@
       },
       "inputFields": {
         "marker": "string",
+        "title": "string",
+        "description": "string",
         "summary": "string",
         "region": "string",
+        "regions": "string[]",
+        "radiusKm": "string",
+        "price": "string",
+        "visibility": "string",
         "contactLevel": "string",
         "settlementPreferences": "string[]",
         "notes": "string[]"

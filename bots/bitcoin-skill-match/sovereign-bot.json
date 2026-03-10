@@ -47,15 +47,12 @@
         "statePath",
         "policyPath"
       ],
-      "allowedCommands": [
-        "sovereign-tool json-state show --instance <tool-instance-id> --json",
-        "sovereign-tool json-state list --instance <tool-instance-id> --entity <id> --json",
-        "sovereign-tool json-state upsert-self --instance <tool-instance-id> --entity <id> --session-key <session_status.sessionKey> --input-json <json-object> --json",
-        "sovereign-tool json-state upsert-self --instance <tool-instance-id> --entity <id> --origin-from <session_status.origin.from> --input-json <json-object> --json",
-        "sovereign-tool json-state upsert-self --instance <tool-instance-id> --entity <id> --session-key <session_status.sessionKey> --origin-from <session_status.origin.from> --input-json <json-object> --json",
-        "sovereign-tool json-state delete-self --instance <tool-instance-id> --entity <id> --session-key <session_status.sessionKey> --id <value> --json",
-        "sovereign-tool json-state delete-self --instance <tool-instance-id> --entity <id> --origin-from <session_status.origin.from> --id <value> --json",
-        "sovereign-tool json-state delete-self --instance <tool-instance-id> --entity <id> --session-key <session_status.sessionKey> --origin-from <session_status.origin.from> --id <value> --json"
+      "allowedCommands": [],
+      "openclawPlugins": [
+        "guarded-json-state"
+      ],
+      "openclawToolNames": [
+        "guarded_json_state"
       ]
     }
   ],
