@@ -17,15 +17,15 @@ Profile and offer workflow:
 Request workflow:
 1. Read current state with action `show`.
 2. Use `guarded_json_state` action `upsert-self` for request writes.
-4. Capture `requestId`, `skill`, `region`, trust preference, and settlement hints.
-5. Upsert the request with `entity` `requests`.
-6. Read state again and verify the request exists under `requests[]` with the same `createdByMatrixUserId`.
+3. Capture `requestId`, `skill`, `region`, trust preference, and settlement hints.
+4. Upsert the request with `entity` `requests`.
+5. Read state again and verify the request exists under `requests[]` with the same `createdByMatrixUserId`.
 
 Delete workflow:
 1. Read current state with action `show`.
-4. Confirm the target exists and is owned by the current actor.
-5. Delete with `guarded_json_state` action `delete-self`.
-6. Read state again and verify the target is gone before replying.
+2. Confirm the target exists and is owned by the current actor.
+3. Delete with `guarded_json_state` action `delete-self`.
+4. Read state again and verify the target is gone before replying.
 
 Match query workflow:
 1. Read current state with action `show`.

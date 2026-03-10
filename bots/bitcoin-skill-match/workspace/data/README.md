@@ -3,19 +3,18 @@
 The bot's canonical skill-sharing state is private and managed through `guarded_json_state`.
 
 Top-level sections:
-- `skills`
-- `regions`
-- `members`
-- `requests`
-- `trustEdges`
-- `introductions`
+- `skills`: normalized skill tags used across profiles and requests
+- `regions`: normalized location labels used for matching
+- `members`: one entry per community member; member offers live in `members[].offers[]`
+- `requests`: open or fulfilled skill searches
+- `trustEdges`: direct trust relationships between members
+- `introductions`: consent and status for suggested intros
 
 Canonical rules:
 - There is no canonical top-level `offers` array
 - Offers belong inside `members[].offers[]`
 - Requests belong inside the top-level `requests[]`
-- Owner ids must be full Matrix user ids such as `@satoshi:example.org`
-- Never store OpenClaw session keys such as `agent:bitcoin-skill-match:matrix:direct:@satoshi:example.org`
+- Owner ids must be full Matrix user ids like `@satoshi:example.org`, never OpenClaw session keys like `agent:bitcoin-skill-match:matrix:direct:@satoshi:example.org`
 
 Guarded write path:
 - Policy file: `data/community-state.policy.json`
@@ -35,11 +34,6 @@ Covered entity types:
 - `members`: self-owned profile records keyed as `member:<matrixUserId>`
 - `offers`: self-owned child records under `members[].offers[]`
 - `requests`: self-owned top-level request records keyed by `requestId`
-
-Ownership rules:
-- All humans may read and query all entries
-- Only the creator may update or delete a member profile, offer, or request
-- Legacy entries without `createdByMatrixUserId` stay readable but must be treated as read-only
 
 Recommended member fields:
 - `memberId`
@@ -77,6 +71,9 @@ Offer marker behavior:
 - Humans may provide a marker explicitly
 - If no marker is provided, the guarded CLI generates one automatically
 
+Recommended self-owned member id:
+- `member:@satoshi:example.org`
+
 Recommended request fields:
 - `requestId`
 - `marker`
@@ -93,3 +90,17 @@ Recommended request fields:
 - `status`
 - `settlementPreferences`
 - `notes`
+
+Recommended trust edge fields:
+- `fromMemberId`
+- `toMemberId`
+- `relation`
+- `strength`
+- `updatedAt`
+
+Ownership rules:
+- All human users may read and query all entries
+- Only the creator of a member profile, offer, or request may update or delete it
+- Use `createdByMatrixUserId` as the ownership key for enforcement
+- Use the full Matrix user id such as `@satoshi:example.org`, not only `satoshi`
+- Legacy entries without `createdByMatrixUserId` stay readable but must be treated as read-only
