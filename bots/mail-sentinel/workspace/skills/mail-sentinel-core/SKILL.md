@@ -1,7 +1,7 @@
 # mail-sentinel-core
 
 Checklist:
-1. Confirm IMAP tool instance is available
-2. Read newest inbox messages with read-only commands
-3. Produce a 3-mail summary
-4. Flag urgent messages and suggest next action
+1. Run `mail-sentinel-scan` for polling work
+2. Use `mail-sentinel-list-alerts` for today/recent alert overviews
+3. Use `mail-sentinel-feedback` for important / not-important / less-often / remind-later actions
+4. Keep the interaction scoped to signal detection, alerts, and feedback

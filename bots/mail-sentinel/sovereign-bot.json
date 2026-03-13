@@ -3,9 +3,9 @@
   "id": "mail-sentinel",
   "version": "1.0.0",
   "displayName": "Mail Sentinel",
-  "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+  "description": "Local-first inbox sentinel that detects important mail, alerts Matrix, and adapts from feedback.",
   "defaultInstall": true,
-  "helloMessage": "Hello from Mail Sentinel. I can summarize your latest 3 inbox mails.",
+  "helloMessage": "Hello from Mail Sentinel. I watch incoming mail, alert only on important signals, and learn from your feedback.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
@@ -15,47 +15,69 @@
       "enabled": true
     },
     "alertRoom": {
-      "autoReply": false,
-      "requireMention": true
+      "autoReply": true,
+      "requireMention": false
     }
   },
   "configDefaults": {
+    "agentId": "mail-sentinel",
     "pollInterval": "5m",
     "lookbackWindow": "15m",
-    "e2eeAlertRoom": false
+    "defaultReminderDelay": "4h",
+    "e2eeAlertRoom": false,
+    "model": "qwen/qwen-2.5-32b-instruct",
+    "statePath": "data/mail-sentinel-state.json",
+    "rulesPath": "config/default-rules.json"
   },
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "mail-sentinel-tool",
+      "version": "1.0.0",
+      "description": "Local-first mail watcher for IMAP scoring, Matrix alerts, and feedback-driven tuning.",
+      "capabilities": [
+        "mail-sentinel.scan",
+        "mail-sentinel.feedback",
+        "mail-sentinel.alerts.read"
+      ],
+      "requiredSecretRefs": [],
+      "requiredConfigKeys": [
+        "agentId",
+        "statePath",
+        "rulesPath"
+      ],
+      "allowedCommands": [
+        "sovereign-tool mail-sentinel-scan --instance <tool-instance-id> --json",
+        "sovereign-tool mail-sentinel-list-alerts --instance <tool-instance-id> --view today --json",
+        "sovereign-tool mail-sentinel-list-alerts --instance <tool-instance-id> --view recent --json",
+        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --latest --action important --json",
+        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
+        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json"
+      ]
+    }
+  ],
   "toolInstances": [
     {
-      "id": "mail-sentinel-imap",
-      "templateRef": "imap-readonly@1.0.0",
-      "enabledWhen": {
-        "path": "imap.status",
-        "equals": "configured"
-      },
+      "id": "mail-sentinel-core",
+      "templateRef": "mail-sentinel-tool@1.0.0",
       "config": {
-        "host": {
-          "from": "imap.host"
+        "agentId": {
+          "from": "bots.config.mail-sentinel.agentId"
         },
-        "port": {
-          "from": "imap.port",
-          "stringify": true
+        "statePath": {
+          "from": "bots.config.mail-sentinel.statePath"
         },
-        "tls": {
-          "from": "imap.tls",
-          "stringify": true
+        "rulesPath": {
+          "from": "bots.config.mail-sentinel.rulesPath"
         },
-        "username": {
-          "from": "imap.username"
+        "lookbackWindow": {
+          "from": "bots.config.mail-sentinel.lookbackWindow"
         },
-        "mailbox": {
-          "from": "imap.mailbox"
+        "defaultReminderDelay": {
+          "from": "bots.config.mail-sentinel.defaultReminderDelay"
         }
       },
-      "secretRefs": {
-        "password": {
-          "from": "imap.secretRef"
-        }
-      }
+      "secretRefs": {}
     }
   ],
   "openclaw": {
@@ -64,23 +86,25 @@
       "everyConfigKey": "pollInterval",
       "defaultEvery": "5m",
       "session": "isolated",
-      "message": "Summarize the latest 3 emails in INBOX using read-only IMAP tools. The tool instance is already scoped to the configured mailbox, so use --query ALL for the whole mailbox and do not include INBOX in the query string. Highlight urgent or security-relevant items. If IMAP is not configured, report the missing setup clearly."
+      "announce": false,
+      "message": "Run the Mail Sentinel scan command from TOOLS.md for the configured instance. Do not summarize the inbox manually. Do not add extra commentary beyond the tool result."
     }
   },
   "agentTemplate": {
     "id": "mail-sentinel",
     "version": "1.0.0",
-    "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+    "description": "Local-first inbox sentinel that detects important mail, alerts Matrix, and adapts from feedback.",
+    "model": "qwen/qwen-2.5-32b-instruct",
     "matrix": {
       "localpartPrefix": "mail-sentinel"
     },
-    "requiredToolTemplates": [],
-    "optionalToolTemplates": [
+    "requiredToolTemplates": [
       {
-        "id": "imap-readonly",
+        "id": "mail-sentinel-tool",
         "version": "1.0.0"
       }
     ],
+    "optionalToolTemplates": [],
     "workspaceFiles": [
       {
         "path": "README.md",
@@ -97,6 +121,14 @@
       {
         "path": "skills/mail-sentinel-core/SKILL.md",
         "source": "workspace/skills/mail-sentinel-core/SKILL.md"
+      },
+      {
+        "path": "config/default-rules.json",
+        "source": "workspace/config/default-rules.json"
+      },
+      {
+        "path": "data/README.md",
+        "source": "workspace/data/README.md"
       }
     ]
   }

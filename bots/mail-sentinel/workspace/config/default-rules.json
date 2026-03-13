@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "thresholds": {
+    "alert": 4,
+    "category": 4
+  },
+  "defaultReminderDelay": "4h",
+  "senderWeights": {},
+  "domainWeights": {},
+  "rules": [
+    {
+      "id": "decision-approval-subject",
+      "field": "subject",
+      "pattern": "\\b(freigabe|approve|approval|entscheidung|decision|confirm|rueckmeldung|ruckmeldung)\\b",
+      "weight": 5,
+      "categories": [
+        "decision-required"
+      ],
+      "reason": "subject asks for an approval, confirmation, or decision"
+    },
+    {
+      "id": "decision-question-text",
+      "field": "text",
+      "pattern": "\\b(kannst du entscheiden|can you decide|please decide|bitte entscheiden|please confirm|bitte bestaetigen|bitte bestatigen)\\b",
+      "weight": 4,
+      "categories": [
+        "decision-required"
+      ],
+      "reason": "body asks for a direct decision or confirmation"
+    },
+    {
+      "id": "financial-invoice-subject",
+      "field": "subject",
+      "pattern": "\\b(rechnung|invoice|angebot|offer|zahlung|payment|vertrag|contract|preis|price)\\b",
+      "weight": 5,
+      "categories": [
+        "financial-relevance"
+      ],
+      "reason": "subject mentions an invoice, offer, contract, or payment"
+    },
+    {
+      "id": "financial-payment-text",
+      "field": "text",
+      "pattern": "\\b(betrag|amount due|zahlbar|payment due|ueberweisen|uberweisen|rechnungssumme|invoice total)\\b",
+      "weight": 4,
+      "categories": [
+        "financial-relevance"
+      ],
+      "reason": "body contains payment-related wording"
+    },
+    {
+      "id": "risk-deadline-text",
+      "field": "text",
+      "pattern": "\\b(frist|deadline|heute|today|morgen|tomorrow|urgent|eskalation|escalation|beschwerde|complaint|security incident|sicherheitsvorfall)\\b",
+      "weight": 5,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "body mentions urgency, deadlines, escalation, or complaints"
+    },
+    {
+      "id": "risk-priority-header",
+      "field": "header",
+      "headerName": "x-priority",
+      "pattern": "1|high",
+      "weight": 3,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "priority headers signal urgency"
+    },
+    {
+      "id": "bulk-negative",
+      "field": "header",
+      "headerName": "precedence",
+      "pattern": "bulk|list|junk",
+      "weight": -6,
+      "reason": "bulk mail headers suggest a newsletter or mailing list"
+    },
+    {
+      "id": "unsubscribe-negative",
+      "field": "header",
+      "headerName": "list-unsubscribe",
+      "pattern": ".+",
+      "weight": -4,
+      "reason": "unsubscribe headers suggest a broadcast-style mail"
+    },
+    {
+      "id": "noreply-negative",
+      "field": "from",
+      "pattern": "\\b(no-?reply|noreply)@",
+      "weight": -3,
+      "reason": "noreply senders are less likely to require action"
+    }
+  ]
+}
