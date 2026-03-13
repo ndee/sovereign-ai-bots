@@ -21,6 +21,7 @@
   },
   "configDefaults": {
     "agentId": "mail-sentinel",
+    "imapInstanceId": "mail-sentinel-imap",
     "pollInterval": "5m",
     "lookbackWindow": "15m",
     "defaultReminderDelay": "4h",
@@ -43,26 +44,62 @@
       "requiredSecretRefs": [],
       "requiredConfigKeys": [
         "agentId",
+        "imapInstanceId",
         "statePath",
         "rulesPath"
       ],
       "allowedCommands": [
-        "sovereign-tool mail-sentinel-scan --instance <tool-instance-id> --json",
-        "sovereign-tool mail-sentinel-list-alerts --instance <tool-instance-id> --view today --json",
-        "sovereign-tool mail-sentinel-list-alerts --instance <tool-instance-id> --view recent --json",
-        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --latest --action important --json",
-        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
-        "sovereign-tool mail-sentinel-feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json"
+        "<agent-workspace>/bin/mail-sentinel.mjs scan --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view today --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view recent --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json"
       ]
     }
   ],
   "toolInstances": [
+    {
+      "id": "mail-sentinel-imap",
+      "templateRef": "imap-readonly@1.0.0",
+      "enabledWhen": {
+        "path": "imap.status",
+        "equals": "configured"
+      },
+      "config": {
+        "host": {
+          "from": "imap.host"
+        },
+        "port": {
+          "from": "imap.port",
+          "stringify": true
+        },
+        "tls": {
+          "from": "imap.tls",
+          "stringify": true
+        },
+        "username": {
+          "from": "imap.username"
+        },
+        "mailbox": {
+          "from": "imap.mailbox"
+        }
+      },
+      "secretRefs": {
+        "password": {
+          "from": "imap.secretRef"
+        }
+      }
+    },
     {
       "id": "mail-sentinel-core",
       "templateRef": "mail-sentinel-tool@1.0.0",
       "config": {
         "agentId": {
           "from": "bots.config.mail-sentinel.agentId"
+        },
+        "imapInstanceId": {
+          "from": "bots.config.mail-sentinel.imapInstanceId"
         },
         "statePath": {
           "from": "bots.config.mail-sentinel.statePath"
@@ -102,6 +139,10 @@
       {
         "id": "mail-sentinel-tool",
         "version": "1.0.0"
+      },
+      {
+        "id": "imap-readonly",
+        "version": "1.0.0"
       }
     ],
     "optionalToolTemplates": [],
@@ -121,6 +162,11 @@
       {
         "path": "skills/mail-sentinel-core/SKILL.md",
         "source": "workspace/skills/mail-sentinel-core/SKILL.md"
+      },
+      {
+        "path": "bin/mail-sentinel.mjs",
+        "source": "workspace/bin/mail-sentinel.mjs",
+        "mode": "755"
       },
       {
         "path": "config/default-rules.json",

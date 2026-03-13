@@ -14,10 +14,10 @@ Execution policy:
 - Keep responses short, calm, and factual
 
 Mail Sentinel Stage 1 flow:
-1. Background polling always runs through `mail-sentinel-scan`
-2. For “What is important today?” use `mail-sentinel-list-alerts --view today`
-3. For “Show me the latest alerts” use `mail-sentinel-list-alerts --view recent`
-4. For “War wichtig” / “Nicht wichtig” / “Nicht mehr so oft melden” / “Später erinnern”, use `mail-sentinel-feedback`
+1. Background polling always runs through the local Mail Sentinel helper `scan` command
+2. For “What is important today?” use the local Mail Sentinel helper `list-alerts --view today`
+3. For “Show me the latest alerts” use the local Mail Sentinel helper `list-alerts --view recent`
+4. For “War wichtig” / “Nicht wichtig” / “Nicht mehr so oft melden” / “Später erinnern”, use the local Mail Sentinel helper `feedback`
 
 Feedback rules:
 1. If the user clearly refers to the newest alert, use `--latest`
