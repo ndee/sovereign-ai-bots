@@ -26,7 +26,6 @@
     "lookbackWindow": "15m",
     "defaultReminderDelay": "4h",
     "e2eeAlertRoom": false,
-    "model": "qwen/qwen-2.5-32b-instruct",
     "statePath": "data/mail-sentinel-state.json",
     "rulesPath": "config/default-rules.json"
   },
@@ -131,7 +130,7 @@
     "id": "mail-sentinel",
     "version": "1.0.0",
     "description": "Local-first inbox sentinel that detects important mail, alerts Matrix, and adapts from feedback.",
-    "model": "qwen/qwen-2.5-32b-instruct",
+    "model": "qwen/qwen3.5-9b",
     "matrix": {
       "localpartPrefix": "mail-sentinel"
     },
