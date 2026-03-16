@@ -52,7 +52,12 @@
         "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view today --json",
         "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view recent --json",
         "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action not-important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action less-often --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action remind-later --delay <duration> --json",
         "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action not-important --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action less-often --json",
         "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json"
       ]
     }
