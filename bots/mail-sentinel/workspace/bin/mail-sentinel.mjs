@@ -20,6 +20,7 @@ const DEFAULT_STATE_LOCK_RETRY_DELAY_MS = 50;
 const DEFAULT_STATE_LOCK_RETRY_ATTEMPTS = 200;
 const DEFAULT_TOOL_EXECUTABLE = "/usr/local/bin/sovereign-tool";
 const DEFAULT_AGENT_ID = "mail-sentinel";
+const RULE_ADJUSTMENT_FLOOR = -1;
 
 const CATEGORY_LABELS = {
   "decision-required": "Decision Required",
@@ -226,11 +227,14 @@ const summarizeReasons = (matches) => {
     .slice(0, 3);
 };
 
-const applyLearningAdjustment = (target, key, delta) => {
+const applyLearningAdjustment = (target, key, delta, floor) => {
   if (typeof key !== "string" || key.length === 0) {
     return;
   }
-  const next = (target[key] ?? 0) + delta;
+  let next = (target[key] ?? 0) + delta;
+  if (typeof floor === "number" && next < floor) {
+    next = floor;
+  }
   if (next === 0) {
     delete target[key];
     return;
@@ -832,7 +836,7 @@ const applyFeedback = async (options) => {
       applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -2);
       applyLearningAdjustment(state.learning.domainWeights, alert.domain, -1);
       for (const ruleId of alert.matchedRuleIds) {
-        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1);
+        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
       }
       note = "Alert marked as not important.";
     } else if (options.action === "less-often") {
@@ -842,7 +846,7 @@ const applyFeedback = async (options) => {
       applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -4);
       applyLearningAdjustment(state.learning.domainWeights, alert.domain, -2);
       for (const ruleId of alert.matchedRuleIds) {
-        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1);
+        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
       }
       note = "Future alerts from this sender will be down-weighted.";
     } else if (options.action === "remind-later") {
