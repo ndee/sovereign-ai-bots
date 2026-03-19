@@ -1,8 +1,15 @@
 {
-  "version": 1,
+  "version": 2,
   "thresholds": {
+    "candidate": 3,
     "alert": 4,
     "category": 4
+  },
+  "zoneThresholds": {
+    "redMinConfidence": 75,
+    "amberMinConfidence": 40,
+    "redMinHeuristicScore": 4,
+    "amberMinHeuristicScore": 3
   },
   "defaultReminderDelay": "4h",
   "senderWeights": {},
