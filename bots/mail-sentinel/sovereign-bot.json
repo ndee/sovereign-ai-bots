@@ -69,7 +69,7 @@
         "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view today --json",
         "<agent-workspace>/bin/mail-sentinel.mjs list-alerts --instance <tool-instance-id> --view recent --json",
         "<agent-workspace>/bin/mail-sentinel.mjs policy list --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.mjs policy important-sender --instance <tool-instance-id> --query <query> --json",
+        "<agent-workspace>/bin/mail-sentinel.mjs policy important-sender --instance <tool-instance-id> --query <query> --announce --json",
         "<agent-workspace>/bin/mail-sentinel.mjs policy add --instance <tool-instance-id> --type <type> --match <pattern> --min-zone <zone> --json",
         "<agent-workspace>/bin/mail-sentinel.mjs policy remove --instance <tool-instance-id> --id <policy-id> --json",
         "<agent-workspace>/bin/mail-sentinel.mjs feedback --instance <tool-instance-id> --latest --action important --json",
