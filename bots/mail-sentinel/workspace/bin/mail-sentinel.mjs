@@ -329,6 +329,10 @@ const parseArgs = (argv) => {
       options.json = true;
       continue;
     }
+    if (token === "--announce") {
+      options.announce = true;
+      continue;
+    }
     if (token === "--latest") {
       options.latest = true;
       continue;
@@ -1047,6 +1051,10 @@ const scoreSenderCandidate = (candidate, query) => {
   const address = candidate.fromAddress.toLowerCase();
   const from = String(candidate.from ?? "").toLowerCase();
   const domain = String(candidate.domain ?? "").toLowerCase();
+  const displayName = extractDisplayName(candidate.from).toLowerCase();
+  const queryTokens = tokenizeSenderText(query).filter((token) => !token.includes("@"));
+  const displayTokens = tokenizeSenderText(displayName);
+  const fromTokens = tokenizeSenderText(from);
   let score = 0;
   if (address === query) {
     score = Math.max(score, 250);
@@ -1074,6 +1082,12 @@ const scoreSenderCandidate = (candidate, query) => {
   }
   if (domain.includes(query)) {
     score = Math.max(score, 100);
+  }
+  if (queryTokens.length > 0 && queryTokens.every((token) => displayTokens.includes(token))) {
+    score = Math.max(score, 210);
+  }
+  if (queryTokens.length > 0 && queryTokens.every((token) => fromTokens.includes(token))) {
+    score = Math.max(score, 190);
   }
   return score;
 };
@@ -1107,11 +1121,18 @@ const pickResolvedSender = (matches) => {
   if (matches.length === 1) {
     return matches[0];
   }
-  if (matches[0].score >= 200 && matches[0].score > matches[1].score) {
-    return matches[0];
+  const top = matches[0];
+  const next = matches[1];
+  const topDisplayTokens = tokenizeSenderText(extractDisplayName(top.from));
+  const nextDisplayTokens = tokenizeSenderText(extractDisplayName(next.from));
+  if (topDisplayTokens.length > 0 && nextDisplayTokens.length > 0 && top.score >= 190 && next.score >= 190) {
+    return null;
   }
-  if (matches[0].score >= 160 && matches[0].score >= matches[1].score + 40) {
-    return matches[0];
+  if (top.score >= 200 && top.score > next.score) {
+    return top;
+  }
+  if (top.score >= 160 && top.score >= next.score + 40) {
+    return top;
   }
   return null;
 };
@@ -1134,6 +1155,7 @@ const upsertSenderPolicy = (policy, input) => {
       id: randomUUID(),
       ...input,
     };
+    delete entry.clearMaxZone;
     normalized.senderPolicies.push(entry);
     return {
       changed: true,
@@ -1182,6 +1204,21 @@ const formatPolicyActionResult = (result) => {
   }
   return lines.join("\n");
 };
+
+const extractDisplayName = (value) => {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return "";
+  }
+  return compactText(raw.replace(/<[^>]+>/g, " "));
+};
+
+const tokenizeSenderText = (value) =>
+  compactText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}@._+-]+/gu, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
 
 class MailSentinelRuntime {
   constructor(instanceId, configPath) {
@@ -1968,52 +2005,65 @@ const policyImportantSender = async (options) => {
   if (typeof options.query !== "string" || compactText(options.query).length === 0) {
     throw new Error("Expected --query <sender name or email>");
   }
-  return await withLockedState(runtime.statePath, async () => {
-    const state = await runtime.readState();
-    const policy = await runtime.readPolicy();
-    const matches = findSenderCandidates(state, options.query);
-    if (matches.length === 0) {
+  try {
+    const result = await withLockedState(runtime.statePath, async () => {
+      const state = await runtime.readState();
+      const policy = await runtime.readPolicy();
+      const matches = findSenderCandidates(state, options.query);
+      if (matches.length === 0) {
+        return {
+          instanceId: runtime.instanceId,
+          changed: false,
+          status: "not-found",
+          note: `I could not match '${options.query}' to a known sender yet. Please use the email address directly if needed.`,
+          matches: [],
+        };
+      }
+      const resolved = pickResolvedSender(matches);
+      if (resolved === null) {
+        return {
+          instanceId: runtime.instanceId,
+          changed: false,
+          status: "ambiguous",
+          note: `I found multiple sender matches for '${options.query}'. Please pick the exact address.`,
+          matches: matches.slice(0, 5).map(summarizeSenderCandidate),
+        };
+      }
+      const upserted = upsertSenderPolicy(policy, {
+        match: resolved.fromAddress,
+        minZone: "amber",
+        clearMaxZone: true,
+        reason: `Direct sender importance from '${options.query}'`,
+      });
+      if (upserted.changed) {
+        await runtime.writePolicy(upserted.policy);
+      }
       return {
         instanceId: runtime.instanceId,
-        changed: false,
-        status: "not-found",
-        note: `I could not match '${options.query}' to a known sender yet. Please use the email address directly if needed.`,
-        matches: [],
+        changed: upserted.changed,
+        status: upserted.created ? "created" : upserted.changed ? "updated" : "unchanged",
+        note: upserted.changed
+          ? `Mails from ${resolved.fromAddress} will now be treated as at least amber.`
+          : `Mails from ${resolved.fromAddress} were already treated as at least amber.`,
+        matches: [summarizeSenderCandidate(resolved)],
+        policy: {
+          type: "sender",
+          ...upserted.entry,
+        },
       };
-    }
-    const resolved = pickResolvedSender(matches);
-    if (resolved === null) {
-      return {
-        instanceId: runtime.instanceId,
-        changed: false,
-        status: "ambiguous",
-        note: `I found multiple sender matches for '${options.query}'. Please pick the exact address.`,
-        matches: matches.slice(0, 5).map(summarizeSenderCandidate),
-      };
-    }
-    const upserted = upsertSenderPolicy(policy, {
-      match: resolved.fromAddress,
-      minZone: "amber",
-      clearMaxZone: true,
-      reason: `Direct sender importance from '${options.query}'`,
     });
-    if (upserted.changed) {
-      await runtime.writePolicy(upserted.policy);
+    if (options.announce === true) {
+      await runtime.sendMatrixRoomMessage(formatPolicyActionResult(result));
     }
-    return {
-      instanceId: runtime.instanceId,
-      changed: upserted.changed,
-      status: upserted.created ? "created" : upserted.changed ? "updated" : "unchanged",
-      note: upserted.changed
-        ? `Mails from ${resolved.fromAddress} will now be treated as at least amber.`
-        : `Mails from ${resolved.fromAddress} were already treated as at least amber.`,
-      matches: [summarizeSenderCandidate(resolved)],
-      policy: {
-        type: "sender",
-        ...upserted.entry,
-      },
-    };
-  });
+    return result;
+  } catch (error) {
+    if (options.announce === true) {
+      await runtime.sendMatrixRoomMessage(
+        `Mail Sentinel konnte die Sender-Praferenz nicht anwenden: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    throw error;
+  }
 };
 
 const policyRemove = async (options) => {
