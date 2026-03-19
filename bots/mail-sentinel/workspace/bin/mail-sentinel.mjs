@@ -352,6 +352,7 @@ const parseArgs = (argv) => {
       "--schedule",
       "--pattern",
       "--amount-threshold",
+      "--query",
     ]);
     if (!keyedOptions.has(token)) {
       throw new Error(`Unknown argument: ${token}`);
@@ -378,6 +379,7 @@ const parseArgs = (argv) => {
     if (token === "--schedule") options.schedule = value;
     if (token === "--pattern") options.pattern = value;
     if (token === "--amount-threshold") options.amountThreshold = value;
+    if (token === "--query") options.query = value;
   }
   return {
     command,
@@ -1012,6 +1014,173 @@ const formatPolicyResult = (result) => {
     "Mail Sentinel policies:",
     ...result.policies.map((entry) => `- [${entry.id}] ${entry.type} ${entry.match ?? entry.category ?? entry.schedule ?? entry.pattern}`),
   ].join("\n");
+};
+
+const collectKnownSenders = (state) => {
+  const senders = new Map();
+  for (const entry of Object.values(state.messages)) {
+    if (typeof entry.fromAddress !== "string" || entry.fromAddress.length === 0) {
+      continue;
+    }
+    const existing = senders.get(entry.fromAddress);
+    if (existing === undefined) {
+      senders.set(entry.fromAddress, {
+        from: entry.from,
+        fromAddress: entry.fromAddress,
+        domain: entry.domain ?? extractDomain(entry.fromAddress),
+        messageCount: 1,
+        lastSeenAt: entry.lastSeenAt,
+      });
+      continue;
+    }
+    existing.messageCount += 1;
+    if (entry.lastSeenAt > existing.lastSeenAt) {
+      existing.lastSeenAt = entry.lastSeenAt;
+      existing.from = entry.from;
+      existing.domain = entry.domain ?? existing.domain;
+    }
+  }
+  return Array.from(senders.values());
+};
+
+const scoreSenderCandidate = (candidate, query) => {
+  const address = candidate.fromAddress.toLowerCase();
+  const from = String(candidate.from ?? "").toLowerCase();
+  const domain = String(candidate.domain ?? "").toLowerCase();
+  let score = 0;
+  if (address === query) {
+    score = Math.max(score, 250);
+  }
+  if (from === query) {
+    score = Math.max(score, 220);
+  }
+  if (domain === query) {
+    score = Math.max(score, 200);
+  }
+  if (address.startsWith(query)) {
+    score = Math.max(score, 180);
+  }
+  if (from.startsWith(query)) {
+    score = Math.max(score, 160);
+  }
+  if (domain.startsWith(query)) {
+    score = Math.max(score, 140);
+  }
+  if (address.includes(query)) {
+    score = Math.max(score, 130);
+  }
+  if (from.includes(query)) {
+    score = Math.max(score, 120);
+  }
+  if (domain.includes(query)) {
+    score = Math.max(score, 100);
+  }
+  return score;
+};
+
+const findSenderCandidates = (state, query) => {
+  const normalizedQuery = compactText(query).toLowerCase();
+  if (normalizedQuery.length === 0) {
+    return [];
+  }
+  return collectKnownSenders(state)
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreSenderCandidate(candidate, normalizedQuery),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (right.lastSeenAt !== left.lastSeenAt) {
+        return right.lastSeenAt.localeCompare(left.lastSeenAt);
+      }
+      return left.fromAddress.localeCompare(right.fromAddress);
+    });
+};
+
+const pickResolvedSender = (matches) => {
+  if (matches.length === 0) {
+    return null;
+  }
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  if (matches[0].score >= 200 && matches[0].score > matches[1].score) {
+    return matches[0];
+  }
+  if (matches[0].score >= 160 && matches[0].score >= matches[1].score + 40) {
+    return matches[0];
+  }
+  return null;
+};
+
+const summarizeSenderCandidate = (candidate) => ({
+  from: candidate.from,
+  fromAddress: candidate.fromAddress,
+  ...(candidate.domain === undefined ? {} : { domain: candidate.domain }),
+  messageCount: candidate.messageCount,
+  lastSeenAt: candidate.lastSeenAt,
+});
+
+const upsertSenderPolicy = (policy, input) => {
+  const normalized = normalizePolicy(policy);
+  const index = normalized.senderPolicies.findIndex(
+    (entry) => String(entry.match ?? "").toLowerCase() === input.match.toLowerCase(),
+  );
+  if (index < 0) {
+    const entry = {
+      id: randomUUID(),
+      ...input,
+    };
+    normalized.senderPolicies.push(entry);
+    return {
+      changed: true,
+      created: true,
+      entry,
+      policy: normalized,
+    };
+  }
+  const existing = normalized.senderPolicies[index];
+  const next = {
+    ...existing,
+    ...input,
+    minZone:
+      typeof input.minZone === "string" && typeof existing.minZone === "string"
+        ? zoneMax(existing.minZone, input.minZone)
+        : (input.minZone ?? existing.minZone),
+    maxZone:
+      typeof input.maxZone === "string" && typeof existing.maxZone === "string"
+        ? zoneMin(existing.maxZone, input.maxZone)
+        : (input.maxZone ?? existing.maxZone),
+    reason: existing.reason ?? input.reason,
+  };
+  if (input.clearMaxZone === true) {
+    delete next.maxZone;
+  }
+  delete next.clearMaxZone;
+  const changed = JSON.stringify(existing) !== JSON.stringify(next);
+  normalized.senderPolicies[index] = next;
+  return {
+    changed,
+    created: false,
+    entry: next,
+    policy: normalized,
+  };
+};
+
+const formatPolicyActionResult = (result) => {
+  const lines = [result.note];
+  if (Array.isArray(result.matches) && result.matches.length > 0) {
+    lines.push(
+      ...result.matches.map(
+        (match) =>
+          `- ${match.from} | ${match.fromAddress} | ${String(match.messageCount)} message(s) | last seen ${match.lastSeenAt}`,
+      ),
+    );
+  }
+  return lines.join("\n");
 };
 
 class MailSentinelRuntime {
@@ -1794,6 +1963,59 @@ const policyAdd = async (options) => {
   };
 };
 
+const policyImportantSender = async (options) => {
+  const runtime = await resolveToolRuntime(options.instance, options.configPath);
+  if (typeof options.query !== "string" || compactText(options.query).length === 0) {
+    throw new Error("Expected --query <sender name or email>");
+  }
+  return await withLockedState(runtime.statePath, async () => {
+    const state = await runtime.readState();
+    const policy = await runtime.readPolicy();
+    const matches = findSenderCandidates(state, options.query);
+    if (matches.length === 0) {
+      return {
+        instanceId: runtime.instanceId,
+        changed: false,
+        status: "not-found",
+        note: `I could not match '${options.query}' to a known sender yet. Please use the email address directly if needed.`,
+        matches: [],
+      };
+    }
+    const resolved = pickResolvedSender(matches);
+    if (resolved === null) {
+      return {
+        instanceId: runtime.instanceId,
+        changed: false,
+        status: "ambiguous",
+        note: `I found multiple sender matches for '${options.query}'. Please pick the exact address.`,
+        matches: matches.slice(0, 5).map(summarizeSenderCandidate),
+      };
+    }
+    const upserted = upsertSenderPolicy(policy, {
+      match: resolved.fromAddress,
+      minZone: "amber",
+      clearMaxZone: true,
+      reason: `Direct sender importance from '${options.query}'`,
+    });
+    if (upserted.changed) {
+      await runtime.writePolicy(upserted.policy);
+    }
+    return {
+      instanceId: runtime.instanceId,
+      changed: upserted.changed,
+      status: upserted.created ? "created" : upserted.changed ? "updated" : "unchanged",
+      note: upserted.changed
+        ? `Mails from ${resolved.fromAddress} will now be treated as at least amber.`
+        : `Mails from ${resolved.fromAddress} were already treated as at least amber.`,
+      matches: [summarizeSenderCandidate(resolved)],
+      policy: {
+        type: "sender",
+        ...upserted.entry,
+      },
+    };
+  });
+};
+
 const policyRemove = async (options) => {
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   const policy = await runtime.readPolicy();
@@ -1871,6 +2093,10 @@ const main = async () => {
       printOutput(await policyList(options), options, formatPolicyResult);
       return;
     }
+    if (options.subcommand === "important-sender") {
+      printOutput(await policyImportantSender(options), options, formatPolicyActionResult);
+      return;
+    }
     if (options.subcommand === "add") {
       printOutput(await policyAdd(options), options, (result) => `Policy ${result.policy.id} added.`);
       return;
@@ -1883,13 +2109,20 @@ const main = async () => {
       );
       return;
     }
-    throw new Error("Expected a policy subcommand: list, add, or remove");
+    throw new Error("Expected a policy subcommand: list, important-sender, add, or remove");
   }
 
   throw new Error(`Unknown command: ${command}`);
 };
 
 main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  const message = error instanceof Error ? error.message : String(error);
+  if (process.argv.includes("--json")) {
+    process.stdout.write(
+      `${JSON.stringify({ ok: false, error: { message } }, null, 2)}\n`,
+    );
+  } else {
+    process.stderr.write(`${message}\n`);
+  }
   process.exitCode = 1;
 });
