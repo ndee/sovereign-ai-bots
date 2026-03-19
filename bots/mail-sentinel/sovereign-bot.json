@@ -176,7 +176,7 @@
     "id": "mail-sentinel",
     "version": "1.5.0",
     "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them semantically, applies policy, and chooses red alerts, amber digests, or gray silence.",
-    "model": "qwen/qwen3.5-9b",
+    "model": "qwen/qwen-2.5-32b-instruct",
     "matrix": {
       "localpartPrefix": "mail-sentinel"
     },
