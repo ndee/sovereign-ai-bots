@@ -22,8 +22,8 @@
   "configDefaults": {
     "agentId": "mail-sentinel",
     "imapInstanceId": "mail-sentinel-imap",
-    "pollInterval": "5m",
-    "lookbackWindow": "15m",
+    "pollInterval": "30m",
+    "lookbackWindow": "1h",
     "defaultReminderDelay": "4h",
     "digestInterval": "12h",
     "e2eeAlertRoom": false,
@@ -166,7 +166,7 @@
     "cron": {
       "id": "mail-sentinel-poll",
       "everyConfigKey": "pollInterval",
-      "defaultEvery": "5m",
+      "defaultEvery": "30m",
       "session": "isolated",
       "announce": false,
       "message": "Run the Mail Sentinel scan command from TOOLS.md for the configured instance. Do not summarize the inbox manually. Do not add extra commentary beyond the tool result."
