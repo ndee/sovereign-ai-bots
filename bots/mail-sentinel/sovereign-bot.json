@@ -162,16 +162,7 @@
       "secretRefs": {}
     }
   ],
-  "openclaw": {
-    "cron": {
-      "id": "mail-sentinel-poll",
-      "everyConfigKey": "pollInterval",
-      "defaultEvery": "30m",
-      "session": "isolated",
-      "announce": true,
-      "message": "Run the Mail Sentinel scan command from TOOLS.md for the configured instance. Do not reply. Do not send any message to any channel or DM. The scan tool already posts alerts directly to the alert room."
-    }
-  },
+  "openclaw": {},
   "agentTemplate": {
     "id": "mail-sentinel",
     "version": "1.5.0",
