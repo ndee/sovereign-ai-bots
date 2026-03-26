@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -20,6 +20,7 @@ const DEFAULT_IMAP_SEARCH_LIMIT = 50;
 const DEFAULT_IMAP_READ_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_STATE_LOCK_RETRY_DELAY_MS = 50;
 const DEFAULT_STATE_LOCK_RETRY_ATTEMPTS = 200;
+const DEFAULT_STATE_LOCK_STALE_MS = 5 * 60 * 1000;
 const DEFAULT_TOOL_EXECUTABLE = "/usr/local/bin/sovereign-tool";
 const DEFAULT_AGENT_ID = "mail-sentinel";
 const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
@@ -421,6 +422,15 @@ const withLockedState = async (statePath, action) => {
     } catch (error) {
       if (error?.code !== "EEXIST") {
         throw error;
+      }
+      try {
+        const lockStat = await stat(lockPath);
+        if (Date.now() - lockStat.mtimeMs > DEFAULT_STATE_LOCK_STALE_MS) {
+          await rm(lockPath, { force: true });
+          continue;
+        }
+      } catch {
+        continue;
       }
       await new Promise((resolveDelay) => setTimeout(resolveDelay, DEFAULT_STATE_LOCK_RETRY_DELAY_MS));
     }
