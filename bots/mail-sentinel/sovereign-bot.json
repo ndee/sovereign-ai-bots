@@ -168,7 +168,7 @@
       "everyConfigKey": "pollInterval",
       "defaultEvery": "30m",
       "session": "isolated",
-      "announce": false,
+      "announce": true,
       "message": "Run the Mail Sentinel scan command from TOOLS.md for the configured instance. Do not reply. Do not send any message to any channel or DM. The scan tool already posts alerts directly to the alert room."
     }
   },
