@@ -34,7 +34,14 @@
       "id": "workspace-readme",
       "kind": "managedFile",
       "spec": {
-        "path": { "join": [{ "from": "agent.workspace" }, "/README.md"] },
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
         "source": "workspace/README.md",
         "writePolicy": "always"
       }
@@ -43,7 +50,14 @@
       "id": "workspace-agents",
       "kind": "managedFile",
       "spec": {
-        "path": { "join": [{ "from": "agent.workspace" }, "/AGENTS.md"] },
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
         "source": "workspace/AGENTS.md",
         "writePolicy": "always"
       }
@@ -52,7 +66,14 @@
       "id": "workspace-tools",
       "kind": "managedFile",
       "spec": {
-        "path": { "join": [{ "from": "agent.workspace" }, "/TOOLS.md"] },
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
         "source": "workspace/TOOLS.md",
         "writePolicy": "always"
       }
@@ -61,7 +82,14 @@
       "id": "workspace-skill",
       "kind": "managedFile",
       "spec": {
-        "path": { "join": [{ "from": "agent.workspace" }, "/skills/node-operator-core/SKILL.md"] },
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/node-operator-core/SKILL.md"
+          ]
+        },
         "source": "workspace/skills/node-operator-core/SKILL.md",
         "writePolicy": "always"
       }
