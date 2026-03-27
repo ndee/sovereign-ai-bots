@@ -1,11 +1,12 @@
 {
   "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
   "id": "mail-sentinel",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "displayName": "Mail Sentinel",
   "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them with Lobster plus llm-task, applies personal policy, and chooses red, amber, or gray handling.",
   "defaultInstall": true,
-  "helloMessage": "Hello from Mail Sentinel 1.5. I prefilter inbox signals, review candidates semantically through Lobster, apply your policy, and route mail into red alerts, amber digests, or gray silence.",
+  "helloMessage": "Hello from Mail Sentinel 2.0. I prefilter inbox signals, review candidates semantically through Lobster, apply your policy, and route mail into red alerts, amber digests, or gray silence.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
@@ -38,7 +39,7 @@
     {
       "kind": "sovereign-tool-template",
       "id": "mail-sentinel-tool",
-      "version": "1.5.0",
+      "version": "2.0.0",
       "description": "Local-first mail watcher for heuristic candidate filtering, Lobster semantic review, policy-driven zoning, digests, and feedback tuning.",
       "capabilities": [
         "mail-sentinel.scan",
@@ -122,7 +123,7 @@
     },
     {
       "id": "mail-sentinel-core",
-      "templateRef": "mail-sentinel-tool@1.5.0",
+      "templateRef": "mail-sentinel-tool@2.0.0",
       "config": {
         "agentId": {
           "from": "bots.config.mail-sentinel.agentId"
@@ -162,10 +163,299 @@
       "secretRefs": {}
     }
   ],
-  "openclaw": {},
+  "hostResources": [
+    {
+      "id": "workspace-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
+        "source": "workspace/README.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-agents",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
+        "source": "workspace/AGENTS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-tools",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
+        "source": "workspace/TOOLS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-skill",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/mail-sentinel-core/SKILL.md"
+          ]
+        },
+        "source": "workspace/skills/mail-sentinel-core/SKILL.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-bin",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/bin/mail-sentinel.mjs"
+          ]
+        },
+        "source": "workspace/bin/mail-sentinel.mjs",
+        "mode": "0755",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-default-rules",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/config/default-rules.json"
+          ]
+        },
+        "source": "workspace/config/default-rules.json",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-user-policy",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/config/user-policy.json"
+          ]
+        },
+        "source": "workspace/config/user-policy.json",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-data-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/README.md"
+          ]
+        },
+        "source": "workspace/data/README.md",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-state",
+      "kind": "stateFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/mail-sentinel-state.json"
+          ]
+        },
+        "inlineContent": "{\n  \"consecutiveFailures\": 0\n}",
+        "writePolicy": "ifMissing"
+      },
+      "status": {
+        "fields": {
+          "lastPollAt": {
+            "path": "lastPollAt",
+            "type": "timestamp"
+          },
+          "lastAlertAt": {
+            "path": "lastAlertAt",
+            "type": "timestamp"
+          },
+          "consecutiveFailures": {
+            "path": "consecutiveFailures",
+            "type": "int",
+            "default": 0
+          },
+          "lastError": {
+            "path": "lastError",
+            "type": "object"
+          }
+        }
+      },
+      "checks": [
+        {
+          "kind": "field-threshold",
+          "id": "consecutive-failures",
+          "field": "consecutiveFailures",
+          "warnGte": 1,
+          "failGte": 3
+        }
+      ]
+    },
+    {
+      "id": "scan-service",
+      "kind": "systemdService",
+      "spec": {
+        "name": "sovereign-mail-sentinel-scan.service",
+        "description": "Sovereign Mail Sentinel Scan",
+        "after": [
+          "network-online.target"
+        ],
+        "wants": [
+          "network-online.target"
+        ],
+        "type": "oneshot",
+        "user": {
+          "from": "node.openclaw.serviceUser"
+        },
+        "group": {
+          "from": "node.openclaw.serviceGroup"
+        },
+        "workingDirectory": {
+          "from": "agent.workspace"
+        },
+        "environment": {
+          "HOME": {
+            "from": "node.openclaw.serviceHome"
+          },
+          "SOVEREIGN_NODE_CONFIG": {
+            "from": "node.paths.configPath"
+          },
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        },
+        "execStart": [
+          "/usr/bin/env",
+          "node",
+          {
+            "join": [
+              {
+                "from": "agent.workspace"
+              },
+              "/bin/mail-sentinel.mjs"
+            ]
+          },
+          "scan",
+          "--instance",
+          "mail-sentinel-core",
+          "--json"
+        ],
+        "timeoutStartSec": 300,
+        "wantedBy": [],
+        "desiredState": {
+          "enabled": false,
+          "active": false
+        }
+      }
+    },
+    {
+      "id": "scan-timer",
+      "kind": "systemdTimer",
+      "dependsOn": [
+        "scan-service"
+      ],
+      "supersedes": [
+        {
+          "kind": "openclawCron",
+          "match": {
+            "name": "mail-sentinel-poll",
+            "agentId": "mail-sentinel"
+          }
+        }
+      ],
+      "spec": {
+        "name": "sovereign-mail-sentinel-scan.timer",
+        "description": "Sovereign Mail Sentinel Scan Timer",
+        "unit": "sovereign-mail-sentinel-scan.service",
+        "onActiveSec": "5min",
+        "onUnitActiveSec": {
+          "convert": "duration.toSystemd",
+          "value": {
+            "default": [
+              {
+                "from": "bot.config.pollInterval"
+              },
+              "30m"
+            ]
+          }
+        },
+        "accuracySec": "1min",
+        "persistent": true,
+        "wantedBy": [
+          "timers.target"
+        ],
+        "desiredState": {
+          "enabled": true,
+          "active": true
+        }
+      },
+      "checks": [
+        {
+          "kind": "resource-state",
+          "id": "timer-enabled",
+          "property": "enabled",
+          "equals": true,
+          "severity": "fail"
+        },
+        {
+          "kind": "resource-state",
+          "id": "timer-active",
+          "property": "active",
+          "equals": true,
+          "severity": "fail"
+        }
+      ]
+    }
+  ],
   "agentTemplate": {
     "id": "mail-sentinel",
-    "version": "1.5.0",
+    "version": "2.0.0",
     "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them semantically, applies policy, and chooses red alerts, amber digests, or gray silence.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {
@@ -174,48 +464,13 @@
     "requiredToolTemplates": [
       {
         "id": "mail-sentinel-tool",
-        "version": "1.5.0"
+        "version": "2.0.0"
       },
       {
         "id": "imap-readonly",
         "version": "1.0.0"
       }
     ],
-    "optionalToolTemplates": [],
-    "workspaceFiles": [
-      {
-        "path": "README.md",
-        "source": "workspace/README.md"
-      },
-      {
-        "path": "AGENTS.md",
-        "source": "workspace/AGENTS.md"
-      },
-      {
-        "path": "TOOLS.md",
-        "source": "workspace/TOOLS.md"
-      },
-      {
-        "path": "skills/mail-sentinel-core/SKILL.md",
-        "source": "workspace/skills/mail-sentinel-core/SKILL.md"
-      },
-      {
-        "path": "bin/mail-sentinel.mjs",
-        "source": "workspace/bin/mail-sentinel.mjs",
-        "mode": "755"
-      },
-      {
-        "path": "config/default-rules.json",
-        "source": "workspace/config/default-rules.json"
-      },
-      {
-        "path": "config/user-policy.json",
-        "source": "workspace/config/user-policy.json"
-      },
-      {
-        "path": "data/README.md",
-        "source": "workspace/data/README.md"
-      }
-    ]
+    "optionalToolTemplates": []
   }
 }
