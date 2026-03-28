@@ -1,7 +1,8 @@
 {
   "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
   "id": "node-operator",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "displayName": "Node Operator",
   "description": "Conversational operator that manages Sovereign Node and managed agents.",
   "defaultInstall": false,
@@ -28,10 +29,75 @@
       "secretRefs": {}
     }
   ],
-  "openclaw": {},
+  "hostResources": [
+    {
+      "id": "workspace-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
+        "source": "workspace/README.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-agents",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
+        "source": "workspace/AGENTS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-tools",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
+        "source": "workspace/TOOLS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-skill",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/node-operator-core/SKILL.md"
+          ]
+        },
+        "source": "workspace/skills/node-operator-core/SKILL.md",
+        "writePolicy": "always"
+      }
+    }
+  ],
   "agentTemplate": {
     "id": "node-operator",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Conversational operator that manages Sovereign Node and managed agents.",
     "matrix": {
       "localpartPrefix": "node-operator"
@@ -46,24 +112,6 @@
       {
         "id": "imap-readonly",
         "version": "1.0.0"
-      }
-    ],
-    "workspaceFiles": [
-      {
-        "path": "README.md",
-        "source": "workspace/README.md"
-      },
-      {
-        "path": "AGENTS.md",
-        "source": "workspace/AGENTS.md"
-      },
-      {
-        "path": "TOOLS.md",
-        "source": "workspace/TOOLS.md"
-      },
-      {
-        "path": "skills/node-operator-core/SKILL.md",
-        "source": "workspace/skills/node-operator-core/SKILL.md"
       }
     ]
   }

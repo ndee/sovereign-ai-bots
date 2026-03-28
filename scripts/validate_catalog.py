@@ -40,24 +40,24 @@ def load_packages() -> tuple[list[dict[str, Any]], list[str]]:
     packages: list[dict[str, Any]] = []
     errors: list[str] = []
     for package_dir in list_bot_directories():
-      manifest_path = package_dir / "sovereign-bot.json"
-      if not manifest_path.is_file():
-          errors.append(f"{package_dir.relative_to(ROOT)} is missing sovereign-bot.json")
-          continue
-      try:
-          manifest = load_json(manifest_path)
-      except json.JSONDecodeError as exc:
-          errors.append(
-              f"{manifest_path.relative_to(ROOT)} is not valid JSON: {exc.msg} at line {exc.lineno} column {exc.colno}"
-          )
-          continue
-      packages.append(
-          {
-              "dir": package_dir,
-              "manifest_path": manifest_path,
-              "manifest": manifest,
-          }
-      )
+        manifest_path = package_dir / "sovereign-bot.json"
+        if not manifest_path.is_file():
+            errors.append(f"{package_dir.relative_to(ROOT)} is missing sovereign-bot.json")
+            continue
+        try:
+            manifest = load_json(manifest_path)
+        except json.JSONDecodeError as exc:
+            errors.append(
+                f"{manifest_path.relative_to(ROOT)} is not valid JSON: {exc.msg} at line {exc.lineno} column {exc.colno}"
+            )
+            continue
+        packages.append(
+            {
+                "dir": package_dir,
+                "manifest_path": manifest_path,
+                "manifest": manifest,
+            }
+        )
     return packages, errors
 
 
@@ -135,6 +135,10 @@ def expect_binding_map(value: Any, label: str, errors: list[str]) -> dict[str, d
     return normalized
 
 
+def expect_host_resource_spec(value: Any, label: str, errors: list[str]) -> dict[str, Any] | None:
+    return expect_object(value, f"{label}.spec", errors)
+
+
 def validate_manifest_types(package: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     manifest = expect_object(package["manifest"], str(package["manifest_path"].relative_to(ROOT)), errors)
@@ -144,6 +148,9 @@ def validate_manifest_types(package: dict[str, Any]) -> list[str]:
     expect_string(manifest.get("kind"), "kind", errors)
     if manifest.get("kind") != "sovereign-bot-package":
         errors.append("kind must be 'sovereign-bot-package'")
+    manifest_version = expect_number(manifest.get("manifestVersion"), "manifestVersion", errors)
+    if manifest_version is not None and manifest_version != 2:
+        errors.append("manifestVersion must be 2")
     expect_string(manifest.get("id"), "id", errors)
     expect_string(manifest.get("version"), "version", errors)
     expect_string(manifest.get("displayName"), "displayName", errors)
@@ -267,24 +274,50 @@ def validate_manifest_types(package: dict[str, Any]) -> list[str]:
             expect_binding_map(instance.get("config", {}), f"{label}.config", errors)
             expect_binding_map(instance.get("secretRefs", {}), f"{label}.secretRefs", errors)
 
-    openclaw = expect_object(manifest.get("openclaw", {}), "openclaw", errors)
-    if openclaw is not None:
-        cron = openclaw.get("cron")
-        if cron is not None:
-            cron_object = expect_object(cron, "openclaw.cron", errors)
-            if cron_object is not None:
-                expect_string(cron_object.get("id"), "openclaw.cron.id", errors)
-                if "everyConfigKey" in cron_object:
-                    expect_string(cron_object.get("everyConfigKey"), "openclaw.cron.everyConfigKey", errors)
-                if "defaultEvery" in cron_object:
-                    expect_string(cron_object.get("defaultEvery"), "openclaw.cron.defaultEvery", errors)
-                if "session" in cron_object:
-                    session = expect_string(cron_object.get("session"), "openclaw.cron.session", errors)
-                    if session is not None and session != "isolated":
-                        errors.append("openclaw.cron.session must be 'isolated'")
-                if "announce" in cron_object:
-                    expect_bool(cron_object.get("announce"), "openclaw.cron.announce", errors)
-                expect_string(cron_object.get("message"), "openclaw.cron.message", errors)
+    host_resources = expect_list(manifest.get("hostResources", []), "hostResources", errors)
+    if host_resources is not None:
+        for index, raw_resource in enumerate(host_resources):
+            label = f"hostResources[{index}]"
+            resource = expect_object(raw_resource, label, errors)
+            if resource is None:
+                continue
+            expect_string(resource.get("id"), f"{label}.id", errors)
+            kind = expect_string(resource.get("kind"), f"{label}.kind", errors)
+            if kind is None:
+                continue
+            if kind not in {
+                "directory",
+                "managedFile",
+                "stateFile",
+                "systemdService",
+                "systemdTimer",
+                "openclawCron",
+            }:
+                errors.append(f"{label}.kind is not a supported host resource kind")
+            spec = expect_host_resource_spec(resource.get("spec"), label, errors)
+            if spec is None:
+                continue
+            if kind in {"directory", "managedFile", "stateFile"}:
+                if "path" not in spec:
+                    errors.append(f"{label}.spec.path must be defined")
+                if kind in {"managedFile", "stateFile"} and "source" not in spec and "inlineContent" not in spec:
+                    errors.append(f"{label}.spec must define source or inlineContent")
+            elif kind == "systemdService":
+                for field_name in ("name", "description", "execStart"):
+                    if field_name not in spec:
+                        errors.append(f"{label}.spec.{field_name} must be defined")
+            elif kind == "systemdTimer":
+                for field_name in ("name", "description"):
+                    if field_name not in spec:
+                        errors.append(f"{label}.spec.{field_name} must be defined")
+            elif kind == "openclawCron":
+                for field_name in ("id", "agentId", "desiredState"):
+                    if field_name not in spec:
+                        errors.append(f"{label}.spec.{field_name} must be defined")
+                if spec.get("desiredState") == "present":
+                    for field_name in ("every", "message"):
+                        if field_name not in spec:
+                            errors.append(f"{label}.spec.{field_name} must be defined when desiredState=present")
 
     agent_template = expect_object(manifest.get("agentTemplate"), "agentTemplate", errors)
     if agent_template is not None:
@@ -307,18 +340,6 @@ def validate_manifest_types(package: dict[str, Any]) -> list[str]:
                     continue
                 expect_string(ref.get("id"), f"{label}.id", errors)
                 expect_string(ref.get("version"), f"{label}.version", errors)
-        workspace_files = expect_list(agent_template.get("workspaceFiles"), "agentTemplate.workspaceFiles", errors)
-        if workspace_files is not None:
-            if not workspace_files:
-                errors.append("agentTemplate.workspaceFiles must not be empty")
-            for index, raw_file in enumerate(workspace_files):
-                label = f"agentTemplate.workspaceFiles[{index}]"
-                entry = expect_object(raw_file, label, errors)
-                if entry is None:
-                    continue
-                expect_string(entry.get("path"), f"{label}.path", errors)
-                expect_string(entry.get("source"), f"{label}.source", errors)
-
     return [f"{package['manifest_path'].relative_to(ROOT)}: {error}" for error in errors]
 
 
@@ -395,31 +416,32 @@ def validate_package_invariants(package: dict[str, Any]) -> list[str]:
                     f"{manifest_path}: toolInstances[{index}] is missing required secret bindings: {', '.join(missing_secrets)}"
                 )
 
-    workspace_files = agent_template.get("workspaceFiles", [])
-    workspace_paths = [entry.get("path") for entry in workspace_files]
-    workspace_sources = [entry.get("source") for entry in workspace_files]
-    if not unique([entry for entry in workspace_paths if isinstance(entry, str)]):
-        errors.append(f"{manifest_path}: agentTemplate.workspaceFiles paths must be unique")
-    if not unique([entry for entry in workspace_sources if isinstance(entry, str)]):
-        errors.append(f"{manifest_path}: agentTemplate.workspaceFiles sources must be unique")
+    host_resources = manifest.get("hostResources", [])
+    host_resource_ids = [entry.get("id") for entry in host_resources]
+    if not unique([entry for entry in host_resource_ids if isinstance(entry, str)]):
+        errors.append(f"{manifest_path}: hostResources ids must be unique")
 
-    for index, entry in enumerate(workspace_files):
-        target_path = entry.get("path")
-        source_path = entry.get("source")
-        if not isinstance(target_path, str) or not isinstance(source_path, str):
+    source_paths: list[str] = []
+    for index, entry in enumerate(host_resources):
+        spec = entry.get("spec", {}) if isinstance(entry, dict) else {}
+        if not isinstance(spec, dict):
             continue
-        if not is_safe_relative_path(target_path):
-            errors.append(f"{manifest_path}: agentTemplate.workspaceFiles[{index}].path must be a safe relative path")
+        source_path = spec.get("source")
+        if not isinstance(source_path, str):
+            continue
+        source_paths.append(source_path)
         if not is_safe_relative_path(source_path):
-            errors.append(f"{manifest_path}: agentTemplate.workspaceFiles[{index}].source must be a safe relative path")
+            errors.append(f"{manifest_path}: hostResources[{index}].spec.source must be a safe relative path")
             continue
         if not source_path.startswith("workspace/"):
-            errors.append(f"{manifest_path}: agentTemplate.workspaceFiles[{index}].source must stay under workspace/")
+            errors.append(f"{manifest_path}: hostResources[{index}].spec.source must stay under workspace/")
         resolved_source = package_dir / source_path
         if not resolved_source.is_file():
             errors.append(
-                f"{manifest_path}: agentTemplate.workspaceFiles[{index}].source '{source_path}' does not exist"
+                f"{manifest_path}: hostResources[{index}].spec.source '{source_path}' does not exist"
             )
+    if not unique(source_paths):
+        errors.append(f"{manifest_path}: hostResources source paths must be unique")
 
     default_account = manifest.get("matrixRouting", {}).get("defaultAccount")
     if default_account is True and matrix_identity.get("mode") != "dedicated-account":
@@ -516,14 +538,22 @@ def run_smoke() -> int:
         for package in packages:
             manifest = package["manifest"]
             destination_root = temp_root / str(manifest["id"])
-            for entry in manifest["agentTemplate"]["workspaceFiles"]:
-                source = package["dir"] / entry["source"]
-                destination = destination_root / entry["path"]
+            copied = 0
+            for entry in manifest["hostResources"]:
+                spec = entry.get("spec", {}) if isinstance(entry, dict) else {}
+                if not isinstance(spec, dict):
+                    continue
+                source_path = spec.get("source")
+                if not isinstance(source_path, str):
+                    continue
+                source = package["dir"] / source_path
+                destination = destination_root / source_path
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, destination)
+                copied += 1
             print(
                 f"Smoked {manifest['id']}@{manifest['version']} with "
-                f"{len(manifest['agentTemplate']['workspaceFiles'])} workspace files."
+                f"{copied} source-backed host resources."
             )
 
     return 0
