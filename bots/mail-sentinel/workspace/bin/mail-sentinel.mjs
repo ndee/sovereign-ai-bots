@@ -1659,7 +1659,12 @@ const scan = async (options) => {
         }
 
         const scored = scoreMessage(parsed, state, rules);
-        if (!scored.candidate) {
+        const policyResult = evaluatePolicy(parsed, scored, policy, new Date(scanAt));
+        if (
+          !scored.candidate &&
+          policyResult.zoneFloor === null &&
+          scored.score + policyResult.scoreModifier < rules.thresholds.candidate
+        ) {
           state.zoneHistory.push({
             at: scanAt,
             messageKey: parsed.key,
@@ -1668,8 +1673,6 @@ const scan = async (options) => {
           });
           continue;
         }
-
-        const policyResult = evaluatePolicy(parsed, scored, policy, new Date(scanAt));
         let llmResult = null;
         try {
           llmResult = await runtime.classifyCandidate(buildLlmCandidate(parsed, scored, policyResult, state));
