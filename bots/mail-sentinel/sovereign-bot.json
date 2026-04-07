@@ -170,32 +170,6 @@
         },
         "matrixAlertRoomId": {
           "from": "instance.matrix.alertRoom.roomId"
-        },
-        "matrixAdminBaseUrl": {
-          "from": "runtime.matrix.adminBaseUrl"
-        },
-        "matrixAlertRoomName": {
-          "from": "instance.matrix.alertRoom.roomName"
-        },
-        "instanceId": {
-          "from": "instance.id"
-        },
-        "mailbox": {
-          "from": "instance.config.imapMailbox"
-        },
-        "imapUsername": {
-          "from": "instance.config.imapUsername"
-        },
-        "imapHost": {
-          "from": "instance.config.imapHost"
-        },
-        "imapPort": {
-          "from": "instance.config.imapPort",
-          "stringify": true
-        },
-        "imapTls": {
-          "from": "instance.config.imapTls",
-          "stringify": true
         }
       },
       "secretRefs": {}
