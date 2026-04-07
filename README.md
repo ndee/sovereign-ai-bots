@@ -56,6 +56,23 @@ A package currently contains:
 
 - `mail-sentinel`
 - `node-operator`
+- `bitcoin-skill-match`
+
+## Tooling
+
+The catalog validation and probe tooling now use TypeScript.
+
+Common commands:
+
+- `pnpm lint` -- Biome checks for `src/`
+- `pnpm typecheck` -- TypeScript type-checking
+- `pnpm test:coverage:unit` -- Vitest with 100% coverage on catalog tooling
+- `pnpm build` -- build the CLI entrypoints into `dist/`
+- `pnpm catalog:lint` -- validate all `bots/**/*.json` files and canonical JSON formatting
+- `pnpm catalog:typecheck` -- schema-check all bot manifests
+- `pnpm catalog:test` -- run catalog invariants
+- `pnpm catalog:smoke` -- copy source-backed host resources into a temp directory
+- `pnpm probe:mail-sentinel-model` -- manually probe the configured Mail Sentinel chat model via OpenRouter
 
 ## Current package roles
 
