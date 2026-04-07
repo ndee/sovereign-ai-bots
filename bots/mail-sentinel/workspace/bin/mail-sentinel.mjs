@@ -1265,11 +1265,14 @@ class MailSentinelRuntime {
     this.llmTimeoutMs = Number.parseInt(String(tool.config?.llmTimeoutMs ?? DEFAULT_LLM_TIMEOUT_MS), 10);
     this.openclawToken = await this.readOpenClawGatewayToken();
     this.matrix = {
-      adminBaseUrl: this.runtimeConfig.matrix?.adminBaseUrl,
-      roomId: this.runtimeConfig.matrix?.alertRoom?.roomId,
+      adminBaseUrl: tool.config?.matrixAdminBaseUrl ?? this.runtimeConfig.matrix?.adminBaseUrl,
+      roomId: tool.config?.matrixAlertRoomId ?? this.runtimeConfig.matrix?.alertRoom?.roomId,
       accessToken: await resolveSecretRefValue(agent.matrix?.accessTokenSecretRef),
     };
-    this.imapConfigured = this.runtimeConfig.imap?.status === "configured";
+    this.imapConfigured =
+      typeof tool.config?.imapConfigured === "string"
+        ? tool.config.imapConfigured === "true"
+        : this.runtimeConfig.imap?.status === "configured";
   }
 
   async readOpenClawGatewayToken() {

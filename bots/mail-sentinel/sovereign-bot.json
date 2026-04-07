@@ -21,8 +21,12 @@
     }
   },
   "configDefaults": {
-    "agentId": "mail-sentinel",
-    "imapInstanceId": "mail-sentinel-imap",
+    "imapConfigured": false,
+    "imapHost": "pending",
+    "imapPort": 993,
+    "imapTls": true,
+    "imapUsername": "pending",
+    "imapMailbox": "INBOX",
     "pollInterval": "30m",
     "lookbackWindow": "1h",
     "defaultReminderDelay": "4h",
@@ -58,6 +62,7 @@
       "requiredConfigKeys": [
         "agentId",
         "imapInstanceId",
+        "imapConfigured",
         "statePath",
         "rulesPath",
         "policyPath",
@@ -93,31 +98,31 @@
       "id": "mail-sentinel-imap",
       "templateRef": "imap-readonly@1.0.0",
       "enabledWhen": {
-        "path": "imap.status",
-        "equals": "configured"
+        "path": "instance.config.imapConfigured",
+        "equals": true
       },
       "config": {
         "host": {
-          "from": "imap.host"
+          "from": "instance.config.imapHost"
         },
         "port": {
-          "from": "imap.port",
+          "from": "instance.config.imapPort",
           "stringify": true
         },
         "tls": {
-          "from": "imap.tls",
+          "from": "instance.config.imapTls",
           "stringify": true
         },
         "username": {
-          "from": "imap.username"
+          "from": "instance.config.imapUsername"
         },
         "mailbox": {
-          "from": "imap.mailbox"
+          "from": "instance.config.imapMailbox"
         }
       },
       "secretRefs": {
         "password": {
-          "from": "imap.secretRef"
+          "from": "instance.secretRefs.imapPassword"
         }
       }
     },
@@ -126,38 +131,45 @@
       "templateRef": "mail-sentinel-tool@2.0.0",
       "config": {
         "agentId": {
-          "from": "bots.config.mail-sentinel.agentId"
+          "from": "agent.id"
         },
         "imapInstanceId": {
-          "from": "bots.config.mail-sentinel.imapInstanceId"
+          "from": "instance.toolInstanceIds.mail-sentinel-imap"
+        },
+        "imapConfigured": {
+          "from": "instance.config.imapConfigured",
+          "stringify": true
         },
         "statePath": {
-          "from": "bots.config.mail-sentinel.statePath"
+          "from": "instance.config.statePath"
         },
         "rulesPath": {
-          "from": "bots.config.mail-sentinel.rulesPath"
+          "from": "instance.config.rulesPath"
         },
         "policyPath": {
-          "from": "bots.config.mail-sentinel.policyPath"
+          "from": "instance.config.policyPath"
         },
         "lookbackWindow": {
-          "from": "bots.config.mail-sentinel.lookbackWindow"
+          "from": "instance.config.lookbackWindow"
         },
         "defaultReminderDelay": {
-          "from": "bots.config.mail-sentinel.defaultReminderDelay"
+          "from": "instance.config.defaultReminderDelay"
         },
         "digestInterval": {
-          "from": "bots.config.mail-sentinel.digestInterval"
+          "from": "instance.config.digestInterval"
         },
         "openclawUrl": {
-          "from": "bots.config.mail-sentinel.openclawUrl"
+          "from": "instance.config.openclawUrl"
         },
         "llmModel": {
-          "from": "bots.config.mail-sentinel.llmModel"
+          "from": "instance.config.llmModel"
         },
         "llmTimeoutMs": {
-          "from": "bots.config.mail-sentinel.llmTimeoutMs",
+          "from": "instance.config.llmTimeoutMs",
           "stringify": true
+        },
+        "matrixAlertRoomId": {
+          "from": "instance.matrix.alertRoom.roomId"
         }
       },
       "secretRefs": {}
@@ -343,8 +355,23 @@
       "id": "scan-service",
       "kind": "systemdService",
       "spec": {
-        "name": "sovereign-mail-sentinel-scan.service",
-        "description": "Sovereign Mail Sentinel Scan",
+        "name": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.service"
+          ]
+        },
+        "description": {
+          "join": [
+            "Sovereign Mail Sentinel Scan ",
+            {
+              "from": "instance.id"
+            }
+          ]
+        },
         "after": [
           "network-online.target"
         ],
@@ -383,7 +410,9 @@
           },
           "scan",
           "--instance",
-          "mail-sentinel-core",
+          {
+            "from": "instance.toolInstanceIds.mail-sentinel-core"
+          },
           "--json"
         ],
         "timeoutStartSec": 300,
@@ -404,15 +433,47 @@
         {
           "kind": "openclawCron",
           "match": {
-            "name": "mail-sentinel-poll",
-            "agentId": "mail-sentinel"
+            "name": {
+              "join": [
+                {
+                  "from": "instance.id"
+                },
+                "-poll"
+              ]
+            },
+            "agentId": {
+              "from": "agent.id"
+            }
           }
         }
       ],
       "spec": {
-        "name": "sovereign-mail-sentinel-scan.timer",
-        "description": "Sovereign Mail Sentinel Scan Timer",
-        "unit": "sovereign-mail-sentinel-scan.service",
+        "name": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.timer"
+          ]
+        },
+        "description": {
+          "join": [
+            "Sovereign Mail Sentinel Scan Timer ",
+            {
+              "from": "instance.id"
+            }
+          ]
+        },
+        "unit": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.service"
+          ]
+        },
         "onActiveSec": "5min",
         "onUnitActiveSec": {
           "convert": "duration.toSystemd",
