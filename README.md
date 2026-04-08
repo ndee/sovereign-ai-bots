@@ -82,8 +82,8 @@ Common commands:
 - `pnpm catalog:test` -- run catalog invariants
 - `pnpm catalog:smoke` -- copy source-backed host resources into a temp
   directory
-- `pnpm probe:mail-sentinel-model` -- manually probe the configured Mail
-  Sentinel chat model via OpenRouter
+- `pnpm probe:mail-sentinel-model` -- manually probe the Mail Sentinel model
+  declared in `bots/mail-sentinel/sovereign-bot.json` via OpenRouter
 
 ### Running a bot CLI during development
 
@@ -108,6 +108,7 @@ It:
 - classifies important signals
 - pushes relevant alerts into Matrix
 - adapts local scoring behavior from feedback
+- supports installer-managed per-instance config, state, and scheduling
 
 ### `node-operator`
 The operational bot for interacting with the local node.
