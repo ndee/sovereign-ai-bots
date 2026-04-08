@@ -1,0 +1,30 @@
+[
+  {
+    "ruleId": "sender:alice@example.com",
+    "reason": "sender has been rated as important before",
+    "weight": 3,
+    "categories": []
+  },
+  {
+    "ruleId": "domain:example.com",
+    "reason": "sender domain has been rated as important before",
+    "weight": 1,
+    "categories": []
+  },
+  {
+    "ruleId": "rule-invoice",
+    "reason": "subject mentions an invoice",
+    "weight": 4,
+    "categories": [
+      "financial-relevance"
+    ]
+  },
+  {
+    "ruleId": "rule-amount",
+    "reason": "mentions a dollar amount",
+    "weight": 2,
+    "categories": [
+      "financial-relevance"
+    ]
+  }
+]

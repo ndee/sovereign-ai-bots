@@ -246,13 +246,7 @@ export async function listBotDirectories(rootDir: string): Promise<string[]> {
   }
 }
 
-const NON_CATALOG_DIRECTORIES = new Set([
-  "node_modules",
-  "src",
-  "dist",
-  ".turbo",
-  ".tsbuildinfo",
-]);
+const NON_CATALOG_DIRECTORIES = new Set(["node_modules", "src", "dist", ".turbo", ".tsbuildinfo"]);
 
 const NON_CATALOG_FILENAMES = new Set([
   "tsconfig.json",

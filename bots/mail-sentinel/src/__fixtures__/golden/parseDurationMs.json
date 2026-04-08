@@ -1,0 +1,7 @@
+{
+  "minutes": 1800000,
+  "hours": 7200000,
+  "days": 86400000,
+  "longForm": 900000,
+  "zeroHours": 0
+}

@@ -1,0 +1,25 @@
+{
+  "empty": {
+    "version": 1,
+    "senderPolicies": [],
+    "domainPolicies": [],
+    "categoryPolicies": [],
+    "contentPolicies": [],
+    "timePolicies": [],
+    "mutePolicies": []
+  },
+  "partial": {
+    "version": 1,
+    "senderPolicies": [
+      {
+        "id": "x",
+        "match": "a@b"
+      }
+    ],
+    "domainPolicies": [],
+    "categoryPolicies": [],
+    "contentPolicies": [],
+    "timePolicies": [],
+    "mutePolicies": []
+  }
+}

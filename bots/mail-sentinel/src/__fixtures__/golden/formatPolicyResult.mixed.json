@@ -1,0 +1,1 @@
+"Mail Sentinel policies:\n- [p1] sender alice@example.com\n- [p2] category risk-escalation\n- [p3] time 09:00-17:00\n- [p4] content invoice"

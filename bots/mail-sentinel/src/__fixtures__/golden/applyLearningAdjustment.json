@@ -1,0 +1,12 @@
+{
+  "increment": {
+    "a@b": 3
+  },
+  "decrementToFloor": {
+    "a@b": -1
+  },
+  "removeOnZero": {},
+  "emptyKey": {
+    "a@b": 1
+  }
+}

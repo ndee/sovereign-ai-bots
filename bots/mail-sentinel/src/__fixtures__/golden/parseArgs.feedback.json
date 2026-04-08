@@ -1,0 +1,10 @@
+{
+  "command": "feedback",
+  "options": {
+    "json": true,
+    "instance": "ms-core",
+    "latest": true,
+    "action": "remind-later",
+    "delay": "4h"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "decision_required": {
+      "type": "boolean"
+    },
+    "financial_relevance": {
+      "type": "boolean"
+    },
+    "risk_escalation": {
+      "type": "boolean"
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "urgency": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "deadline_detected": {
+      "type": "boolean"
+    },
+    "amount_detected": {
+      "type": "boolean"
+    },
+    "suggested_zone": {
+      "type": "string",
+      "enum": [
+        "red",
+        "amber",
+        "gray"
+      ]
+    }
+  },
+  "required": [
+    "decision_required",
+    "financial_relevance",
+    "risk_escalation",
+    "confidence",
+    "urgency",
+    "reason",
+    "deadline_detected",
+    "amount_detected",
+    "suggested_zone"
+  ]
+}

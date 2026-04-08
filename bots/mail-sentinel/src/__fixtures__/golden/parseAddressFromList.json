@@ -1,0 +1,5 @@
+{
+  "single": "alice@example.com",
+  "empty": "(unknown sender)",
+  "notArray": "(unknown sender)"
+}

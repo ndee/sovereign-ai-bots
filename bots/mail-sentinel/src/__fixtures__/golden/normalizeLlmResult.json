@@ -1,0 +1,24 @@
+{
+  "full": {
+    "decisionRequired": true,
+    "financialRelevance": true,
+    "riskEscalation": false,
+    "confidence": 83,
+    "urgency": "high",
+    "reason": "clear invoice",
+    "deadlineDetected": true,
+    "amountDetected": true,
+    "suggestedZone": "red"
+  },
+  "defaults": {
+    "decisionRequired": false,
+    "financialRelevance": false,
+    "riskEscalation": false,
+    "confidence": 0,
+    "urgency": "low",
+    "reason": "No semantic reason returned.",
+    "deadlineDetected": false,
+    "amountDetected": false,
+    "suggestedZone": "gray"
+  }
+}
