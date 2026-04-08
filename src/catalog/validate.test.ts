@@ -477,9 +477,9 @@ describe("catalog validator", () => {
     const helperRoot = await createCatalogRoot();
     await ensureFile(helperRoot, "bots/helper/workspace/README.md", "helper\n");
     await ensureFile(helperRoot, "bots/helper/workspace/README.md", "helper\n");
-    expect(catalogInternals.existsSyncLike(join(helperRoot, "bots/helper/workspace/README.md"))).toBe(
-      true,
-    );
+    expect(
+      catalogInternals.existsSyncLike(join(helperRoot, "bots/helper/workspace/README.md")),
+    ).toBe(true);
 
     await ensureFile(
       repoRoot,

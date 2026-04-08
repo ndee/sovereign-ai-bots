@@ -29,6 +29,20 @@ describe("policy/engine", () => {
     expect(isTimeInSchedule(new Date(), 42 as unknown as string)).toBe(false);
   });
 
+  it("covers both sides of the cross-midnight OR (TZ-independent)", () => {
+    // Use Date constructor with local components so the test is deterministic
+    // across runner timezones. 02:30 local falls inside 22:00-06:00 via the
+    // `<= endMinutes` branch, and 23:30 local falls inside via the
+    // `>= startMinutes` branch.
+    const earlyMorning = new Date(2026, 3, 8, 2, 30, 0);
+    const lateNight = new Date(2026, 3, 8, 23, 30, 0);
+    expect(isTimeInSchedule(earlyMorning, "22:00-06:00")).toBe(true);
+    expect(isTimeInSchedule(lateNight, "22:00-06:00")).toBe(true);
+    // Outside the window still returns false.
+    const noon = new Date(2026, 3, 8, 12, 0, 0);
+    expect(isTimeInSchedule(noon, "22:00-06:00")).toBe(false);
+  });
+
   it("matches the evaluatePolicy golden fixture", () => {
     expect(
       evaluatePolicy(

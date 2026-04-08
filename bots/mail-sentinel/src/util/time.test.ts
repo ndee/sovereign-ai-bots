@@ -64,19 +64,32 @@ describe("util/time", () => {
     expect(() => clampLimit("abc", 20)).toThrow(golden.message);
   });
 
-  it("matches the startOfLocalDay golden fixture", () => {
+  it("returns midnight local time for a given instant", () => {
+    // Verify idempotence and round-trip: applying startOfLocalDay to its own
+    // output yields the same timestamp, and the result is always at local
+    // midnight (hour/minute/second/ms all zero in local time). This makes the
+    // assertion TZ-independent so it passes under any runner timezone.
     const isoDate = new Date("2026-04-08T12:34:56.000Z");
-    expect({
-      iso: startOfLocalDay(isoDate),
-      midnight: startOfLocalDay(FIXED_NOW),
-    }).toEqual({
-      iso: new Date(isoDate.getFullYear(), isoDate.getMonth(), isoDate.getDate()).getTime(),
-      midnight: new Date(
-        FIXED_NOW.getFullYear(),
-        FIXED_NOW.getMonth(),
-        FIXED_NOW.getDate(),
-      ).getTime(),
-    });
+    const isoMidnight = startOfLocalDay(isoDate);
+    const fixedMidnight = startOfLocalDay(FIXED_NOW);
+
+    expect(startOfLocalDay(isoMidnight)).toBe(isoMidnight);
+    expect(startOfLocalDay(fixedMidnight)).toBe(fixedMidnight);
+
+    const isoLocal = new Date(isoMidnight);
+    expect(isoLocal.getHours()).toBe(0);
+    expect(isoLocal.getMinutes()).toBe(0);
+    expect(isoLocal.getSeconds()).toBe(0);
+    expect(isoLocal.getMilliseconds()).toBe(0);
+
+    const fixedLocal = new Date(fixedMidnight);
+    expect(fixedLocal.getHours()).toBe(0);
+    expect(fixedLocal.getMinutes()).toBe(0);
+
+    // The local date components of the midnight must match those of the input.
+    expect(isoLocal.getFullYear()).toBe(isoDate.getFullYear());
+    expect(isoLocal.getMonth()).toBe(isoDate.getMonth());
+    expect(isoLocal.getDate()).toBe(isoDate.getDate());
   });
 
   it("matches the isSameLocalDay golden fixture", () => {
