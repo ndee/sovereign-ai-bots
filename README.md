@@ -60,19 +60,42 @@ A package currently contains:
 
 ## Tooling
 
-The catalog validation and probe tooling now use TypeScript.
+Catalog validation, probe tooling, and bot runtimes use TypeScript. The
+`mail-sentinel` bot source lives under `bots/mail-sentinel/src/` and tsup
+bundles it into a single file at `bots/mail-sentinel/workspace/bin/dist/
+mail-sentinel.js` (gitignored). The manifest (`sovereign-bot.json`) and
+systemd unit both reference the compiled `mail-sentinel.js`. `pnpm build`
+must run before any `pnpm catalog:*` command because the validator
+checks that `hostResources[].spec.source` exists on disk.
 
 Common commands:
 
-- `pnpm lint` -- Biome checks for `src/`
+- `pnpm lint` -- Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` -- TypeScript type-checking
+- `pnpm build` -- build the root CLI entrypoints into `dist/` **and** every bot's
+  compiled bundle into `bots/*/workspace/bin/dist/`
 - `pnpm test:coverage:unit` -- Vitest with 100% coverage on catalog tooling
-- `pnpm build` -- build the CLI entrypoints into `dist/`
-- `pnpm catalog:lint` -- validate all `bots/**/*.json` files and canonical JSON formatting
+  and every bot's TypeScript source tree
+- `pnpm catalog:lint` -- validate all `bots/**/*.json` files and canonical
+  JSON formatting (run `pnpm build` first)
 - `pnpm catalog:typecheck` -- schema-check all bot manifests
 - `pnpm catalog:test` -- run catalog invariants
-- `pnpm catalog:smoke` -- copy source-backed host resources into a temp directory
-- `pnpm probe:mail-sentinel-model` -- manually probe the configured Mail Sentinel chat model via OpenRouter
+- `pnpm catalog:smoke` -- copy source-backed host resources into a temp
+  directory
+- `pnpm probe:mail-sentinel-model` -- manually probe the configured Mail
+  Sentinel chat model via OpenRouter
+
+### Running a bot CLI during development
+
+To run `mail-sentinel` without a full build, use `tsx` against the
+source entry point:
+
+```bash
+tsx bots/mail-sentinel/src/cli.ts <command> --instance <id> --json
+```
+
+For a production-style run, `pnpm build` first then invoke
+`node bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js ...`.
 
 ## Current package roles
 

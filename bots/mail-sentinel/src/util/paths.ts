@@ -18,8 +18,7 @@ export const parseRuntimeConfigDocument = (raw: string): unknown => {
     return JSON.parse(raw);
   } catch {
     // JSON5-style runtime config: evaluate as a JS expression inside strict mode.
-    // This mirrors the behavior of the original mail-sentinel.mjs — the runtime
-    // config is a trusted file shipped alongside the installer.
+    // The runtime config is a trusted file shipped alongside the installer.
     return new Function(`"use strict"; return (${raw});`)();
   }
 };
