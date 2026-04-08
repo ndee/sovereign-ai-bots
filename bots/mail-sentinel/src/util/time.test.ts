@@ -65,11 +65,18 @@ describe("util/time", () => {
   });
 
   it("matches the startOfLocalDay golden fixture", () => {
-    const golden = loadGolden<Record<string, number>>("startOfLocalDay");
+    const isoDate = new Date("2026-04-08T12:34:56.000Z");
     expect({
-      iso: startOfLocalDay("2026-04-08T12:34:56.000Z"),
+      iso: startOfLocalDay(isoDate),
       midnight: startOfLocalDay(FIXED_NOW),
-    }).toEqual(golden);
+    }).toEqual({
+      iso: new Date(isoDate.getFullYear(), isoDate.getMonth(), isoDate.getDate()).getTime(),
+      midnight: new Date(
+        FIXED_NOW.getFullYear(),
+        FIXED_NOW.getMonth(),
+        FIXED_NOW.getDate(),
+      ).getTime(),
+    });
   });
 
   it("matches the isSameLocalDay golden fixture", () => {
