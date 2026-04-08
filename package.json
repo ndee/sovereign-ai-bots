@@ -12,10 +12,10 @@
     "probe-mail-sentinel-chat-model": "./dist/probe-mail-sentinel-chat-model.js"
   },
   "scripts": {
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
     "typecheck": "tsc --noEmit",
-    "build": "tsup src/bin/validate-catalog.ts src/bin/probe-mail-sentinel-chat-model.ts --format esm --dts --out-dir dist",
+    "build": "tsup",
     "test": "vitest run",
     "test:coverage:unit": "vitest run --config vitest.unit.config.ts",
     "test:watch": "vitest",

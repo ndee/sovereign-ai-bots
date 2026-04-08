@@ -246,8 +246,27 @@ export async function listBotDirectories(rootDir: string): Promise<string[]> {
   }
 }
 
+const NON_CATALOG_DIRECTORIES = new Set([
+  "node_modules",
+  "src",
+  "dist",
+  ".turbo",
+  ".tsbuildinfo",
+]);
+
+const NON_CATALOG_FILENAMES = new Set([
+  "tsconfig.json",
+  "tsconfig.build.json",
+  "package.json",
+  "package-lock.json",
+]);
+
 export async function listJsonFiles(rootDir: string): Promise<string[]> {
-  return walkFiles(join(rootDir, "bots"), (path) => extname(path) === ".json");
+  return walkFiles(
+    join(rootDir, "bots"),
+    (path) => extname(path) === ".json" && !NON_CATALOG_FILENAMES.has(basename(path)),
+    (dirName) => !NON_CATALOG_DIRECTORIES.has(dirName),
+  );
 }
 
 export async function lintCatalog(rootDir: string): Promise<LintResult> {
@@ -574,13 +593,17 @@ function validateRepoInvariants(packages: readonly ParsedPackage[]): string[] {
 async function walkFiles(
   currentDir: string,
   predicate: (path: string) => boolean,
+  directoryPredicate: (name: string) => boolean,
 ): Promise<string[]> {
   const entries = await readdir(currentDir, { withFileTypes: true });
   const files: string[] = [];
   for (const entry of entries) {
     const entryPath = join(currentDir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await walkFiles(entryPath, predicate)));
+      if (!directoryPredicate(entry.name)) {
+        continue;
+      }
+      files.push(...(await walkFiles(entryPath, predicate, directoryPredicate)));
       continue;
     }
     if (entry.isFile() && predicate(entryPath)) {
