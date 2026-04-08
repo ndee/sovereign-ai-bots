@@ -66,13 +66,13 @@ Common commands:
 
 - `pnpm lint` -- Biome checks for `src/`
 - `pnpm typecheck` -- TypeScript type-checking
-- `pnpm test:coverage:unit` -- Vitest with 100% coverage on catalog tooling
+- `pnpm test:coverage:unit` -- Vitest with 100% coverage on the catalog validator and Mail Sentinel model probe
 - `pnpm build` -- build the CLI entrypoints into `dist/`
 - `pnpm catalog:lint` -- validate all `bots/**/*.json` files and canonical JSON formatting
 - `pnpm catalog:typecheck` -- schema-check all bot manifests
 - `pnpm catalog:test` -- run catalog invariants
 - `pnpm catalog:smoke` -- copy source-backed host resources into a temp directory
-- `pnpm probe:mail-sentinel-model` -- manually probe the configured Mail Sentinel chat model via OpenRouter
+- `pnpm probe:mail-sentinel-model` -- manually probe the Mail Sentinel model declared in `bots/mail-sentinel/sovereign-bot.json` via OpenRouter
 
 ## Current package roles
 
@@ -85,6 +85,7 @@ It:
 - classifies important signals
 - pushes relevant alerts into Matrix
 - adapts local scoring behavior from feedback
+- supports installer-managed per-instance config, state, and scheduling
 
 ### `node-operator`
 The operational bot for interacting with the local node.
