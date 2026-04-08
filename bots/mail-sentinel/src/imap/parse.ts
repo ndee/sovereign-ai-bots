@@ -55,7 +55,8 @@ export const parseHighestAmount = (text: unknown): AmountSignal | null => {
   let best: AmountSignal | null = null;
   for (const pattern of patterns) {
     for (const match of raw.matchAll(pattern)) {
-      const numericText = String(match[1] ?? "");
+      // Capture group [1] is guaranteed to exist when the regex matches.
+      const numericText = String(match[1]);
       const normalized = numericText
         .replace(/\.(?=.*[,])/g, "")
         .replace(/,(?=\d{3}(?:\D|$))/g, "")

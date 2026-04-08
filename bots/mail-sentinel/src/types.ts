@@ -44,7 +44,7 @@ export interface StoredMessage {
   uid: number;
   messageId?: string | undefined;
   subject: string;
-  normalizedThreadSubject: string;
+  normalizedThreadSubject?: string | undefined;
   from: string;
   fromAddress?: string | undefined;
   domain?: string | undefined;

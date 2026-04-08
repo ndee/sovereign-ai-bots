@@ -101,18 +101,18 @@ export const isMainModule = (): boolean => {
   if (typeof entry !== "string") {
     return false;
   }
-  try {
-    const entryUrl = pathToFileURL(resolvePath(entry)).href;
-    return import.meta.url === entryUrl;
-  } catch {
-    return false;
-  }
+  return import.meta.url === pathToFileURL(resolvePath(entry)).href;
 };
 
+/* v8 ignore start -- entry-point guard only fires when the compiled script is
+   invoked directly by node; unit tests always import the module so this branch
+   is unreachable in the test runner. */
 if (isMainModule()) {
   runCli(process.argv.slice(2)).catch((error: unknown) => {
     reportError(error, process.argv);
   });
 }
+
+/* v8 ignore stop */
 
 export type { CommandOptions };

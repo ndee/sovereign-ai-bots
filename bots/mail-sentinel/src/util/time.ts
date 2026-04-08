@@ -10,8 +10,9 @@ export const parseDurationMs = (value: unknown): number => {
   if (match === null) {
     throw new Error(`Unsupported duration '${String(value)}'`);
   }
-  const amount = Number.parseInt(match[1] ?? "0", 10);
-  const unit = match[2] ?? "m";
+  // Regex capture groups are guaranteed to exist when the regex matches.
+  const amount = Number.parseInt(match[1] as string, 10);
+  const unit = match[2] as string;
   const multiplier = unit.startsWith("d")
     ? 24 * 60 * 60 * 1000
     : unit.startsWith("h")

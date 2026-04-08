@@ -209,11 +209,12 @@ export const scan = async (
           llmResult,
           rules,
         });
+        // determineZone always populates at least one reason.
         state.zoneHistory.push({
           at: scanAt,
           messageKey: parsed.key,
           zone: zoneDecision.zone,
-          reason: zoneDecision.reasons[0] ?? "zone decided",
+          reason: zoneDecision.reasons[0] as string,
         });
         if (zoneDecision.zone === "gray") {
           continue;
@@ -230,10 +231,8 @@ export const scan = async (
           from: parsed.from,
           ...(parsed.fromAddress === undefined ? {} : { fromAddress: parsed.fromAddress }),
           ...(parsed.domain === undefined ? {} : { domain: parsed.domain }),
-          why:
-            zoneDecision.reasons[0] === undefined
-              ? "matched Mail Sentinel relevance rules"
-              : zoneDecision.reasons.slice(0, 2).join("; "),
+          // determineZone always populates at least one reason.
+          why: zoneDecision.reasons.slice(0, 2).join("; "),
           sentAt: scanAt,
           score: scored.score,
           adjustedScore: zoneDecision.adjustedScore,

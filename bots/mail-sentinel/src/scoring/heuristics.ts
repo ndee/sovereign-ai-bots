@@ -136,8 +136,10 @@ export const scoreMessage = (
   }
   const category = pickPrimaryCategory(categoryScores);
   const candidate = score >= rules.thresholds.candidate;
+  // categoryScores always has an entry for the chosen category.
   const relevant =
-    score >= rules.thresholds.alert && (categoryScores[category] ?? 0) >= rules.thresholds.category;
+    score >= rules.thresholds.alert &&
+    (categoryScores[category] as number) >= rules.thresholds.category;
   return {
     candidate,
     relevant,
