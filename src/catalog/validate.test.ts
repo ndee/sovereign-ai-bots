@@ -30,7 +30,8 @@ describe("catalog validator", () => {
   });
 
   it("passes lint, typecheck, test, and smoke for the current catalog", async () => {
-    await ensureRepoFile(
+    await ensureFile(
+      repoRoot,
       "bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js",
       "#!/usr/bin/env node\n",
     );
@@ -473,7 +474,15 @@ describe("catalog validator", () => {
       ],
     });
 
-    await ensureRepoFile(
+    const helperRoot = await createCatalogRoot();
+    await ensureFile(helperRoot, "bots/helper/workspace/README.md", "helper\n");
+    await ensureFile(helperRoot, "bots/helper/workspace/README.md", "helper\n");
+    expect(catalogInternals.existsSyncLike(join(helperRoot, "bots/helper/workspace/README.md"))).toBe(
+      true,
+    );
+
+    await ensureFile(
+      repoRoot,
       "bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js",
       "#!/usr/bin/env node\n",
     );
@@ -539,15 +548,17 @@ async function createCatalogRoot(): Promise<string> {
   return rootDir;
 }
 
-async function ensureRepoFile(relativePath: string, contents: string): Promise<void> {
-  const filePath = join(repoRoot, relativePath);
+async function ensureFile(rootDir: string, relativePath: string, contents: string): Promise<void> {
+  const filePath = join(rootDir, relativePath);
   try {
     await access(filePath);
     return;
   } catch {
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, contents, "utf8");
-    tempRepoPaths.push(filePath);
+    if (rootDir === repoRoot) {
+      tempRepoPaths.push(filePath);
+    }
   }
 }
 
