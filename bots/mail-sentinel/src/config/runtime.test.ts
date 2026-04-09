@@ -510,6 +510,15 @@ describe("config/runtime", () => {
         expect(result.confidence).toBe(72);
         expect(writeFile).toHaveBeenCalled();
         expect(rm).toHaveBeenCalled();
+        expect(runner).toHaveBeenCalledTimes(1);
+        const firstCall = runner.mock.calls[0];
+        expect(firstCall).toBeDefined();
+        const [executable, lobsterArgs] = firstCall as [string, readonly string[]];
+        expect(executable).toBe("lobster");
+        const pipeline = lobsterArgs[0];
+        expect(pipeline).toContain('--session-key "agent:mail-sentinel:main"');
+        expect(pipeline).toContain("--tool llm-task");
+        expect(pipeline).toContain("--action json");
       } finally {
         setExecFileAsync(previous);
       }
