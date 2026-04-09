@@ -355,6 +355,7 @@ export class MailSentinelRuntime {
       `.mail-sentinel-candidate-${randomUUID()}.json`,
     );
     await writeFile(candidateFile, `${JSON.stringify(candidate)}\n`, "utf8");
+    const sessionKey = `agent:${this.agent.id}:main`;
     const pipeline = [
       "exec",
       `--json --shell ${quoteLobsterArg(`cat ${candidateFile}`)}`,
@@ -362,6 +363,7 @@ export class MailSentinelRuntime {
       "--tool llm-task",
       "--action json",
       `--args-json ${quoteLobsterArg(JSON.stringify(args))}`,
+      `--session-key ${quoteLobsterArg(sessionKey)}`,
       "--each --item-key input",
       "| json",
     ].join(" ");
