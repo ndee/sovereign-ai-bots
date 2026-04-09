@@ -81,7 +81,7 @@ export const applyFeedback = async (
       nextReminderAt = new Date(Date.now() + parseDurationMs(delay)).toISOString();
       alert.reminderDueAt = nextReminderAt;
       note = `Reminder scheduled for ${nextReminderAt}.`;
-    } else if (action === "always-like-this" || action === "reduce") {
+    } else if (action === "always-like-this" || action === "reduce" || action === "digest-only") {
       const policy = await runtime.readPolicy();
       const derived = derivePolicyFromFeedback(alert, action);
       if (derived === null) {
@@ -89,10 +89,13 @@ export const applyFeedback = async (
       }
       policyId = derived.entry.id;
       await runtime.writePolicy(addPolicyEntry(policy, derived.type, derived.entry));
-      note =
-        action === "always-like-this"
-          ? "Sender policy created to keep this handling pattern."
-          : "Sender policy created to reduce similar future signals.";
+      if (action === "always-like-this") {
+        note = "Sender policy created to keep this handling pattern.";
+      } else if (action === "digest-only") {
+        note = "Sender policy created to route similar future signals to the digest only.";
+      } else {
+        note = "Sender policy created to reduce similar future signals.";
+      }
       if (action === "reduce") {
         applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -2);
         applyLearningAdjustment(state.learning.domainWeights, alert.domain, -1);

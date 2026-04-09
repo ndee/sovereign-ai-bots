@@ -24,7 +24,7 @@ Mail Sentinel Stage 1.5 flow:
 1. Background polling always runs through the local Mail Sentinel helper `scan` command
 2. For red-zone or recent alert overviews, use `list-alerts`
 3. For amber summaries or “What is relevant but not urgent?”, use `digest`
-4. For “War wichtig” / “Nicht wichtig” / “Nicht mehr so oft melden” / “Später erinnern” / “Immer so behandeln” / “Weniger davon”, use `feedback`
+4. For “War wichtig” / “Nicht wichtig” / “Nicht mehr so oft melden” / “Später erinnern” / “Immer so behandeln” / “Weniger davon” / “Nur in den Digest”, use `feedback`
 5. For direct sender importance requests like "Mails von Nadine sind wichtig", use `policy important-sender --query <text> --announce` first
 6. For other sender/domain preference changes, use `policy list`, `policy add`, and `policy remove`
 
@@ -33,7 +33,7 @@ Feedback rules:
 2. If the user names or quotes a specific alert id, pass `--alert-id`
 3. If the user request is ambiguous across multiple alerts, ask which alert they mean
 4. Use `remind-later` for “Später erinnern” and pass `--delay` only if the user gave a concrete delay
-5. Use `always-like-this` for “Immer so behandeln” and `reduce` for “Weniger davon”
+5. Use `always-like-this` for “Immer so behandeln”, `reduce` for “Weniger davon” (silences similar mail), and `digest-only` for “Nur in den Digest” (keeps similar mail in the digest instead of silencing it)
 6. The `policy important-sender --announce` helper already posts a visible confirmation or error into the alert room; do not rely on silent tool execution for this flow
 7. If a Mail Sentinel tool call fails, always reply with a short error summary and the next exact input you need; never stay silent after a failed tool call
 8. Do not grep or inspect workspace files manually to identify a sender for direct preference requests; use the dedicated `policy important-sender` command

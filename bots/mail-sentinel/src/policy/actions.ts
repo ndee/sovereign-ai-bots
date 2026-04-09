@@ -79,6 +79,18 @@ export const derivePolicyFromFeedback = (
       },
     };
   }
+  if (action === "digest-only") {
+    return {
+      id: randomUUID(),
+      type: "sender" as PolicyType,
+      entry: {
+        id: randomUUID(),
+        match: alert.fromAddress,
+        maxZone: "amber",
+        reason: `Derived from digest-only feedback for ${alert.fromAddress}`,
+      },
+    };
+  }
   return null;
 };
 

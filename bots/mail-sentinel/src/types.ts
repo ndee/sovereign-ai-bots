@@ -8,7 +8,8 @@ export type FeedbackState =
   | "not-important"
   | "less-often"
   | "always-like-this"
-  | "reduce";
+  | "reduce"
+  | "digest-only";
 
 export type FeedbackAction =
   | "important"
@@ -16,7 +17,8 @@ export type FeedbackAction =
   | "less-often"
   | "remind-later"
   | "always-like-this"
-  | "reduce";
+  | "reduce"
+  | "digest-only";
 
 export interface AmountSignal {
   amount: number;
