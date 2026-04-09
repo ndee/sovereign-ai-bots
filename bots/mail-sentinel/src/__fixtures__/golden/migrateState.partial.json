@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "consecutiveFailures": 0,
+  "mailbox": {
+    "lastSeenUid": 7
+  },
+  "messages": {
+    "msg:<a@b>": {
+      "key": "msg:<a@b>",
+      "uid": 5,
+      "lastSeenAt": "2026-04-08T10:00:00Z"
+    }
+  },
+  "alerts": [
+    {
+      "alertId": "x",
+      "sentAt": "2026-04-08T10:00:00Z",
+      "zone": "red"
+    }
+  ],
+  "feedback": [],
+  "learning": {
+    "senderWeights": {
+      "a@b.com": 2
+    },
+    "domainWeights": {},
+    "ruleAdjustments": {}
+  },
+  "digest": {
+    "pendingAmber": [
+      "x"
+    ],
+    "lastDigestAt": "2026-04-08T09:00:00Z"
+  },
+  "zoneHistory": []
+}

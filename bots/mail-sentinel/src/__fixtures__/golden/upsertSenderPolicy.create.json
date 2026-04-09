@@ -1,0 +1,26 @@
+{
+  "changed": true,
+  "created": true,
+  "entry": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "match": "alice@example.com",
+    "minZone": "amber",
+    "reason": "test"
+  },
+  "policy": {
+    "version": 1,
+    "senderPolicies": [
+      {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "match": "alice@example.com",
+        "minZone": "amber",
+        "reason": "test"
+      }
+    ],
+    "domainPolicies": [],
+    "categoryPolicies": [],
+    "contentPolicies": [],
+    "timePolicies": [],
+    "mutePolicies": []
+  }
+}

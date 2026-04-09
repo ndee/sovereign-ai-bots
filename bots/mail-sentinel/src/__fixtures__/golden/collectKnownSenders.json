@@ -1,0 +1,16 @@
+[
+  {
+    "from": "Alice Smith <alice@example.com>",
+    "fromAddress": "alice@example.com",
+    "domain": "example.com",
+    "messageCount": 2,
+    "lastSeenAt": "2026-04-08T11:00:00Z"
+  },
+  {
+    "from": "Bob <bob@other.example>",
+    "fromAddress": "bob@other.example",
+    "domain": "other.example",
+    "messageCount": 1,
+    "lastSeenAt": "2026-04-08T12:00:00Z"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "alertId": "alert-1",
+  "kind": "new-alert",
+  "zone": "red",
+  "category": "financial-relevance",
+  "subject": "Invoice $500",
+  "from": "Alice <alice@example.com>",
+  "why": "invoice due today",
+  "sentAt": "2026-04-08T08:00:00.000Z",
+  "confidence": 85,
+  "messageId": "<abc@ex>"
+}

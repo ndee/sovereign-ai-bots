@@ -1,0 +1,21 @@
+{
+  "key": "msg:<abc@ex>",
+  "uid": 42,
+  "messageId": "<abc@ex>",
+  "subject": "Re: Budget $500",
+  "normalizedThreadSubject": "budget $500",
+  "from": "Alice <alice@example.com>",
+  "fromAddress": "alice@example.com",
+  "domain": "example.com",
+  "date": "2026-04-08T08:00:00.000Z",
+  "text": "Please approve the $500 expense by tomorrow.",
+  "snippet": "Please approve the $500 expense by tomorrow.",
+  "headers": {
+    "from": "alice@example.com",
+    "subject": "Re: Budget $500"
+  },
+  "amountSignal": {
+    "amount": 500
+  },
+  "deadlineDetected": true
+}

@@ -1,0 +1,24 @@
+{
+  "changed": true,
+  "created": false,
+  "entry": {
+    "id": "existing",
+    "match": "alice@example.com",
+    "minZone": "red"
+  },
+  "policy": {
+    "version": 1,
+    "senderPolicies": [
+      {
+        "id": "existing",
+        "match": "alice@example.com",
+        "minZone": "red"
+      }
+    ],
+    "domainPolicies": [],
+    "categoryPolicies": [],
+    "contentPolicies": [],
+    "timePolicies": [],
+    "mutePolicies": []
+  }
+}

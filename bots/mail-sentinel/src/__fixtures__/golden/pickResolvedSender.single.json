@@ -1,0 +1,7 @@
+{
+  "fromAddress": "a@b",
+  "score": 100,
+  "from": "A <a@b>",
+  "messageCount": 1,
+  "lastSeenAt": "x"
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "senderPolicies": [
+    {
+      "id": "s1",
+      "match": "a@b"
+    }
+  ],
+  "domainPolicies": [
+    {
+      "id": "d1",
+      "match": "*.b"
+    }
+  ],
+  "categoryPolicies": [],
+  "contentPolicies": [],
+  "timePolicies": [],
+  "mutePolicies": []
+}

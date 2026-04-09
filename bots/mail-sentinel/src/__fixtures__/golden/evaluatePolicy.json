@@ -1,0 +1,17 @@
+{
+  "scoreModifier": 6,
+  "zoneFloor": "amber",
+  "zoneCeiling": null,
+  "muted": false,
+  "minConfidence": 60,
+  "reasons": [
+    "known-good",
+    "policy matched",
+    "policy matched"
+  ],
+  "matchedPolicyIds": [
+    "p-sender",
+    "p-content",
+    "p-time"
+  ]
+}
