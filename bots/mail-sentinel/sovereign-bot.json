@@ -84,12 +84,14 @@
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action remind-later --delay <duration> --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action always-like-this --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action reduce --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action digest-only --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action not-important --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action less-often --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json",
         "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action always-like-this --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action reduce --json"
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action reduce --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action digest-only --json"
       ]
     }
   ],

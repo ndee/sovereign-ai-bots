@@ -150,6 +150,37 @@ describe("commands/feedback", () => {
     expect(runtime.state.learning.senderWeights["alice@example.com"]).toBe(-2);
   });
 
+  it("creates a digest-only policy that caps an amber alert's sender at amber", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert({ zone: "amber" })];
+    const result = await applyFeedback({
+      instance: "ms-core",
+      alertId: "alert-1",
+      action: "digest-only",
+    });
+    expect(result.policyId).toBeDefined();
+    expect(result.note).toBe(
+      "Sender policy created to route similar future signals to the digest only.",
+    );
+    expect(runtime.policy.senderPolicies[0]?.maxZone).toBe("amber");
+    expect(runtime.state.alerts[0]?.feedbackState).toBe("digest-only");
+    // digest-only must not nudge the learning weights like reduce does.
+    expect(runtime.state.learning.senderWeights["alice@example.com"]).toBeUndefined();
+    expect(runtime.state.learning.domainWeights["example.com"]).toBeUndefined();
+  });
+
+  it("creates a digest-only policy that also caps a red alert's sender at amber", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert({ zone: "red" })];
+    await applyFeedback({
+      instance: "ms-core",
+      alertId: "alert-1",
+      action: "digest-only",
+    });
+    expect(runtime.policy.senderPolicies[0]?.maxZone).toBe("amber");
+    expect(runtime.state.alerts[0]?.feedbackState).toBe("digest-only");
+  });
+
   it("throws when the alert does not contain enough info to derive a policy", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts = [baseAlert({ fromAddress: undefined })];

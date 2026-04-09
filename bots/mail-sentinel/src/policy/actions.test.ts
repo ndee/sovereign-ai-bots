@@ -69,6 +69,14 @@ describe("policy/actions", () => {
         "always-like-this",
       ),
       reduce: derivePolicyFromFeedback({ fromAddress: "alice@example.com", zone: "red" }, "reduce"),
+      digestOnlyFromAmber: derivePolicyFromFeedback(
+        { fromAddress: "alice@example.com", zone: "amber" },
+        "digest-only",
+      ),
+      digestOnlyFromRed: derivePolicyFromFeedback(
+        { fromAddress: "alice@example.com", zone: "red" },
+        "digest-only",
+      ),
       notDerivable: derivePolicyFromFeedback(
         { fromAddress: "alice@example.com", zone: "red" },
         "important",
@@ -92,6 +100,22 @@ describe("policy/actions", () => {
       "reduce",
     );
     expect(derived?.entry.maxZone).toBe("gray");
+  });
+
+  it("caps a digest-only policy at amber regardless of source zone", () => {
+    for (const zone of ["red", "amber"] as const) {
+      const derived = derivePolicyFromFeedback(
+        { fromAddress: "alice@example.com", zone },
+        "digest-only",
+      );
+      expect(derived?.entry.maxZone).toBe("amber");
+      expect(derived?.entry.minZone).toBeUndefined();
+      expect(derived?.entry.reason).toBe("Derived from digest-only feedback for alice@example.com");
+    }
+  });
+
+  it("returns null for digest-only when the sender is unknown", () => {
+    expect(derivePolicyFromFeedback({ zone: "amber" }, "digest-only")).toBeNull();
   });
 
   it("matches the applyLearningAdjustment golden fixture", () => {

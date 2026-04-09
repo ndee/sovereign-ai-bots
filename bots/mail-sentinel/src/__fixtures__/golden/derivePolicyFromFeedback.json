@@ -19,6 +19,26 @@
       "reason": "Derived from reduce feedback for alice@example.com"
     }
   },
+  "digestOnlyFromAmber": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "type": "sender",
+    "entry": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "match": "alice@example.com",
+      "maxZone": "amber",
+      "reason": "Derived from digest-only feedback for alice@example.com"
+    }
+  },
+  "digestOnlyFromRed": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "type": "sender",
+    "entry": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "match": "alice@example.com",
+      "maxZone": "amber",
+      "reason": "Derived from digest-only feedback for alice@example.com"
+    }
+  },
   "notDerivable": null,
   "noSender": null
 }
