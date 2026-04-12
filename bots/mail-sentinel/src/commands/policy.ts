@@ -205,8 +205,8 @@ export const policyImportantSender = async (
           changed: upserted.changed,
           status: upserted.created ? "created" : upserted.changed ? "updated" : "unchanged",
           note: upserted.changed
-            ? `Mails from ${resolved.fromAddress} will now be treated as at least amber.`
-            : `Mails from ${resolved.fromAddress} were already treated as at least amber.`,
+            ? `Policy updated locally. ${resolved.fromAddress} routed as at least amber.`
+            : `No change. ${resolved.fromAddress} already routed as at least amber.`,
           matches: [summarizeSenderCandidate(resolved)],
           policy: {
             type: "sender" as PolicyType,

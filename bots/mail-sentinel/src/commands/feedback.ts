@@ -55,7 +55,7 @@ export const applyFeedback = async (
       for (const ruleId of alert.matchedRuleIds ?? []) {
         applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, 1);
       }
-      note = "Alert marked as important.";
+      note = "Feedback applied. Alert marked as important.";
     } else if (action === "not-important") {
       alert.feedbackState = "not-important";
       alert.feedbackAt = appliedAt;
@@ -65,7 +65,7 @@ export const applyFeedback = async (
       for (const ruleId of alert.matchedRuleIds ?? []) {
         applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
       }
-      note = "Alert marked as not important.";
+      note = "Feedback applied. Alert marked as not important.";
     } else if (action === "less-often") {
       alert.feedbackState = "less-often";
       alert.feedbackAt = appliedAt;
@@ -75,7 +75,7 @@ export const applyFeedback = async (
       for (const ruleId of alert.matchedRuleIds ?? []) {
         applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
       }
-      note = "Future alerts from this sender will be down-weighted.";
+      note = "Feedback applied. Sender weight reduced.";
     } else if (action === "remind-later") {
       const delay = options.delay ?? runtime.defaultReminderDelay;
       nextReminderAt = new Date(Date.now() + parseDurationMs(delay)).toISOString();
@@ -90,11 +90,11 @@ export const applyFeedback = async (
       policyId = derived.entry.id;
       await runtime.writePolicy(addPolicyEntry(policy, derived.type, derived.entry));
       if (action === "always-like-this") {
-        note = "Sender policy created to keep this handling pattern.";
+        note = "Policy updated locally. Sender routing pattern locked.";
       } else if (action === "digest-only") {
-        note = "Sender policy created to route similar future signals to the digest only.";
+        note = "Policy updated locally. Similar signals routed to digest only.";
       } else {
-        note = "Sender policy created to reduce similar future signals.";
+        note = "Policy updated locally. Similar signals reduced.";
       }
       if (action === "reduce") {
         applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -2);

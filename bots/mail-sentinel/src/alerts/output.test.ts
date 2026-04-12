@@ -41,9 +41,12 @@ describe("alerts/output", () => {
   });
 
   it("matches the formatFeedbackResult golden fixtures", () => {
-    expect(formatFeedbackResult({ note: "Alert marked as important.", alertId: "alert-1" })).toBe(
-      loadGolden("formatFeedbackResult.plain"),
-    );
+    expect(
+      formatFeedbackResult({
+        note: "Feedback applied. Alert marked as important.",
+        alertId: "alert-1",
+      }),
+    ).toBe(loadGolden("formatFeedbackResult.plain"));
     expect(
       formatFeedbackResult({
         note: "Reminder scheduled.",
@@ -53,7 +56,7 @@ describe("alerts/output", () => {
     ).toBe(loadGolden("formatFeedbackResult.reminder"));
     expect(
       formatFeedbackResult({
-        note: "Policy created.",
+        note: "Policy updated locally.",
         alertId: "alert-1",
         policyId: "pol-1",
       }),

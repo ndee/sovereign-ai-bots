@@ -16,7 +16,7 @@
     "riskEscalation": false,
     "confidence": 0,
     "urgency": "low",
-    "reason": "No semantic reason returned.",
+    "reason": "No reason available.",
     "deadlineDetected": false,
     "amountDetected": false,
     "suggestedZone": "gray"
