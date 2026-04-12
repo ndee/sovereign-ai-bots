@@ -98,7 +98,7 @@ describe("alerts/format", () => {
       { ...sampleAlert, category: "mystery" as unknown as "financial-relevance" },
       "new-alert",
     );
-    expect(msg).toContain("Kategorie: mystery");
+    expect(msg).toContain("Category: mystery");
   });
 
   it("uses raw category label in buildDigestMessage when unknown", () => {

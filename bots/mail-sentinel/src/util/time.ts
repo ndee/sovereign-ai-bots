@@ -45,15 +45,15 @@ export const isSameLocalDay = (value: string | Date | number, reference: Date): 
 
 export const formatConfidenceLabel = (confidence: unknown): string => {
   if (typeof confidence !== "number") {
-    return "unbekannt";
+    return "unknown";
   }
   if (confidence >= 75) {
-    return `hoch (${confidence}%)`;
+    return `high (${confidence}%)`;
   }
   if (confidence >= 40) {
-    return `mittel (${confidence}%)`;
+    return `medium (${confidence}%)`;
   }
-  return `niedrig (${confidence}%)`;
+  return `low (${confidence}%)`;
 };
 
 export const sortAlertsNewestFirst = <T extends Pick<StoredAlert | AlertSummary, "sentAt">>(
