@@ -1,6 +1,6 @@
 {
-  "high": "hoch (85%)",
-  "medium": "mittel (50%)",
-  "low": "niedrig (10%)",
-  "undef": "unbekannt"
+  "high": "high (85%)",
+  "medium": "medium (50%)",
+  "low": "low (10%)",
+  "undef": "unknown"
 }
