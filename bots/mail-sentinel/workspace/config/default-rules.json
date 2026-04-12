@@ -56,6 +56,16 @@
       "reason": "body contains payment-related wording"
     },
     {
+      "id": "risk-escalation-subject",
+      "field": "subject",
+      "pattern": "\\b(eskalation|escalation|sicherheitsvorfall|security incident|beschwerde|complaint|warnung|warning|failed payment|fehlgeschlagene zahlung)\\b",
+      "weight": 5,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "subject mentions escalation, security incidents, complaints, or payment failures"
+    },
+    {
       "id": "risk-deadline-text",
       "field": "text",
       "pattern": "\\b(frist|deadline|heute|today|morgen|tomorrow|urgent|eskalation|escalation|beschwerde|complaint|security incident|sicherheitsvorfall)\\b",
