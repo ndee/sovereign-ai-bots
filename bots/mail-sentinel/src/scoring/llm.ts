@@ -47,7 +47,7 @@ export const normalizeLlmResult = (raw: RawLlmPayload | null | undefined): LlmRe
     riskEscalation: raw?.risk_escalation === true,
     confidence,
     urgency,
-    reason: compactText(raw?.reason ?? "No semantic reason returned."),
+    reason: compactText(raw?.reason ?? "No reason available."),
     deadlineDetected: raw?.deadline_detected === true,
     amountDetected: raw?.amount_detected === true,
     suggestedZone,

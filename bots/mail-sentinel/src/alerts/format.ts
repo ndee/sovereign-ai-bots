@@ -40,10 +40,10 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): strin
     `From: ${alert.from}`,
     `Why it matters: ${alert.why}`,
     `Confidence: ${formatConfidenceLabel(alert.confidence)}`,
-    "Feedback: 'Important', 'Not important', 'Remind later', 'Always like this' or 'Less often'.",
+    "Feedback: Reply with 'Very important', 'Not important', 'Remind later', 'Always treat like this', or 'Less of this'.",
   ];
   if (alert.messageId !== undefined) {
-    lines.push(`Message-ID: ${alert.messageId}`);
+    lines.push(`Message ID: ${alert.messageId}`);
   }
   return lines.join("\n");
 };
@@ -65,7 +65,7 @@ export const buildDigestMessage = (
       `   From: ${alert.from}`,
       `   Category: ${CATEGORY_LABELS[alert.category] ?? alert.category}`,
       `   Confidence: ${formatConfidenceLabel(alert.confidence)}`,
-      `   Why: ${alert.why}`,
+      `   Why it matters: ${alert.why}`,
     );
   }
   if (alerts.length > 10) {

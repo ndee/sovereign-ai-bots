@@ -77,7 +77,7 @@ describe("commands/feedback", () => {
       alertId: "alert-1",
       action: "important",
     });
-    expect(result.note).toBe("Alert marked as important.");
+    expect(result.note).toBe("Feedback applied. Alert marked as important.");
     expect(runtime.state.alerts[0]?.feedbackState).toBe("important");
     expect(runtime.state.learning.senderWeights["alice@example.com"]).toBe(2);
     expect(runtime.state.learning.domainWeights["example.com"]).toBe(1);
@@ -159,9 +159,7 @@ describe("commands/feedback", () => {
       action: "digest-only",
     });
     expect(result.policyId).toBeDefined();
-    expect(result.note).toBe(
-      "Sender policy created to route similar future signals to the digest only.",
-    );
+    expect(result.note).toBe("Policy updated locally. Similar signals routed to digest only.");
     expect(runtime.policy.senderPolicies[0]?.maxZone).toBe("amber");
     expect(runtime.state.alerts[0]?.feedbackState).toBe("digest-only");
     // digest-only must not nudge the learning weights like reduce does.
