@@ -80,7 +80,7 @@ export const applyFeedback = async (
       const delay = options.delay ?? runtime.defaultReminderDelay;
       nextReminderAt = new Date(Date.now() + parseDurationMs(delay)).toISOString();
       alert.reminderDueAt = nextReminderAt;
-      note = `Reminder scheduled for ${nextReminderAt}.`;
+      note = "Reminder scheduled.";
     } else if (action === "always-like-this" || action === "reduce" || action === "digest-only") {
       const policy = await runtime.readPolicy();
       const derived = derivePolicyFromFeedback(alert, action);

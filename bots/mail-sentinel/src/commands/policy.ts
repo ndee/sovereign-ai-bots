@@ -177,7 +177,7 @@ export const policyImportantSender = async (
             instanceId: runtime.instanceId,
             changed: false,
             status: "not-found",
-            note: `I could not match '${query}' to a known sender yet. Please use the email address directly if needed.`,
+            note: `No match found for '${query}'. Use the email address directly if needed.`,
             matches: [],
           };
         }
@@ -187,7 +187,7 @@ export const policyImportantSender = async (
             instanceId: runtime.instanceId,
             changed: false,
             status: "ambiguous",
-            note: `I found multiple sender matches for '${query}'. Please pick the exact address.`,
+            note: `Multiple sender matches found for '${query}'. Pick the exact address.`,
             matches: matches.slice(0, 5).map(summarizeSenderCandidate),
           };
         }
@@ -222,7 +222,7 @@ export const policyImportantSender = async (
   } catch (error) {
     if (options.announce === true) {
       await runtime.sendMatrixRoomMessage(
-        `Mail Sentinel konnte die Sender-Praferenz nicht anwenden: ${
+        `Mail Sentinel could not apply the sender preference: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

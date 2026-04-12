@@ -6,7 +6,7 @@
   "displayName": "Mail Sentinel",
   "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them with Lobster plus llm-task, applies personal policy, and chooses red, amber, or gray handling.",
   "defaultInstall": true,
-  "helloMessage": "Hello from Mail Sentinel 2.0. I prefilter inbox signals, review candidates semantically through Lobster, apply your policy, and route mail into red alerts, amber digests, or gray silence.",
+  "helloMessage": "Mail Sentinel 2.0 online. Filtering inbox signals, reviewing candidates through Lobster, applying policy, routing into red alerts, amber digests, or gray silence.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
