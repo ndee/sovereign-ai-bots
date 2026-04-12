@@ -1,6 +1,6 @@
 # sovereign-ai-bots
 
-Installable bot packages for Sovereign AI Node.
+Installable bot packages for [Sovereign AI Node](https://github.com/ndee/sovereign-ai-node).
 
 This repository contains the packaged bot modules consumed by `sovereign-ai-node`. It is not the runtime itself. It is the bot package layer.
 
@@ -14,32 +14,17 @@ This repository contains the packaged bot modules consumed by `sovereign-ai-node
 - installable
 - separate from the core runtime
 
-Sovereign AI Node provides the runtime, Matrix control plane, and policy boundaries.  
+Sovereign AI Node provides the runtime, Matrix control plane, and policy boundaries.
 This repository provides the installable bot packages that run inside that environment.
 
 ## Relationship to Sovereign AI Node
 
-### `sovereign-ai-node`
-Provides:
+| Layer | Repository | Role |
+|---|---|---|
+| **Runtime** | [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node) | Installer, Matrix stack, agent/tool contracts, policy boundaries |
+| **Bots** | `sovereign-ai-bots` | Packaged bot definitions, workspace files, manifests |
 
-- the runtime kernel
-- Matrix integration
-- agent and tool contracts
-- installer and operator flows
-- local-first execution
-
-### `sovereign-ai-bots`
-Provides:
-
-- packaged bot definitions
-- bot workspace files
-- bot manifests
-- installable module versions
-
-In short:
-
-**Node runs bots.  
-This repo defines packaged bots.**
+**Node runs bots. This repo defines packaged bots.**
 
 ## Package structure
 
@@ -56,61 +41,62 @@ A package currently contains:
 
 - `mail-sentinel`
 - `node-operator`
-- `bitcoin-skill-match`
 
-## Tooling
+---
 
-Catalog validation, probe tooling, and bot runtimes use TypeScript. The
-`mail-sentinel` bot source lives under `bots/mail-sentinel/src/` and tsup
-bundles it into a single file at `bots/mail-sentinel/workspace/bin/dist/
-mail-sentinel.js` (gitignored). The manifest (`sovereign-bot.json`) and
-systemd unit both reference the compiled `mail-sentinel.js`. `pnpm build`
-must run before any `pnpm catalog:*` command because the validator
-checks that `hostResources[].spec.source` exists on disk.
+## Mail Sentinel
 
-Common commands:
+Mail Sentinel is the first concrete module on Sovereign AI Node. It monitors an IMAP mailbox locally, classifies incoming signals using a heuristic prefilter and LLM second pass, and routes what matters into Matrix.
 
-- `pnpm lint` -- Biome checks for `src/` and `bots/*/src/`
-- `pnpm typecheck` -- TypeScript type-checking
-- `pnpm build` -- build the root CLI entrypoints into `dist/` **and** every bot's
-  compiled bundle into `bots/*/workspace/bin/dist/`
-- `pnpm test:coverage:unit` -- Vitest with 100% coverage on catalog tooling
-  and every bot's TypeScript source tree
-- `pnpm catalog:lint` -- validate all `bots/**/*.json` files and canonical
-  JSON formatting (run `pnpm build` first)
-- `pnpm catalog:typecheck` -- schema-check all bot manifests
-- `pnpm catalog:test` -- run catalog invariants
-- `pnpm catalog:smoke` -- copy source-backed host resources into a temp
-  directory
-- `pnpm probe:mail-sentinel-model` -- manually probe the Mail Sentinel model
-  declared in `bots/mail-sentinel/sovereign-bot.json` via OpenRouter
+### What it looks like
 
-### Running a bot CLI during development
+![Mail Sentinel RED alert surfaced in Matrix](docs/img/mail-sentinel/01-hero-alert.png)
+Mail Sentinel surfaces high-signal messages in Matrix.
 
-To run `mail-sentinel` without a full build, use `tsx` against the
-source entry point:
+![Mail Sentinel AMBER digest grouped in Matrix](docs/img/mail-sentinel/02-amber-digest.png)
+Mail Sentinel can group relevant messages into a calm digest.
 
-```bash
-tsx bots/mail-sentinel/src/cli.ts <command> --instance <id> --json
+![Operator feedback updating Mail Sentinel routing policy](docs/img/mail-sentinel/04-feedback.png)
+Operator feedback updates local policy and influences future routing.
+
+### How it works
+
+```mermaid
+flowchart TD
+    A[IMAP / Proton Bridge] --> B[Mail Intake]
+    B --> C[Heuristic Prefilter]
+    C --> D{Candidate for semantic review?}
+    D -- No --> E[GRAY<br/>Silent]
+    D -- Yes --> F[LLM Second Pass]
+    F --> G[Policy Layer<br/>local rules / preferences / weights]
+    G --> H{Zone Routing}
+    H --> I[RED<br/>Immediate alert in Matrix]
+    H --> J[AMBER<br/>Digest in Matrix]
+    H --> E
+    I --> K[User feedback]
+    J --> K
+    K --> G
 ```
 
-For a production-style run, `pnpm build` first then invoke
-`node bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js ...`.
+Not every message reaches the LLM. Heuristic filters run first to discard obvious noise. Messages that pass the prefilter get a semantic second pass, then route through a local policy layer that controls zone assignment (RED, AMBER, GRAY). Operator feedback — submitted directly in Matrix — updates local scoring rules and preferences, which shifts future routing. Matrix is the delivery surface for all alerts and digests.
 
-## Current package roles
+Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
-### `mail-sentinel`
-The first concrete module for Sovereign AI Node.
+### Signal fields
 
-It:
+Each classified message includes:
 
-- monitors IMAP-based mail
-- classifies important signals
-- pushes relevant alerts into Matrix
-- adapts local scoring behavior from feedback
-- supports installer-managed per-instance config, state, and scheduling
+- **Zone** — RED, AMBER, or GRAY
+- **Category** — e.g. Decision Required, Financial Relevance, Risk / Escalation
+- **Subject** / **From** — original message metadata
+- **Why it matters** — short explanation of the routing decision
+- **Confidence** — model confidence in the classification
+- **Feedback** — operator action to refine future routing
 
-### `node-operator`
+---
+
+## node-operator
+
 The operational bot for interacting with the local node.
 
 It:
@@ -129,6 +115,45 @@ Bot packages should remain compatible with the Sovereign AI Node trust model:
 - tool access mediated by node policy boundaries
 - inspectable package contents before installation
 
+## Tooling
+
+Catalog validation, probe tooling, and bot runtimes use TypeScript. The
+`mail-sentinel` bot source lives under `bots/mail-sentinel/src/` and tsup
+bundles it into a single file at `bots/mail-sentinel/workspace/bin/dist/
+mail-sentinel.js` (gitignored). The manifest (`sovereign-bot.json`) and
+systemd unit both reference the compiled `mail-sentinel.js`. `pnpm build`
+must run before any `pnpm catalog:*` command because the validator
+checks that `hostResources[].spec.source` exists on disk.
+
+Common commands:
+
+- `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
+- `pnpm typecheck` — TypeScript type-checking
+- `pnpm build` — build the root CLI entrypoints into `dist/` **and** every bot's
+  compiled bundle into `bots/*/workspace/bin/dist/`
+- `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
+  and every bot's TypeScript source tree
+- `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
+  JSON formatting (run `pnpm build` first)
+- `pnpm catalog:typecheck` — schema-check all bot manifests
+- `pnpm catalog:test` — run catalog invariants
+- `pnpm catalog:smoke` — copy source-backed host resources into a temp
+  directory
+- `pnpm probe:mail-sentinel-model` — manually probe the Mail Sentinel model
+  declared in `bots/mail-sentinel/sovereign-bot.json` via OpenRouter
+
+### Running a bot CLI during development
+
+To run `mail-sentinel` without a full build, use `tsx` against the
+source entry point:
+
+```bash
+tsx bots/mail-sentinel/src/cli.ts <command> --instance <id> --json
+```
+
+For a production-style run, `pnpm build` first then invoke
+`node bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js ...`.
+
 ## Long-term direction
 
 Over time, this repo should grow into a catalog of specialized modules for Sovereign AI Node, including:
@@ -140,6 +165,6 @@ Over time, this repo should grow into a catalog of specialized modules for Sover
 - security
 - finance
 
-## Related repo
+## Related
 
-- `sovereign-ai-node` — open-core runtime a
+- [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node) — open-core runtime and control plane
