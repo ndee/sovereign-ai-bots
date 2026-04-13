@@ -82,6 +82,25 @@ Not every message reaches the LLM. Heuristic filters run first to discard obviou
 
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
+### Prerequisites
+
+Mail Sentinel requires:
+
+- an IMAP-accessible mailbox with credentials
+- Sovereign AI Node installed on a supported Ubuntu VM
+- provider credentials (OpenRouter API key) configured at the node level — see [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node)
+
+If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bridge) must be installed and configured on the host to expose IMAP access. On the current self-hosted path, Proton Bridge is installed manually. It is not required for other IMAP providers.
+
+### Current tested path
+
+The current documented and tested path for Mail Sentinel is:
+
+- Sovereign AI Node on a fresh Ubuntu VM
+- Matrix as control plane (provisioned by the installer)
+- IMAP mailbox (any provider, or Proton Mail via Proton Bridge)
+- provider-backed runtime path with an OpenRouter API key (configured at node level)
+
 ### Signal fields
 
 Each classified message includes:
@@ -156,14 +175,7 @@ For a production-style run, `pnpm build` first then invoke
 
 ## Long-term direction
 
-Over time, this repo should grow into a catalog of specialized modules for Sovereign AI Node, including:
-
-- mail
-- documents
-- calendars
-- operations
-- security
-- finance
+Over time, this repo should grow into a catalog of specialized modules for Sovereign AI Node spanning mail, documents, calendars, operations, security, and finance.
 
 ## Related
 
