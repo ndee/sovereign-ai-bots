@@ -272,7 +272,7 @@
           ]
         },
         "source": "workspace/config/default-rules.json",
-        "writePolicy": "ifMissing"
+        "writePolicy": "always"
       }
     },
     {
