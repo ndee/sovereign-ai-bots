@@ -62,6 +62,27 @@ describe("policy/actions", () => {
     expect(withMute.mutePolicies).toHaveLength(1);
   });
 
+  it("adds a receiver policy entry", () => {
+    const base = createDefaultPolicy();
+    const withReceiver = addPolicyEntry(base, "receiver", { id: "r1", match: "me@biz.com" });
+    expect(withReceiver.receiverPolicies).toHaveLength(1);
+    expect(withReceiver.receiverPolicies[0]?.match).toBe("me@biz.com");
+  });
+
+  it("includes receiver policies in flattenPolicies", () => {
+    const flat = flattenPolicies({
+      version: 1,
+      senderPolicies: [],
+      domainPolicies: [],
+      receiverPolicies: [{ id: "r1", match: "me@biz.com" }],
+      categoryPolicies: [],
+      contentPolicies: [],
+      timePolicies: [],
+      mutePolicies: [],
+    });
+    expect(flat).toEqual([{ type: "receiver", id: "r1", match: "me@biz.com" }]);
+  });
+
   it("matches the derivePolicyFromFeedback golden fixture", () => {
     const result = {
       always: derivePolicyFromFeedback(

@@ -101,6 +101,16 @@ export const evaluatePolicy = (
     }
   }
 
+  for (const entry of normalized.receiverPolicies) {
+    const pattern = entry.match ?? "";
+    if (
+      pattern.length > 0 &&
+      message.toAddresses.some((addr) => matchGlob(addr, pattern))
+    ) {
+      noteMatch(entry);
+    }
+  }
+
   for (const entry of normalized.categoryPolicies) {
     if (entry.category === scored.category) {
       noteMatch(entry);
