@@ -82,6 +82,8 @@ Not every message reaches the LLM. Heuristic filters run first to discard obviou
 
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
+The packaged baseline rules file (`config/default-rules.json`) is installer-managed and reapplied on install/update so shipped heuristics stay aligned with the current bot version. Operator-specific preferences and feedback stay in local policy/state files instead of editing that packaged defaults file in place.
+
 ### Prerequisites
 
 Mail Sentinel requires:
