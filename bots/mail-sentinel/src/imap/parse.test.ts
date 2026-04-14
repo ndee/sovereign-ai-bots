@@ -149,10 +149,7 @@ describe("imap/parse", () => {
   });
 
   it("returns empty toAddresses when no receiver data is present", () => {
-    const parsed = parseMessage(
-      { uid: 12 },
-      { message: { uid: 12, text: "hi" } },
-    );
+    const parsed = parseMessage({ uid: 12 }, { message: { uid: 12, text: "hi" } });
     expect(parsed.toAddresses).toEqual([]);
   });
 
@@ -168,18 +165,15 @@ describe("imap/parse", () => {
     });
 
     it("extracts from comma-separated string", () => {
-      expect(
-        parseReceiverAddresses("alice@a.com, bob@b.com", undefined, {}),
-      ).toEqual(["alice@a.com", "bob@b.com"]);
+      expect(parseReceiverAddresses("alice@a.com, bob@b.com", undefined, {})).toEqual([
+        "alice@a.com",
+        "bob@b.com",
+      ]);
     });
 
     it("deduplicates addresses across to, cc, and headers", () => {
       expect(
-        parseReceiverAddresses(
-          ["alice@a.com"],
-          undefined,
-          { to: "alice@a.com", cc: "bob@b.com" },
-        ),
+        parseReceiverAddresses(["alice@a.com"], undefined, { to: "alice@a.com", cc: "bob@b.com" }),
       ).toEqual(["alice@a.com", "bob@b.com"]);
     });
 

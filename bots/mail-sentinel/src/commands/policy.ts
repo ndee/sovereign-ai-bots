@@ -56,7 +56,10 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
   if (typeof options.type !== "string" || options.type.length === 0) {
     throw new Error("Expected --type <sender|domain|receiver|category|content|time|mute>");
   }
-  if (["sender", "domain", "receiver", "mute"].includes(options.type) && typeof options.match !== "string") {
+  if (
+    ["sender", "domain", "receiver", "mute"].includes(options.type) &&
+    typeof options.match !== "string"
+  ) {
     throw new Error(`Policy type '${options.type}' requires --match <pattern>`);
   }
   if (options.type === "category" && typeof options.category !== "string") {

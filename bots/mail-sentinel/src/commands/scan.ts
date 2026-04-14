@@ -167,7 +167,7 @@ export const scan = async (
           ...(parsed.domain === undefined ? {} : { domain: parsed.domain }),
           ...(parsed.date === undefined ? {} : { date: parsed.date }),
           snippet: parsed.snippet,
-          ...(parsed.toAddresses.length > 0 ? { toAddresses: parsed.toAddresses } : {}),
+          toAddresses: parsed.toAddresses,
           firstSeenAt: knownMessage?.firstSeenAt ?? scanAt,
           lastSeenAt: scanAt,
           ...(knownMessage?.alertId === undefined ? {} : { alertId: knownMessage.alertId }),
@@ -232,7 +232,7 @@ export const scan = async (
           from: parsed.from,
           ...(parsed.fromAddress === undefined ? {} : { fromAddress: parsed.fromAddress }),
           ...(parsed.domain === undefined ? {} : { domain: parsed.domain }),
-          ...(parsed.toAddresses.length > 0 ? { toAddresses: parsed.toAddresses } : {}),
+          toAddresses: parsed.toAddresses,
           // determineZone always populates at least one reason.
           why: zoneDecision.reasons.slice(0, 2).join("; "),
           sentAt: scanAt,

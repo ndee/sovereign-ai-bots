@@ -182,7 +182,14 @@ export interface MailSentinelPolicy {
   mutePolicies: PolicyEntryBase[];
 }
 
-export type PolicyType = "sender" | "domain" | "receiver" | "category" | "content" | "time" | "mute";
+export type PolicyType =
+  | "sender"
+  | "domain"
+  | "receiver"
+  | "category"
+  | "content"
+  | "time"
+  | "mute";
 
 export interface FlattenedPolicyEntry extends PolicyEntryBase {
   type: PolicyType;

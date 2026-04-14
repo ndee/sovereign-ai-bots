@@ -28,6 +28,7 @@ describe("policy/actions", () => {
         version: 1,
         senderPolicies: [{ id: "s1", match: "a@b" }],
         domainPolicies: [{ id: "d1", match: "*.b" }],
+        receiverPolicies: [],
         categoryPolicies: [{ id: "c1", category: "decision-required" }],
         contentPolicies: [{ id: "co1", pattern: "invoice" }],
         timePolicies: [{ id: "t1", schedule: "09:00-17:00" }],
