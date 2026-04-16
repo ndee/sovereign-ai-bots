@@ -41,6 +41,38 @@ describe("scoring/heuristics", () => {
     expect(pickPrimaryCategory({})).toBe("decision-required");
   });
 
+  it("tie-breaks on equal scores by risk > financial > decision-required priority", () => {
+    expect(
+      pickPrimaryCategory({
+        "decision-required": 3,
+        "financial-relevance": 3,
+        "risk-escalation": 3,
+      }),
+    ).toBe("risk-escalation");
+    expect(
+      pickPrimaryCategory({
+        "decision-required": 3,
+        "financial-relevance": 3,
+        "risk-escalation": 0,
+      }),
+    ).toBe("financial-relevance");
+    expect(
+      pickPrimaryCategory({
+        "decision-required": 3,
+        "financial-relevance": 0,
+        "risk-escalation": 0,
+      }),
+    ).toBe("decision-required");
+  });
+
+  it("falls back to alphabetical order when tied categories are not in the priority list", () => {
+    const result = pickPrimaryCategory({
+      "zeta-custom": 5,
+      "alpha-custom": 5,
+    } as unknown as Record<string, number>);
+    expect(result).toBe("alpha-custom");
+  });
+
   it("matches the summarizeReasons golden fixture", () => {
     const matches: RuleMatch[] = [
       { ruleId: "r1", reason: "a", weight: 3, categories: [] },

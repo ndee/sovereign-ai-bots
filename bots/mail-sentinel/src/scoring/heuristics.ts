@@ -104,10 +104,26 @@ export const buildRuleMatches = (
   return matches;
 };
 
+// Tie-break order when multiple categories share the top score: prefer the one
+// that most likely needs human attention. risk > financial > decision-required
+// matches the ordering the digest uses when it summarises mixed signals.
+const CATEGORY_TIE_BREAK: readonly Category[] = [
+  "risk-escalation",
+  "financial-relevance",
+  "decision-required",
+];
+
 export const pickPrimaryCategory = (scores: Record<string, number>): Category => {
   const sorted = Object.entries(scores).sort((left, right) => {
     if (right[1] !== left[1]) {
       return right[1] - left[1];
+    }
+    const leftRank = CATEGORY_TIE_BREAK.indexOf(left[0] as Category);
+    const rightRank = CATEGORY_TIE_BREAK.indexOf(right[0] as Category);
+    const leftOrdered = leftRank === -1 ? CATEGORY_TIE_BREAK.length : leftRank;
+    const rightOrdered = rightRank === -1 ? CATEGORY_TIE_BREAK.length : rightRank;
+    if (leftOrdered !== rightOrdered) {
+      return leftOrdered - rightOrdered;
     }
     return left[0].localeCompare(right[0]);
   });
