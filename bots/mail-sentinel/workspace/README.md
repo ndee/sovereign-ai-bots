@@ -3,7 +3,8 @@
 Provisioned by sovereign-node install flow.
 Managed by Sovereign Node installer.
 
-- `config/default-rules.json` seeds the default local relevance rules.
+- `config/default-rules.json` contains the packaged default local relevance rules and is refreshed from the bot package on install/update.
+- `config/user-policy.json` is the operator-managed override layer and is only created when missing.
 - runtime config is resolved per Mail Sentinel instance via `mail-sentinel.js --instance <id>`.
 - instance-scoped paths such as state, rules, policy, alert room, and timers are provided from the installed tool configuration.
 - `data/` is the default local state location when an instance keeps the packaged workspace layout.
