@@ -41,6 +41,7 @@ A package currently contains:
 
 - `mail-sentinel`
 - `node-operator`
+- `bitcoin-skill-match`
 
 ---
 
@@ -148,8 +149,8 @@ Common commands:
 
 - `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` — TypeScript type-checking
-- `pnpm build` — build the root CLI entrypoints into `dist/` **and** every bot's
-  compiled bundle into `bots/*/workspace/bin/dist/`
+- `pnpm build` — build the root CLI entrypoints into `dist/` and the current
+  Mail Sentinel bot bundle into `bots/mail-sentinel/workspace/bin/dist/`
 - `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
   and every bot's TypeScript source tree
 - `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
