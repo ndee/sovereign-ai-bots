@@ -66,11 +66,17 @@ export const buildDigestMessage = (
       `   Category: ${CATEGORY_LABELS[alert.category] ?? alert.category}`,
       `   Confidence: ${formatConfidenceLabel(alert.confidence)}`,
       `   Why it matters: ${alert.why}`,
+      `   Alert ID: ${alert.alertId}`,
     );
   }
   if (alerts.length > 10) {
     lines.push(`... and ${String(alerts.length - 10)} more.`);
   }
-  lines.push("", `Generated: ${sentAt}`);
+  lines.push(
+    "",
+    "Feedback: Reply with 'Very important', 'Not important', 'Remind later', 'Always treat like this', or 'Less of this' and reference an item number or subject.",
+    "",
+    `Generated: ${sentAt}`,
+  );
   return lines.join("\n");
 };
