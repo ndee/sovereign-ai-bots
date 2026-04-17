@@ -225,4 +225,49 @@ describe("commands/feedback", () => {
     });
     expect(result.alertId).toBe("newest");
   });
+
+  // Pin the note string for every FeedbackAction so any wrapper (Matrix bridge,
+  // agent loop, digest formatter) that paraphrases or interpolates a sender
+  // name into the confirmation fails CI.
+  describe("note wording is a stable, self-contained string", () => {
+    const cases: Array<{ action: Parameters<typeof applyFeedback>[0]["action"]; note: string }> = [
+      { action: "important", note: "Feedback applied. Alert marked as important." },
+      { action: "not-important", note: "Feedback applied. Alert marked as not important." },
+      { action: "less-often", note: "Feedback applied. Sender weight reduced." },
+      {
+        action: "always-like-this",
+        note: "Policy updated locally. Sender routing pattern locked.",
+      },
+      { action: "reduce", note: "Policy updated locally. Similar signals reduced." },
+      {
+        action: "digest-only",
+        note: "Policy updated locally. Similar signals routed to digest only.",
+      },
+    ];
+    for (const { action, note } of cases) {
+      it(`${String(action)} returns exactly '${note}'`, async () => {
+        const runtime = getFakeRuntime();
+        runtime.state.alerts = [baseAlert()];
+        const result = await applyFeedback({
+          instance: "ms-core",
+          alertId: "alert-1",
+          action,
+        });
+        expect(result.note).toBe(note);
+        expect(result.note).not.toContain("alice@example.com");
+        expect(result.note).not.toContain("example.com");
+      });
+    }
+
+    it("remind-later returns exactly 'Reminder scheduled.'", async () => {
+      const runtime = getFakeRuntime();
+      runtime.state.alerts = [baseAlert()];
+      const result = await applyFeedback({
+        instance: "ms-core",
+        alertId: "alert-1",
+        action: "remind-later",
+      });
+      expect(result.note).toBe("Reminder scheduled.");
+    });
+  });
 });
