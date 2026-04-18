@@ -140,6 +140,30 @@ describe("commands/policy", () => {
       });
       expect(runtime.policy.timePolicies).toHaveLength(1);
     });
+
+    it("rejects a receiver policy without --match", async () => {
+      await expect(
+        policyAdd({ instance: "ms-core", json: false, type: "receiver" }),
+      ).rejects.toThrow("'receiver' requires --match");
+    });
+
+    it("adds a receiver policy with the provided flags", async () => {
+      const runtime = getFakeRuntime();
+      const result = await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "receiver",
+        match: "me@business.com",
+        minZone: "red",
+        boost: "5",
+        reason: "business email",
+      });
+      expect(result.changed).toBe(true);
+      expect(runtime.policy.receiverPolicies).toHaveLength(1);
+      expect(runtime.policy.receiverPolicies[0]?.match).toBe("me@business.com");
+      expect(runtime.policy.receiverPolicies[0]?.boost).toBe(5);
+      expect(result.policy.type).toBe("receiver");
+    });
   });
 
   describe("policyRemove", () => {
@@ -167,6 +191,14 @@ describe("commands/policy", () => {
       const result = await policyRemove({ instance: "ms-core", id: "missing" });
       expect(result.changed).toBe(false);
       expect(runtime.policy.senderPolicies).toHaveLength(1);
+    });
+
+    it("removes a receiver policy", async () => {
+      const runtime = getFakeRuntime();
+      runtime.policy.receiverPolicies.push({ id: "r1", match: "me@biz.com" });
+      const result = await policyRemove({ instance: "ms-core", id: "r1" });
+      expect(result.changed).toBe(true);
+      expect(runtime.policy.receiverPolicies).toHaveLength(0);
     });
   });
 

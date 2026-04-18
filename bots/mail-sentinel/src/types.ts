@@ -37,6 +37,7 @@ export interface ParsedMessage {
   text: string;
   snippet: string;
   headers: Record<string, string>;
+  toAddresses: string[];
   amountSignal: AmountSignal | null;
   deadlineDetected: boolean;
 }
@@ -52,6 +53,7 @@ export interface StoredMessage {
   domain?: string | undefined;
   date?: string | undefined;
   snippet: string;
+  toAddresses?: string[] | undefined;
   firstSeenAt: string;
   lastSeenAt: string;
   alertId?: string | undefined;
@@ -68,6 +70,7 @@ export interface StoredAlert {
   from: string;
   fromAddress?: string | undefined;
   domain?: string | undefined;
+  toAddresses?: string[] | undefined;
   why: string;
   sentAt: string;
   score?: number | undefined;
@@ -175,10 +178,18 @@ export interface MailSentinelPolicy {
   categoryPolicies: PolicyEntryBase[];
   contentPolicies: PolicyEntryBase[];
   timePolicies: PolicyEntryBase[];
+  receiverPolicies: PolicyEntryBase[];
   mutePolicies: PolicyEntryBase[];
 }
 
-export type PolicyType = "sender" | "domain" | "category" | "content" | "time" | "mute";
+export type PolicyType =
+  | "sender"
+  | "domain"
+  | "receiver"
+  | "category"
+  | "content"
+  | "time"
+  | "mute";
 
 export interface FlattenedPolicyEntry extends PolicyEntryBase {
   type: PolicyType;

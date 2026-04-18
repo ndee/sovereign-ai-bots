@@ -1,16 +1,18 @@
 {
-  "scoreModifier": 6,
+  "scoreModifier": 9,
   "zoneFloor": "amber",
   "zoneCeiling": null,
   "muted": false,
   "minConfidence": 60,
   "reasons": [
     "known-good",
+    "business email",
     "policy matched",
     "policy matched"
   ],
   "matchedPolicyIds": [
     "p-sender",
+    "p-receiver",
     "p-content",
     "p-time"
   ]
