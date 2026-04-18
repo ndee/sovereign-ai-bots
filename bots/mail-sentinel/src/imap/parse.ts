@@ -87,12 +87,48 @@ interface ImapReadResult {
     uid?: number;
     messageId?: unknown;
     from?: unknown;
+    to?: unknown;
+    cc?: unknown;
     subject?: unknown;
     text?: unknown;
     date?: unknown;
     headers?: unknown;
   };
 }
+
+export const parseReceiverAddresses = (
+  to: unknown,
+  cc: unknown,
+  headers: Record<string, string>,
+): string[] => {
+  const seen = new Set<string>();
+  const add = (raw: unknown): void => {
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        const addr = normalizeEmailAddress(entry);
+        if (addr !== undefined) {
+          seen.add(addr);
+        }
+      }
+    } else if (typeof raw === "string" && raw.length > 0) {
+      for (const part of raw.split(",")) {
+        const addr = normalizeEmailAddress(part.trim());
+        if (addr !== undefined) {
+          seen.add(addr);
+        }
+      }
+    }
+  };
+  add(to);
+  add(cc);
+  for (const headerKey of ["to", "cc", "delivered-to"]) {
+    const value = headers[headerKey];
+    if (typeof value === "string" && value.length > 0) {
+      add(value);
+    }
+  }
+  return [...seen];
+};
 
 export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): ParsedMessage => {
   const message = readResult.message;
@@ -101,6 +137,7 @@ export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): 
   const fromAddress = normalizeEmailAddress(from);
   const text = compactText(message.text ?? "");
   const domain = extractDomain(fromAddress);
+  const headers = normalizeHeaderMap(message.headers);
   return {
     key: buildMessageKey(messageId, message.uid),
     uid: message.uid as number,
@@ -113,7 +150,8 @@ export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): 
     ...(typeof message.date === "string" ? { date: message.date } : {}),
     text,
     snippet: text.slice(0, 500),
-    headers: normalizeHeaderMap(message.headers),
+    headers,
+    toAddresses: parseReceiverAddresses(message.to, message.cc, headers),
     amountSignal: parseHighestAmount(`${message.subject ?? ""}\n${text}`),
     deadlineDetected: detectDeadlineSignal(`${message.subject ?? ""}\n${text}`),
   };

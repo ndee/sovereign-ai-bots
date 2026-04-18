@@ -2,6 +2,7 @@
   "version": 1,
   "senderPolicies": [],
   "domainPolicies": [],
+  "receiverPolicies": [],
   "categoryPolicies": [],
   "contentPolicies": [],
   "timePolicies": [],

@@ -17,6 +17,7 @@ export const flattenPolicies = (
   return [
     ...normalized.senderPolicies.map((entry) => ({ type: "sender" as const, ...entry })),
     ...normalized.domainPolicies.map((entry) => ({ type: "domain" as const, ...entry })),
+    ...normalized.receiverPolicies.map((entry) => ({ type: "receiver" as const, ...entry })),
     ...normalized.categoryPolicies.map((entry) => ({ type: "category" as const, ...entry })),
     ...normalized.contentPolicies.map((entry) => ({ type: "content" as const, ...entry })),
     ...normalized.timePolicies.map((entry) => ({ type: "time" as const, ...entry })),
@@ -34,6 +35,8 @@ export const addPolicyEntry = (
     normalized.senderPolicies.push(entry);
   } else if (type === "domain") {
     normalized.domainPolicies.push(entry);
+  } else if (type === "receiver") {
+    normalized.receiverPolicies.push(entry);
   } else if (type === "category") {
     normalized.categoryPolicies.push(entry);
   } else if (type === "content") {
