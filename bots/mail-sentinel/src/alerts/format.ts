@@ -24,20 +24,44 @@ const trimSubject = (subject: string): string =>
     ? subject
     : `${subject.slice(0, DIGEST_SUBJECT_MAX - 1).trimEnd()}…`;
 
-// "Alice <alice@example.com>" -> "Alice"; bare addresses fall through unchanged.
+// Extract a calm operator-facing sender display from a raw From header.
+// Preference order:
+//   1. Display name, when present: `"Alice" <alice@example.com>` -> `Alice`.
+//   2. Local part minus any `+alias` tag, when only a bare address is given:
+//      `billing+invoice@privex.com` -> `billing`.
+//      `sovereign-ai-node-test+decision@proton.me` -> `sovereign-ai-node-test`.
+//   3. The raw string, trimmed, as a last resort.
+// Full address is never lost: callers still have `alert.from` internally.
 export const formatSenderDisplay = (from: string): string => {
-  // The capture group always matches when the regex matches, so match[1] is
-  // guaranteed to be a string; the `as string` cast pins that invariant and
-  // keeps branch coverage clean.
-  const match = /^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/u.exec(from);
-  if (match !== null) {
-    const name = (match[1] as string).trim();
+  const displayName = /^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/u.exec(from);
+  if (displayName !== null) {
+    const name = (displayName[1] as string).trim();
     if (name.length > 0) {
       return name;
     }
   }
+  const bareAddress = /^\s*([^\s<>@]+)@[^\s<>]+\s*$/u.exec(from);
+  if (bareAddress !== null) {
+    const localPart = (bareAddress[1] as string).split("+")[0] as string;
+    if (localPart.length > 0) {
+      return localPart;
+    }
+  }
   return from.trim();
 };
+
+// Strip synthetic/test suffix patterns that leak into visible subjects via
+// the live e2e fixtures. Matches `e2e-<digits>` anywhere, plus any
+// kebab-tag-wrapper directly preceding it (e.g. `invoice-overdue-e2e-123`),
+// and any `—`/`-`/`:` separator immediately before. Preserves the stored
+// subject; only the visible headline is cleaned.
+const E2E_TAG_TOKEN = /\s*[—\-:]?\s*(?:[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*-)?e2e-\d+/giu;
+
+export const cleanSubjectForDisplay = (subject: string): string =>
+  subject
+    .replace(E2E_TAG_TOKEN, "")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
 
 export const formatAlertLine = (
   alert: Pick<StoredAlert, "alertId" | "zone" | "category" | "from" | "subject">,
@@ -66,10 +90,10 @@ export const mapAlertToSummary = (
 export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): string => {
   const title = kind === "reminder" ? "Mail Sentinel Reminder" : "Mail Sentinel Alert";
   const lines = [
-    `● ${title} [${alert.alertId}]`,
+    title,
     `${zoneLabel(alert.zone)} · ${categoryLabel(alert.category)}`,
     "",
-    alert.subject,
+    cleanSubjectForDisplay(alert.subject),
     "",
     `From: ${formatSenderDisplay(alert.from)}`,
     `Why it matters: ${alert.why}`,
@@ -93,7 +117,7 @@ export const buildDigestMessage = (
   for (const [index, alert] of alerts.slice(0, DIGEST_VISIBLE_LIMIT).entries()) {
     lines.push(
       "",
-      `${String(index + 1)}. ${trimSubject(alert.subject)}`,
+      `${String(index + 1)}. ${trimSubject(cleanSubjectForDisplay(alert.subject))}`,
       `   From: ${formatSenderDisplay(alert.from)}  ·  id ${alert.alertId}`,
       `   ${formatCategoryConfidence(alert.category, alert.confidence)}`,
       `   Why it matters: ${alert.why}`,
