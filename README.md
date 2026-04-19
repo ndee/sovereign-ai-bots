@@ -173,8 +173,7 @@ Common commands:
 - `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` — TypeScript type-checking
 - `pnpm build` — build the root CLI entrypoints into `dist/` and the current
-  compiled bot bundle for `mail-sentinel` into
-  `bots/mail-sentinel/workspace/bin/dist/`
+  Mail Sentinel bot bundle into `bots/mail-sentinel/workspace/bin/dist/`
 - `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
   and every bot's TypeScript source tree
 - `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
