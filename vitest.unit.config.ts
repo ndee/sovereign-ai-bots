@@ -12,11 +12,13 @@ export default defineConfig({
       include: [
         "src/catalog/validate.ts",
         "src/probe/mail-sentinel-chat-model.ts",
-        "bots/mail-sentinel/src/**/*.ts"
+        "bots/mail-sentinel/src/**/*.ts",
+        "bots/project-sentinel/src/**/*.ts"
       ],
       exclude: [
         "bots/mail-sentinel/src/**/*.test.ts",
-        "bots/mail-sentinel/src/__fixtures__/**"
+        "bots/mail-sentinel/src/__fixtures__/**",
+        "bots/project-sentinel/src/**/*.test.ts"
       ],
       thresholds: {
         statements: 100,

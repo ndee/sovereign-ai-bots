@@ -26,4 +26,16 @@ export default defineConfig([
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
   },
+  {
+    entry: { "project-sentinel": "bots/project-sentinel/src/cli.ts" },
+    format: "esm",
+    dts: false,
+    outDir: "bots/project-sentinel/workspace/bin/dist",
+    target: "node22",
+    clean: true,
+    splitting: false,
+    sourcemap: true,
+    shims: false,
+    banner: { js: "#!/usr/bin/env node" },
+  },
 ]);

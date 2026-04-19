@@ -6,7 +6,7 @@ import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../const
 import { parseMessage } from "../imap/parse.js";
 import { evaluatePolicy } from "../policy/engine.js";
 import { scoreMessage } from "../scoring/heuristics.js";
-import { buildLlmCandidate, determineZone } from "../scoring/llm.js";
+import { buildLlmCandidate, buildUserFacingWhy, determineZone } from "../scoring/llm.js";
 import { withLockedState } from "../state/io.js";
 import { queueAmberAlert, resolvePendingAmberAlerts } from "../state/thread.js";
 import type {
@@ -233,8 +233,7 @@ export const scan = async (
           ...(parsed.fromAddress === undefined ? {} : { fromAddress: parsed.fromAddress }),
           ...(parsed.domain === undefined ? {} : { domain: parsed.domain }),
           toAddresses: parsed.toAddresses,
-          // determineZone always populates at least one reason.
-          why: zoneDecision.reasons.slice(0, 2).join("; "),
+          why: buildUserFacingWhy(zoneDecision, llmResult),
           sentAt: scanAt,
           score: scored.score,
           adjustedScore: zoneDecision.adjustedScore,
