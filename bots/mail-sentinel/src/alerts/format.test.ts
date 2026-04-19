@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { sampleAlert } from "../__fixtures__/inputs.js";
-import { loadGolden, normalizeUuids } from "../__fixtures__/load.js";
+import { loadGolden } from "../__fixtures__/load.js";
 import type { StoredAlert } from "../types.js";
 import {
   buildDigestMessage,
@@ -8,14 +8,6 @@ import {
   formatAlertLine,
   mapAlertToSummary,
 } from "./format.js";
-
-vi.mock("node:crypto", async () => {
-  const actual = await vi.importActual<typeof import("node:crypto")>("node:crypto");
-  return {
-    ...actual,
-    randomUUID: () => "00000000-0000-0000-0000-000000000000",
-  };
-});
 
 describe("alerts/format", () => {
   it("matches the formatAlertLine golden fixture", () => {
@@ -66,7 +58,7 @@ describe("alerts/format", () => {
       "12h",
       "2026-04-08T12:00:00.000Z",
     );
-    expect(normalizeUuids(message)).toBe(loadGolden("buildDigestMessage.few"));
+    expect(message).toBe(loadGolden("buildDigestMessage.few"));
   });
 
   it("falls back to 'RED' when zone is undefined in formatAlertLine", () => {
@@ -110,6 +102,29 @@ describe("alerts/format", () => {
     expect(msg).toContain("mystery");
   });
 
+  it("trims overly long digest subjects with an ellipsis", () => {
+    const longSubject = `Re: ${"subject ".repeat(30)}end`;
+    const msg = buildDigestMessage(
+      [{ ...sampleAlert, subject: longSubject }],
+      "12h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    const line = msg.split("\n").find((entry) => entry.startsWith("1. "));
+    expect(line).toBeDefined();
+    expect((line as string).endsWith("…")).toBe(true);
+    expect((line as string).length).toBeLessThanOrEqual("1. ".length + 120);
+  });
+
+  it("keeps short digest subjects intact (no trim)", () => {
+    const msg = buildDigestMessage(
+      [{ ...sampleAlert, subject: "Invoice #short" }],
+      "12h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    expect(msg).toContain("1. Invoice #short");
+    expect(msg).not.toContain("…");
+  });
+
   it("matches the buildDigestMessage many-alerts golden fixture", () => {
     const message = buildDigestMessage(
       Array.from({ length: 12 }, (_, i) => ({
@@ -120,6 +135,6 @@ describe("alerts/format", () => {
       "12h",
       "2026-04-08T12:00:00.000Z",
     );
-    expect(normalizeUuids(message)).toBe(loadGolden("buildDigestMessage.many"));
+    expect(message).toBe(loadGolden("buildDigestMessage.many"));
   });
 });
