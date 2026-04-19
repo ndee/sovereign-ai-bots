@@ -15,9 +15,12 @@ const zoneLabel = (zone: unknown): string => String(zone ?? "red").toUpperCase()
 
 // "Alice <alice@example.com>" -> "Alice"; bare addresses fall through unchanged.
 export const formatSenderDisplay = (from: string): string => {
+  // The capture group always matches when the regex matches, so match[1] is
+  // guaranteed to be a string; the `as string` cast pins that invariant and
+  // keeps branch coverage clean.
   const match = /^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/u.exec(from);
   if (match !== null) {
-    const name = (match[1] ?? "").trim();
+    const name = (match[1] as string).trim();
     if (name.length > 0) {
       return name;
     }
