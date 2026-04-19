@@ -1,7 +1,8 @@
 {
   "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
   "id": "bitcoin-skill-match",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "displayName": "Bitcoin Skill Match",
   "description": "Matrix-based community matchmaker that stores local skill profiles, requests, regions, and trust relationships.",
   "defaultInstall": false,
@@ -25,52 +26,214 @@
     "introPolicy": "consent-first",
     "trustSearchDepth": 2,
     "allowBarter": true,
-    "allowSkillSwap": true
+    "allowSkillSwap": true,
+    "model": "openai/gpt-5-mini",
+    "statePath": "data/community-state.json",
+    "statePolicyPath": "data/community-state.policy.json",
+    "stateAuditPath": "data/community-state.audit.jsonl"
   },
-  "toolInstances": [],
-  "openclaw": {},
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "guarded-json-state",
+      "version": "1.0.0",
+      "description": "Guarded JSON state access for self-owned records with auditable mutations.",
+      "capabilities": [
+        "json-state.read",
+        "json-state.self-upsert",
+        "json-state.self-delete"
+      ],
+      "requiredSecretRefs": [],
+      "requiredConfigKeys": [
+        "statePath",
+        "policyPath"
+      ],
+      "allowedCommands": [],
+      "openclawPlugins": [
+        "guarded-json-state"
+      ],
+      "openclawToolNames": [
+        "guarded_json_state"
+      ]
+    }
+  ],
+  "toolInstances": [
+    {
+      "id": "bitcoin-skill-match-state",
+      "templateRef": "guarded-json-state@1.0.0",
+      "config": {
+        "statePath": {
+          "from": "bots.config.bitcoin-skill-match.statePath"
+        },
+        "policyPath": {
+          "from": "bots.config.bitcoin-skill-match.statePolicyPath"
+        },
+        "auditPath": {
+          "from": "bots.config.bitcoin-skill-match.stateAuditPath"
+        }
+      },
+      "secretRefs": {}
+    }
+  ],
+  "hostResources": [
+    {
+      "id": "workspace-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
+        "source": "workspace/README.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-agents",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
+        "source": "workspace/AGENTS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-tools",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
+        "source": "workspace/TOOLS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-skill",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/bitcoin-skill-match-core/SKILL.md"
+          ]
+        },
+        "source": "workspace/skills/bitcoin-skill-match-core/SKILL.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-state-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/README.md"
+          ]
+        },
+        "source": "workspace/data/README.md",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-state",
+      "kind": "stateFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/community-state.json"
+          ]
+        },
+        "source": "workspace/data/community-state.json",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-policy",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/community-state.policy.json"
+          ]
+        },
+        "source": "workspace/data/community-state.policy.json",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "profile-template",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/templates/profile-template.md"
+          ]
+        },
+        "source": "workspace/templates/profile-template.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "intro-template",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/templates/intro-template.md"
+          ]
+        },
+        "source": "workspace/templates/intro-template.md",
+        "writePolicy": "always"
+      }
+    }
+  ],
   "agentTemplate": {
     "id": "bitcoin-skill-match",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Matrix-based community matchmaker that stores local skill profiles, requests, regions, and trust relationships.",
     "matrix": {
       "localpartPrefix": "bitcoin-skill-match"
     },
-    "requiredToolTemplates": [],
-    "optionalToolTemplates": [],
-    "workspaceFiles": [
+    "requiredToolTemplates": [
       {
-        "path": "README.md",
-        "source": "workspace/README.md"
-      },
-      {
-        "path": "AGENTS.md",
-        "source": "workspace/AGENTS.md"
-      },
-      {
-        "path": "TOOLS.md",
-        "source": "workspace/TOOLS.md"
-      },
-      {
-        "path": "skills/bitcoin-skill-match-core/SKILL.md",
-        "source": "workspace/skills/bitcoin-skill-match-core/SKILL.md"
-      },
-      {
-        "path": "data/README.md",
-        "source": "workspace/data/README.md"
-      },
-      {
-        "path": "data/community-state.json",
-        "source": "workspace/data/community-state.json"
-      },
-      {
-        "path": "templates/profile-template.md",
-        "source": "workspace/templates/profile-template.md"
-      },
-      {
-        "path": "templates/intro-template.md",
-        "source": "workspace/templates/intro-template.md"
+        "id": "guarded-json-state",
+        "version": "1.0.0"
       }
-    ]
+    ],
+    "optionalToolTemplates": []
   }
 }

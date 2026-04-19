@@ -1,11 +1,12 @@
 {
   "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
   "id": "mail-sentinel",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "displayName": "Mail Sentinel",
-  "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+  "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them with Lobster plus llm-task, applies personal policy, and chooses red, amber, or gray handling.",
   "defaultInstall": true,
-  "helloMessage": "Hello from Mail Sentinel. I can summarize your latest 3 inbox mails.",
+  "helloMessage": "Mail Sentinel 2.0. Prefilters inbox signals, reviews relevant candidates, applies local policy, and routes messages into red alerts, amber digests, or gray silence.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "mail-sentinel"
@@ -15,89 +16,524 @@
       "enabled": true
     },
     "alertRoom": {
-      "autoReply": false,
-      "requireMention": true
+      "autoReply": true,
+      "requireMention": false
     }
   },
   "configDefaults": {
-    "pollInterval": "5m",
-    "lookbackWindow": "15m",
-    "e2eeAlertRoom": false
+    "imapConfigured": false,
+    "imapHost": "pending",
+    "imapPort": 993,
+    "imapTls": true,
+    "imapUsername": "pending",
+    "imapMailbox": "INBOX",
+    "pollInterval": "30m",
+    "lookbackWindow": "1h",
+    "defaultReminderDelay": "4h",
+    "digestInterval": "12h",
+    "e2eeAlertRoom": false,
+    "statePath": "data/mail-sentinel-state.json",
+    "rulesPath": "config/default-rules.json",
+    "policyPath": "config/user-policy.json",
+    "openclawUrl": "http://127.0.0.1:18789",
+    "llmModel": "qwen/qwen3.5-9b",
+    "llmTimeoutMs": 30000
   },
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "mail-sentinel-tool",
+      "version": "2.0.0",
+      "description": "Local-first mail watcher for heuristic candidate filtering, Lobster semantic review, policy-driven zoning, digests, and feedback tuning.",
+      "capabilities": [
+        "mail-sentinel.scan",
+        "mail-sentinel.feedback",
+        "mail-sentinel.alerts.read"
+      ],
+      "openclawBundledPlugins": [
+        "lobster",
+        "llm-task"
+      ],
+      "openclawToolNames": [
+        "lobster",
+        "llm-task"
+      ],
+      "requiredSecretRefs": [],
+      "requiredConfigKeys": [
+        "agentId",
+        "imapInstanceId",
+        "imapConfigured",
+        "statePath",
+        "rulesPath",
+        "policyPath",
+        "openclawUrl",
+        "llmModel"
+      ],
+      "allowedCommands": [
+        "<agent-workspace>/bin/mail-sentinel.js scan --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js digest --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view today --json",
+        "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view recent --json",
+        "<agent-workspace>/bin/mail-sentinel.js policy list --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js policy important-sender --instance <tool-instance-id> --query <query> --announce --json",
+        "<agent-workspace>/bin/mail-sentinel.js policy add --instance <tool-instance-id> --type <type> --match <pattern> --min-zone <zone> --json",
+        "<agent-workspace>/bin/mail-sentinel.js policy remove --instance <tool-instance-id> --id <policy-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action not-important --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action less-often --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action remind-later --delay <duration> --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action always-like-this --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action reduce --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action digest-only --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action not-important --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action less-often --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action always-like-this --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action reduce --json",
+        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action digest-only --json"
+      ]
+    }
+  ],
   "toolInstances": [
     {
       "id": "mail-sentinel-imap",
       "templateRef": "imap-readonly@1.0.0",
       "enabledWhen": {
-        "path": "imap.status",
-        "equals": "configured"
+        "path": "instance.config.imapConfigured",
+        "equals": true
       },
       "config": {
         "host": {
-          "from": "imap.host"
+          "from": "instance.config.imapHost"
         },
         "port": {
-          "from": "imap.port",
+          "from": "instance.config.imapPort",
           "stringify": true
         },
         "tls": {
-          "from": "imap.tls",
+          "from": "instance.config.imapTls",
           "stringify": true
         },
         "username": {
-          "from": "imap.username"
+          "from": "instance.config.imapUsername"
         },
         "mailbox": {
-          "from": "imap.mailbox"
+          "from": "instance.config.imapMailbox"
         }
       },
       "secretRefs": {
         "password": {
-          "from": "imap.secretRef"
+          "from": "instance.secretRefs.imapPassword"
         }
       }
+    },
+    {
+      "id": "mail-sentinel-core",
+      "templateRef": "mail-sentinel-tool@2.0.0",
+      "config": {
+        "agentId": {
+          "from": "agent.id"
+        },
+        "imapInstanceId": {
+          "from": "instance.toolInstanceIds.mail-sentinel-imap"
+        },
+        "imapConfigured": {
+          "from": "instance.config.imapConfigured",
+          "stringify": true
+        },
+        "statePath": {
+          "from": "instance.config.statePath"
+        },
+        "rulesPath": {
+          "from": "instance.config.rulesPath"
+        },
+        "policyPath": {
+          "from": "instance.config.policyPath"
+        },
+        "lookbackWindow": {
+          "from": "instance.config.lookbackWindow"
+        },
+        "defaultReminderDelay": {
+          "from": "instance.config.defaultReminderDelay"
+        },
+        "digestInterval": {
+          "from": "instance.config.digestInterval"
+        },
+        "openclawUrl": {
+          "from": "instance.config.openclawUrl"
+        },
+        "llmModel": {
+          "from": "instance.config.llmModel"
+        },
+        "llmTimeoutMs": {
+          "from": "instance.config.llmTimeoutMs",
+          "stringify": true
+        },
+        "matrixAlertRoomId": {
+          "from": "instance.matrix.alertRoom.roomId"
+        }
+      },
+      "secretRefs": {}
     }
   ],
-  "openclaw": {
-    "cron": {
-      "id": "mail-sentinel-poll",
-      "everyConfigKey": "pollInterval",
-      "defaultEvery": "5m",
-      "session": "isolated",
-      "message": "Summarize the latest 3 emails in INBOX using read-only IMAP tools. The tool instance is already scoped to the configured mailbox, so use --query ALL for the whole mailbox and do not include INBOX in the query string. Highlight urgent or security-relevant items. If IMAP is not configured, report the missing setup clearly."
+  "hostResources": [
+    {
+      "id": "workspace-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
+        "source": "workspace/README.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-agents",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
+        "source": "workspace/AGENTS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-tools",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
+        "source": "workspace/TOOLS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-skill",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/mail-sentinel-core/SKILL.md"
+          ]
+        },
+        "source": "workspace/skills/mail-sentinel-core/SKILL.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-bin",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/bin/mail-sentinel.js"
+          ]
+        },
+        "source": "workspace/bin/dist/mail-sentinel.js",
+        "mode": "0755",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-default-rules",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/config/default-rules.json"
+          ]
+        },
+        "source": "workspace/config/default-rules.json",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-user-policy",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/config/user-policy.json"
+          ]
+        },
+        "source": "workspace/config/user-policy.json",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-data-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/README.md"
+          ]
+        },
+        "source": "workspace/data/README.md",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-state",
+      "kind": "stateFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/mail-sentinel-state.json"
+          ]
+        },
+        "inlineContent": "{\n  \"consecutiveFailures\": 0\n}",
+        "writePolicy": "ifMissing"
+      },
+      "status": {
+        "fields": {
+          "lastPollAt": {
+            "path": "lastPollAt",
+            "type": "timestamp"
+          },
+          "lastAlertAt": {
+            "path": "lastAlertAt",
+            "type": "timestamp"
+          },
+          "consecutiveFailures": {
+            "path": "consecutiveFailures",
+            "type": "int",
+            "default": 0
+          },
+          "lastError": {
+            "path": "lastError",
+            "type": "object"
+          }
+        }
+      },
+      "checks": [
+        {
+          "kind": "field-threshold",
+          "id": "consecutive-failures",
+          "field": "consecutiveFailures",
+          "warnGte": 1,
+          "failGte": 3
+        }
+      ]
+    },
+    {
+      "id": "scan-service",
+      "kind": "systemdService",
+      "spec": {
+        "name": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.service"
+          ]
+        },
+        "description": {
+          "join": [
+            "Sovereign Mail Sentinel Scan ",
+            {
+              "from": "instance.id"
+            }
+          ]
+        },
+        "after": [
+          "network-online.target"
+        ],
+        "wants": [
+          "network-online.target"
+        ],
+        "type": "oneshot",
+        "user": {
+          "from": "node.openclaw.serviceUser"
+        },
+        "group": {
+          "from": "node.openclaw.serviceGroup"
+        },
+        "workingDirectory": {
+          "from": "agent.workspace"
+        },
+        "environment": {
+          "HOME": {
+            "from": "node.openclaw.serviceHome"
+          },
+          "SOVEREIGN_NODE_CONFIG": {
+            "from": "node.paths.configPath"
+          },
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        },
+        "execStart": [
+          "/usr/bin/env",
+          "node",
+          {
+            "join": [
+              {
+                "from": "agent.workspace"
+              },
+              "/bin/mail-sentinel.js"
+            ]
+          },
+          "scan",
+          "--instance",
+          {
+            "from": "instance.toolInstanceIds.mail-sentinel-core"
+          },
+          "--json"
+        ],
+        "timeoutStartSec": 300,
+        "wantedBy": [],
+        "desiredState": {
+          "enabled": false,
+          "active": false
+        }
+      }
+    },
+    {
+      "id": "scan-timer",
+      "kind": "systemdTimer",
+      "dependsOn": [
+        "scan-service"
+      ],
+      "supersedes": [
+        {
+          "kind": "openclawCron",
+          "match": {
+            "name": {
+              "join": [
+                {
+                  "from": "instance.id"
+                },
+                "-poll"
+              ]
+            },
+            "agentId": {
+              "from": "agent.id"
+            }
+          }
+        }
+      ],
+      "spec": {
+        "name": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.timer"
+          ]
+        },
+        "description": {
+          "join": [
+            "Sovereign Mail Sentinel Scan Timer ",
+            {
+              "from": "instance.id"
+            }
+          ]
+        },
+        "unit": {
+          "join": [
+            "sovereign-",
+            {
+              "from": "instance.id"
+            },
+            "-scan.service"
+          ]
+        },
+        "onActiveSec": "5min",
+        "onUnitActiveSec": {
+          "convert": "duration.toSystemd",
+          "value": {
+            "default": [
+              {
+                "from": "bot.config.pollInterval"
+              },
+              "30m"
+            ]
+          }
+        },
+        "accuracySec": "1min",
+        "persistent": true,
+        "wantedBy": [
+          "timers.target"
+        ],
+        "desiredState": {
+          "enabled": true,
+          "active": true
+        }
+      },
+      "checks": [
+        {
+          "kind": "resource-state",
+          "id": "timer-enabled",
+          "property": "enabled",
+          "equals": true,
+          "severity": "fail"
+        },
+        {
+          "kind": "resource-state",
+          "id": "timer-active",
+          "property": "active",
+          "equals": true,
+          "severity": "fail"
+        }
+      ]
     }
-  },
+  ],
   "agentTemplate": {
     "id": "mail-sentinel",
-    "version": "1.0.0",
-    "description": "Conversational inbox sentinel for read-only IMAP triage and Matrix summaries.",
+    "version": "2.0.0",
+    "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them semantically, applies policy, and chooses red alerts, amber digests, or gray silence.",
+    "model": "qwen/qwen3.5-27b",
     "matrix": {
       "localpartPrefix": "mail-sentinel"
     },
-    "requiredToolTemplates": [],
-    "optionalToolTemplates": [
+    "requiredToolTemplates": [
+      {
+        "id": "mail-sentinel-tool",
+        "version": "2.0.0"
+      },
       {
         "id": "imap-readonly",
         "version": "1.0.0"
       }
     ],
-    "workspaceFiles": [
-      {
-        "path": "README.md",
-        "source": "workspace/README.md"
-      },
-      {
-        "path": "AGENTS.md",
-        "source": "workspace/AGENTS.md"
-      },
-      {
-        "path": "TOOLS.md",
-        "source": "workspace/TOOLS.md"
-      },
-      {
-        "path": "skills/mail-sentinel-core/SKILL.md",
-        "source": "workspace/skills/mail-sentinel-core/SKILL.md"
-      }
-    ]
+    "optionalToolTemplates": []
   }
 }

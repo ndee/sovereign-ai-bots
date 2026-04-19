@@ -1,0 +1,5 @@
+{
+  "nullCeiling": "red",
+  "lower": "amber",
+  "keep": "gray"
+}

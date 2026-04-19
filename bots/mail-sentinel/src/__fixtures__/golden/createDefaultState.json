@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "consecutiveFailures": 0,
+  "mailbox": {},
+  "messages": {},
+  "alerts": [],
+  "feedback": [],
+  "learning": {
+    "senderWeights": {},
+    "domainWeights": {},
+    "ruleAdjustments": {}
+  },
+  "digest": {
+    "pendingAmber": []
+  },
+  "zoneHistory": []
+}

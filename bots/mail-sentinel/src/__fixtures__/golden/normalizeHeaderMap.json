@@ -1,0 +1,11 @@
+{
+  "fromArray": {
+    "from": "alice@example.com",
+    "subject": "hi"
+  },
+  "fromObject": {
+    "subject": "Hello",
+    "x-multi": "a, b"
+  },
+  "nonObject": {}
+}

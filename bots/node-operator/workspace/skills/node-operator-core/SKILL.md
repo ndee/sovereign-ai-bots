@@ -8,6 +8,7 @@ Checklist:
 
 Human Matrix users:
 1. Accept invite/remove requests only in a direct/private chat from `{{MATRIX_OPERATOR_USER_ID}}`
-2. For onboarding, use `sovereign-node users invite <username> --ttl-minutes <minutes> --json`
-3. For removal, ask for explicit confirmation first, then use `sovereign-node users remove <username> --json`
-4. Keep one-time codes only inside that operator DM
+2. If the operator wants to sign into the existing operator account on another device, use `sovereign-node onboarding issue --ttl-minutes <minutes> --json` instead of a new-user invite
+3. For new local human users, ask only for the bare localpart if it is missing, default TTL to 1440 minutes, and use `sovereign-node users invite <username> --json` unless a custom TTL is explicitly requested
+4. For removal, ask for explicit confirmation first, then use `sovereign-node users remove <username> --json`
+5. Keep one-time codes only inside that operator DM

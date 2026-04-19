@@ -1,0 +1,14 @@
+{
+  "simple": [
+    "alice",
+    "smith"
+  ],
+  "withEmail": [
+    "alice",
+    "alice@example.com"
+  ],
+  "punct": [
+    "alice",
+    "smith"
+  ]
+}

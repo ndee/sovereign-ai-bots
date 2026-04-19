@@ -1,0 +1,4 @@
+{
+  "withMessageId": "msg:<abc@ex>",
+  "withoutMessageId": "uid:99"
+}

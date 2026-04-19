@@ -1,0 +1,31 @@
+{
+  "noCandidate": {
+    "zone": "gray",
+    "adjustedScore": 1,
+    "reasons": [
+      "heuristics did not keep the mail above candidate threshold"
+    ]
+  },
+  "candidateNoLlm": {
+    "zone": "amber",
+    "adjustedScore": 5,
+    "reasons": [
+      "semantic reviewer unavailable; keeping candidate out of red zone"
+    ]
+  },
+  "llmRed": {
+    "zone": "red",
+    "adjustedScore": 6,
+    "reasons": [
+      "clear invoice"
+    ]
+  },
+  "muted": {
+    "zone": "gray",
+    "adjustedScore": 6,
+    "reasons": [
+      "muted",
+      "policy muted this mail"
+    ]
+  }
+}

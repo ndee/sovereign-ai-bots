@@ -1,0 +1,11 @@
+{
+  "command": "policy",
+  "options": {
+    "json": true,
+    "subcommand": "add",
+    "instance": "ms-core",
+    "type": "sender",
+    "match": "alice@example.com",
+    "minZone": "amber"
+  }
+}
