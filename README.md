@@ -41,6 +41,7 @@ A package currently contains:
 
 - `mail-sentinel`
 - `node-operator`
+- `bitcoin-skill-match`
 
 ---
 
@@ -87,7 +88,7 @@ Mail Sentinel does not train a model locally. It adapts by updating local policy
 Mail Sentinel requires:
 
 - an IMAP-accessible mailbox with credentials
-- Sovereign AI Node installed on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node installed on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - provider credentials (OpenRouter API key) configured at the node level — see [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node)
 
 If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bridge) must be installed and configured on the host to expose IMAP access. On the current self-hosted path, Proton Bridge is installed manually. It is not required for other IMAP providers.
@@ -96,7 +97,7 @@ If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bri
 
 The current documented and tested path for Mail Sentinel is:
 
-- Sovereign AI Node on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - Matrix as control plane (provisioned by the installer)
 - IMAP mailbox (any provider, or Proton Mail via Proton Bridge)
 - provider-backed runtime path with an OpenRouter API key (configured at node level)
@@ -148,8 +149,9 @@ Common commands:
 
 - `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` — TypeScript type-checking
-- `pnpm build` — build the root CLI entrypoints into `dist/` **and** every bot's
-  compiled bundle into `bots/*/workspace/bin/dist/`
+- `pnpm build` — build the root CLI entrypoints into `dist/` and the current
+  compiled bot bundle for `mail-sentinel` into
+  `bots/mail-sentinel/workspace/bin/dist/`
 - `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
   and every bot's TypeScript source tree
 - `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
