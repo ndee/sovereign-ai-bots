@@ -1,1 +1,1 @@
-"Mail Sentinel Alert [alert-1]\nZone: RED\nCategory: Financial Relevance\nSubject: Invoice $500\nFrom: Alice <alice@example.com>\nWhy it matters: invoice due today\nConfidence: high (85%)\nFeedback: Reply with 'Very important', 'Not important', 'Remind later', 'Always treat like this', or 'Less of this'.\nMessage ID: <abc@ex>"
+"● Mail Sentinel Alert [alert-1]\nRED · Financial Relevance\n\nInvoice $500\n\nFrom: Alice\nWhy it matters: invoice due today\nConfidence: high (85%)\n\nFeedback: Very important · Not important · Remind later · Always treat like this · Less of this"
