@@ -3,7 +3,7 @@ import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { z } from "zod";
+import type { z } from "zod";
 
 import { commandSchema, manifestSchema } from "./schema.js";
 

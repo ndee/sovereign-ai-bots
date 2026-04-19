@@ -12,7 +12,9 @@ const hostResourceKindSchema = z.enum([
   "systemdTimer",
   "openclawCron",
 ]);
-const finiteNumberSchema = z.number().refine(Number.isFinite, { message: "must be a finite number" });
+const finiteNumberSchema = z
+  .number()
+  .refine(Number.isFinite, { message: "must be a finite number" });
 const finiteScalarSchema = z.union([z.string(), z.boolean(), finiteNumberSchema]);
 const nonEmptyStringSchema = z.string().refine((value) => value.trim() !== "", {
   message: "must not be empty",
