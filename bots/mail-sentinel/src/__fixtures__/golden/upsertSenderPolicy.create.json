@@ -18,6 +18,7 @@
       }
     ],
     "domainPolicies": [],
+    "receiverPolicies": [],
     "categoryPolicies": [],
     "contentPolicies": [],
     "timePolicies": [],

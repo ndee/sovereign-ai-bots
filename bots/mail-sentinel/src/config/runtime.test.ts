@@ -708,6 +708,7 @@ describe("config/runtime", () => {
         version: 1,
         senderPolicies: [{ id: "p1", match: "a@b" }],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],

@@ -7,6 +7,7 @@ import {
   parseAddressFromList,
   parseHighestAmount,
   parseMessage,
+  parseReceiverAddresses,
 } from "./parse.js";
 
 describe("imap/parse", () => {
@@ -112,5 +113,82 @@ describe("imap/parse", () => {
       { message: { uid: 5, text: "hi" } },
     );
     expect(parsed.subject).toBe("summary-only");
+  });
+
+  it("extracts toAddresses from message.to and message.cc arrays", () => {
+    const parsed = parseMessage(
+      { uid: 10 },
+      {
+        message: {
+          uid: 10,
+          to: ["Me <me@business.com>", "Other <other@business.com>"],
+          cc: ["CC User <cc@example.com>"],
+          text: "hi",
+        },
+      },
+    );
+    expect(parsed.toAddresses).toEqual(["me@business.com", "other@business.com", "cc@example.com"]);
+  });
+
+  it("extracts toAddresses from headers when message.to is absent", () => {
+    const parsed = parseMessage(
+      { uid: 11 },
+      {
+        message: {
+          uid: 11,
+          text: "hi",
+          headers: [
+            { key: "To", value: "recipient@domain.com" },
+            { key: "Delivered-To", value: "delivered@domain.com" },
+          ],
+        },
+      },
+    );
+    expect(parsed.toAddresses).toContain("recipient@domain.com");
+    expect(parsed.toAddresses).toContain("delivered@domain.com");
+  });
+
+  it("returns empty toAddresses when no receiver data is present", () => {
+    const parsed = parseMessage({ uid: 12 }, { message: { uid: 12, text: "hi" } });
+    expect(parsed.toAddresses).toEqual([]);
+  });
+
+  describe("parseReceiverAddresses", () => {
+    it("extracts from array-style to and cc", () => {
+      expect(
+        parseReceiverAddresses(
+          ["Alice <alice@a.com>", "Bob <bob@b.com>"],
+          ["Carol <carol@c.com>"],
+          {},
+        ),
+      ).toEqual(["alice@a.com", "bob@b.com", "carol@c.com"]);
+    });
+
+    it("extracts from comma-separated string", () => {
+      expect(parseReceiverAddresses("alice@a.com, bob@b.com", undefined, {})).toEqual([
+        "alice@a.com",
+        "bob@b.com",
+      ]);
+    });
+
+    it("deduplicates addresses across to, cc, and headers", () => {
+      expect(
+        parseReceiverAddresses(["alice@a.com"], undefined, { to: "alice@a.com", cc: "bob@b.com" }),
+      ).toEqual(["alice@a.com", "bob@b.com"]);
+    });
+
+    it("extracts from delivered-to header", () => {
+      expect(
+        parseReceiverAddresses(undefined, undefined, { "delivered-to": "me@domain.com" }),
+      ).toEqual(["me@domain.com"]);
+    });
+
+    it("returns empty array when no data is present", () => {
+      expect(parseReceiverAddresses(undefined, undefined, {})).toEqual([]);
+    });
+
+    it("ignores empty strings and invalid entries", () => {
+      expect(parseReceiverAddresses("", [], { to: "" })).toEqual([]);
+    });
   });
 });

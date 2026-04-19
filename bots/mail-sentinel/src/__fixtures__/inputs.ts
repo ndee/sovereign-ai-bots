@@ -19,6 +19,7 @@ export const sampleMessage: ParsedMessage = {
   text: "Please pay this invoice. Amount: $500",
   snippet: "Please pay this invoice. Amount: $500",
   headers: { from: "alice@example.com", subject: "Invoice #123 for $500" },
+  toAddresses: ["me@mybusiness.com"],
   amountSignal: { amount: 500 },
   deadlineDetected: false,
 };
@@ -36,6 +37,9 @@ export const samplePolicy: MailSentinelPolicy = {
   ],
   domainPolicies: [
     { id: "p-domain", match: "*.badge.example", boost: -1, reason: "ignore badges" },
+  ],
+  receiverPolicies: [
+    { id: "p-receiver", match: "me@mybusiness.com", minZone: "amber", boost: 3, reason: "business email" },
   ],
   categoryPolicies: [{ id: "p-cat", category: "risk-escalation", boost: 1 }],
   contentPolicies: [
