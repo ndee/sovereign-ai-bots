@@ -1,5 +1,6 @@
 {
   "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
   "id": "bali-compass",
   "version": "1.0.0",
   "displayName": "Bali Compass",
