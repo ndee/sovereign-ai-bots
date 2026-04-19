@@ -85,7 +85,7 @@ describe("alerts/format", () => {
       { ...sampleAlert, zone: undefined as unknown as "red" },
       "new-alert",
     );
-    expect(msg).toContain("Zone: RED");
+    expect(msg).toContain("RED · ");
   });
 
   it("falls back to sentAt for reminders without a lastReminderAt", () => {
@@ -98,7 +98,7 @@ describe("alerts/format", () => {
       { ...sampleAlert, category: "mystery" as unknown as "financial-relevance" },
       "new-alert",
     );
-    expect(msg).toContain("Category: mystery");
+    expect(msg).toContain("· mystery");
   });
 
   it("uses raw category label in buildDigestMessage when unknown", () => {
