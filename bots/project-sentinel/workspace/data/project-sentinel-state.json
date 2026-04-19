@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "consecutiveFailures": 0,
+  "seenSignals": {},
+  "deliveredSignals": [],
+  "feedback": [],
+  "digestQueue": [],
+  "sourceStatus": {}
+}
