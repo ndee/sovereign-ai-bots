@@ -14,6 +14,7 @@
     "from": "alice@example.com",
     "subject": "Re: Budget $500"
   },
+  "toAddresses": [],
   "amountSignal": {
     "amount": 500
   },

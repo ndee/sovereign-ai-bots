@@ -54,9 +54,12 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   const policy = await runtime.readPolicy();
   if (typeof options.type !== "string" || options.type.length === 0) {
-    throw new Error("Expected --type <sender|domain|category|content|time|mute>");
+    throw new Error("Expected --type <sender|domain|receiver|category|content|time|mute>");
   }
-  if (["sender", "domain", "mute"].includes(options.type) && typeof options.match !== "string") {
+  if (
+    ["sender", "domain", "receiver", "mute"].includes(options.type) &&
+    typeof options.match !== "string"
+  ) {
     throw new Error(`Policy type '${options.type}' requires --match <pattern>`);
   }
   if (options.type === "category" && typeof options.category !== "string") {
@@ -123,6 +126,7 @@ export const policyRemove = async (
     ...normalized,
     senderPolicies: strip(normalized.senderPolicies),
     domainPolicies: strip(normalized.domainPolicies),
+    receiverPolicies: strip(normalized.receiverPolicies),
     categoryPolicies: strip(normalized.categoryPolicies),
     contentPolicies: strip(normalized.contentPolicies),
     timePolicies: strip(normalized.timePolicies),

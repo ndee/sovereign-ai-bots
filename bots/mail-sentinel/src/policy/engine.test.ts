@@ -80,6 +80,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [
           { id: "c-nopattern" },
@@ -103,6 +104,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [{ id: "p1" }],
         domainPolicies: [{ id: "p2" }],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -123,6 +125,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [{ id: "p1", match: "*@example.com", reason: "wide" }],
         domainPolicies: [{ id: "p2", match: "example.com", reason: "domain" }],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -145,6 +148,7 @@ describe("policy/engine", () => {
           { id: "pB", match: "alice@*", maxZone: "amber" },
         ],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -163,6 +167,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [{ id: "p", match: "alice@example.com", reason: "exact" }],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -181,6 +186,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [],
         domainPolicies: [{ id: "d", match: "example.com", reason: "known" }],
+        receiverPolicies: [],
         categoryPolicies: [{ id: "c", category: "financial-relevance", reason: "finance" }],
         contentPolicies: [],
         timePolicies: [{ id: "t", schedule: "00:00-23:59", reason: "business" }],
@@ -199,6 +205,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -217,6 +224,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -235,6 +243,7 @@ describe("policy/engine", () => {
         version: 1,
         senderPolicies: [{ match: "alice@*", boost: 1 }],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -257,6 +266,7 @@ describe("policy/engine", () => {
           { id: "p2", match: "alice@*", minZone: "red", boost: 3, minConfidence: 70 },
         ],
         domainPolicies: [],
+        receiverPolicies: [],
         categoryPolicies: [],
         contentPolicies: [],
         timePolicies: [],
@@ -267,5 +277,111 @@ describe("policy/engine", () => {
     expect(result.zoneFloor).toBe("red");
     expect(result.minConfidence).toBe(70);
     expect(result.scoreModifier).toBe(5);
+  });
+
+  it("matches a receiver policy when toAddresses contains the match", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, toAddresses: ["me@business.com", "cc@other.com"] },
+      { category: "financial-relevance" },
+      {
+        version: 1,
+        senderPolicies: [],
+        domainPolicies: [],
+        receiverPolicies: [
+          { id: "r1", match: "me@business.com", minZone: "red", boost: 5, reason: "business mail" },
+        ],
+        categoryPolicies: [],
+        contentPolicies: [],
+        timePolicies: [],
+        mutePolicies: [],
+      },
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toContain("r1");
+    expect(result.zoneFloor).toBe("red");
+    expect(result.scoreModifier).toBe(5);
+    expect(result.reasons).toContain("business mail");
+  });
+
+  it("matches a receiver policy with a glob pattern", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, toAddresses: ["me@mybusiness.com"] },
+      { category: "financial-relevance" },
+      {
+        version: 1,
+        senderPolicies: [],
+        domainPolicies: [],
+        receiverPolicies: [
+          { id: "r2", match: "*@mybusiness.com", boost: 3, reason: "all business addresses" },
+        ],
+        categoryPolicies: [],
+        contentPolicies: [],
+        timePolicies: [],
+        mutePolicies: [],
+      },
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toContain("r2");
+    expect(result.scoreModifier).toBe(3);
+  });
+
+  it("does not match a receiver policy when no toAddresses match", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, toAddresses: ["personal@home.com"] },
+      { category: "financial-relevance" },
+      {
+        version: 1,
+        senderPolicies: [],
+        domainPolicies: [],
+        receiverPolicies: [{ id: "r3", match: "me@business.com", boost: 5 }],
+        categoryPolicies: [],
+        contentPolicies: [],
+        timePolicies: [],
+        mutePolicies: [],
+      },
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toEqual([]);
+  });
+
+  it("skips receiver policies with an empty or missing match pattern", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, toAddresses: ["me@business.com"] },
+      { category: "financial-relevance" },
+      {
+        version: 1,
+        senderPolicies: [],
+        domainPolicies: [],
+        receiverPolicies: [
+          { id: "r4", match: "", boost: 5 },
+          { id: "r4b", boost: 5 },
+        ],
+        categoryPolicies: [],
+        contentPolicies: [],
+        timePolicies: [],
+        mutePolicies: [],
+      },
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toEqual([]);
+  });
+
+  it("does not match a receiver policy when toAddresses is empty", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, toAddresses: [] },
+      { category: "financial-relevance" },
+      {
+        version: 1,
+        senderPolicies: [],
+        domainPolicies: [],
+        receiverPolicies: [{ id: "r5", match: "me@business.com", boost: 5 }],
+        categoryPolicies: [],
+        contentPolicies: [],
+        timePolicies: [],
+        mutePolicies: [],
+      },
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toEqual([]);
   });
 });

@@ -40,6 +40,7 @@ A package currently contains:
 ## Current packages
 
 - `mail-sentinel`
+- `project-sentinel`
 - `node-operator`
 
 ---
@@ -125,6 +126,28 @@ It:
 - inspects node state
 - assists with operator-facing tasks
 - exposes controlled operational functionality
+
+---
+
+## Project Sentinel
+
+Project Sentinel is a project intelligence bot for Sovereign AI Node.
+
+It watches a small, curated set of trusted upstream and community sources,
+classifies relevance against project lanes such as Matrix, OpenClaw, mail stack,
+and node operations, then routes only the resulting signals into Matrix:
+
+- `RED` for immediate review
+- `AMBER` for digest-first review
+- `GRAY` for silence
+
+It is intentionally not a broad AI-news feed. The goal is calm operational
+intelligence for dependencies and ecosystem changes that matter to Sovereign AI
+Node.
+
+Package README:
+
+- [`bots/project-sentinel/README.md`](bots/project-sentinel/README.md)
 
 ## Trust model
 

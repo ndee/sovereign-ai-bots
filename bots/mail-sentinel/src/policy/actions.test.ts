@@ -28,6 +28,7 @@ describe("policy/actions", () => {
         version: 1,
         senderPolicies: [{ id: "s1", match: "a@b" }],
         domainPolicies: [{ id: "d1", match: "*.b" }],
+        receiverPolicies: [],
         categoryPolicies: [{ id: "c1", category: "decision-required" }],
         contentPolicies: [{ id: "co1", pattern: "invoice" }],
         timePolicies: [{ id: "t1", schedule: "09:00-17:00" }],
@@ -60,6 +61,27 @@ describe("policy/actions", () => {
     expect(withMute.contentPolicies).toHaveLength(1);
     expect(withMute.timePolicies).toHaveLength(1);
     expect(withMute.mutePolicies).toHaveLength(1);
+  });
+
+  it("adds a receiver policy entry", () => {
+    const base = createDefaultPolicy();
+    const withReceiver = addPolicyEntry(base, "receiver", { id: "r1", match: "me@biz.com" });
+    expect(withReceiver.receiverPolicies).toHaveLength(1);
+    expect(withReceiver.receiverPolicies[0]?.match).toBe("me@biz.com");
+  });
+
+  it("includes receiver policies in flattenPolicies", () => {
+    const flat = flattenPolicies({
+      version: 1,
+      senderPolicies: [],
+      domainPolicies: [],
+      receiverPolicies: [{ id: "r1", match: "me@biz.com" }],
+      categoryPolicies: [],
+      contentPolicies: [],
+      timePolicies: [],
+      mutePolicies: [],
+    });
+    expect(flat).toEqual([{ type: "receiver", id: "r1", match: "me@biz.com" }]);
   });
 
   it("matches the derivePolicyFromFeedback golden fixture", () => {

@@ -6,10 +6,24 @@ import {
   buildLlmCandidate,
   buildLlmPrompt,
   buildLlmSchema,
+  buildUserFacingWhy,
   determineZone,
   normalizeLlmResult,
   quoteLobsterArg,
 } from "./llm.js";
+
+const llmResult = (reason: string, overrides: Partial<LlmResult> = {}): LlmResult => ({
+  decisionRequired: false,
+  financialRelevance: false,
+  riskEscalation: false,
+  confidence: 80,
+  urgency: "medium",
+  reason,
+  deadlineDetected: false,
+  amountDetected: false,
+  suggestedZone: "red",
+  ...overrides,
+});
 
 const neutralPolicy: PolicyEvaluationResult = {
   scoreModifier: 0,
@@ -547,5 +561,77 @@ describe("scoring/llm", () => {
       rules: sampleRules,
     });
     expect(result.zone).toBe("amber");
+  });
+});
+
+describe("buildUserFacingWhy", () => {
+  it("prefers the LLM reason when it's operator-facing", () => {
+    expect(
+      buildUserFacingWhy(
+        { reasons: ["policy p-sender (known-good)", "policy matched sender alice@example.com"] },
+        llmResult("Payment failure may lead to account restrictions within 48 hours."),
+      ),
+    ).toBe("Payment failure may lead to account restrictions within 48 hours.");
+  });
+
+  it("trims the LLM reason to a single sentence", () => {
+    expect(
+      buildUserFacingWhy(
+        { reasons: [] },
+        llmResult("Invoice due today. Late fees after 24 hours. Vendor will escalate."),
+      ),
+    ).toBe("Invoice due today.");
+  });
+
+  it("caps very long LLM reasons with an ellipsis", () => {
+    const long = `${"x".repeat(200)} tail`;
+    const out = buildUserFacingWhy({ reasons: [] }, llmResult(long));
+    expect(out.length).toBeLessThanOrEqual(180);
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  it("falls back to the first non-internal zone reason when LLM reason is empty", () => {
+    expect(
+      buildUserFacingWhy(
+        {
+          reasons: [
+            "policy p-sender (known-good)",
+            "Vendor warned about pending account suspension.",
+          ],
+        },
+        llmResult(""),
+      ),
+    ).toBe("Vendor warned about pending account suspension.");
+  });
+
+  it("falls back to the first non-internal zone reason when no LLM result", () => {
+    expect(
+      buildUserFacingWhy(
+        { reasons: ["heuristics matched", "Invoice overdue; vendor may suspend service."] },
+        null,
+      ),
+    ).toBe("Invoice overdue; vendor may suspend service.");
+  });
+
+  it("falls back to the first raw reason when everything looks internal", () => {
+    expect(
+      buildUserFacingWhy(
+        { reasons: ["heuristics did not keep the mail above candidate threshold"] },
+        null,
+      ),
+    ).toBe("heuristics did not keep the mail above candidate threshold");
+  });
+
+  it("uses a generic fallback when reasons are empty and no LLM", () => {
+    expect(buildUserFacingWhy({ reasons: [] }, null)).toBe("Flagged by Mail Sentinel.");
+  });
+
+  it("treats an LLM reason containing internal vocabulary as non-operator-facing", () => {
+    expect(
+      buildUserFacingWhy(
+        { reasons: ["Deadline detected in body; vendor will escalate."] },
+        llmResult("Matched policy for risk-escalation rule."),
+      ),
+    ).toBe("Deadline detected in body; vendor will escalate.");
   });
 });
