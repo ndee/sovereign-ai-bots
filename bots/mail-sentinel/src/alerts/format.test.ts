@@ -5,7 +5,9 @@ import type { StoredAlert } from "../types.js";
 import {
   buildDigestMessage,
   buildRedAlertMessage,
+  cleanSubjectForDisplay,
   formatAlertLine,
+  formatSenderDisplay,
   mapAlertToSummary,
 } from "./format.js";
 
@@ -123,6 +125,56 @@ describe("alerts/format", () => {
     );
     expect(msg).toContain("1. Invoice #short");
     expect(msg).not.toContain("…");
+  });
+
+  it("no longer renders an alertId bracket or zone bullet in the RED title", () => {
+    const msg = buildRedAlertMessage(sampleAlert, "new-alert");
+    const firstLine = msg.split("\n")[0] ?? "";
+    expect(firstLine).toBe("Mail Sentinel Alert");
+    expect(msg).not.toContain(sampleAlert.alertId);
+    expect(msg).not.toContain("●");
+  });
+
+  it("cleanSubjectForDisplay strips e2e run-id suffixes", () => {
+    expect(cleanSubjectForDisplay("Urgent invoice e2e-1776634127312 due today")).toBe(
+      "Urgent invoice due today",
+    );
+    expect(
+      cleanSubjectForDisplay("Your invoice is overdue — invoice-overdue-e2e-1776634127312"),
+    ).toBe("Your invoice is overdue");
+    expect(
+      cleanSubjectForDisplay(
+        "Failed payment warning for business account — failed-payment-e2e-1776634127312",
+      ),
+    ).toBe("Failed payment warning for business account");
+    expect(
+      cleanSubjectForDisplay("Urgent escalation: security incident e2e-1776634127312 today"),
+    ).toBe("Urgent escalation: security incident today");
+  });
+
+  it("cleanSubjectForDisplay leaves real subjects untouched", () => {
+    expect(cleanSubjectForDisplay("Invoice #12345 for $500")).toBe("Invoice #12345 for $500");
+    expect(cleanSubjectForDisplay("Quick question about Q2 budget")).toBe(
+      "Quick question about Q2 budget",
+    );
+    expect(cleanSubjectForDisplay("  Padded   subject  ")).toBe("Padded subject");
+  });
+
+  it("formatSenderDisplay prefers the display name when present", () => {
+    expect(formatSenderDisplay('"Alice Smith" <alice@example.com>')).toBe("Alice Smith");
+    expect(formatSenderDisplay("Alice <alice@example.com>")).toBe("Alice");
+  });
+
+  it("formatSenderDisplay falls back to the local part minus alias for bare addresses", () => {
+    expect(formatSenderDisplay("billing+invoice@privex.com")).toBe("billing");
+    expect(formatSenderDisplay("sovereign-ai-node-test+decision@proton.me")).toBe(
+      "sovereign-ai-node-test",
+    );
+    expect(formatSenderDisplay("noreply@stonebridge.example")).toBe("noreply");
+  });
+
+  it("formatSenderDisplay returns the raw string when no display name and no bare-address parse", () => {
+    expect(formatSenderDisplay("not-an-address")).toBe("not-an-address");
   });
 
   it("matches the buildDigestMessage many-alerts golden fixture", () => {
