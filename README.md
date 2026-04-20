@@ -39,6 +39,8 @@ A package currently contains:
 
 ## Current packages
 
+- `bali-compass`
+- `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
 - `node-operator`
