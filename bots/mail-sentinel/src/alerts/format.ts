@@ -109,11 +109,13 @@ export const buildDigestMessage = (
   interval: string,
   sentAt: string,
 ): string => {
-  const lines = [`Amber signals digest (${String(alerts.length)})`, `Window: last ${interval}`];
-  for (const [index, alert] of alerts.slice(0, DIGEST_VISIBLE_LIMIT).entries()) {
+  const count = alerts.length;
+  const header = `AMBER DIGEST — ${String(count)} item${count === 1 ? "" : "s"}`;
+  const lines = [header, `Window: last ${interval}`];
+  for (const alert of alerts.slice(0, DIGEST_VISIBLE_LIMIT)) {
     lines.push(
       "",
-      `${String(index + 1)}. ${trimSubject(cleanSubjectForDisplay(alert.subject))}`,
+      trimSubject(cleanSubjectForDisplay(alert.subject)),
       `   From: ${formatSenderDisplay(alert.from)}`,
       `   ${formatCategoryConfidence(alert.category, alert.confidence)}`,
       `   Why it matters: ${alert.why}`,
@@ -122,11 +124,6 @@ export const buildDigestMessage = (
   if (alerts.length > DIGEST_VISIBLE_LIMIT) {
     lines.push("", `... and ${String(alerts.length - DIGEST_VISIBLE_LIMIT)} more.`);
   }
-  lines.push(
-    "",
-    `${FEEDBACK_ROW} — reference an item number or subject.`,
-    "",
-    `Generated: ${sentAt}`,
-  );
+  lines.push("", `${FEEDBACK_ROW} — reference by subject or sender.`, "", `Generated: ${sentAt}`);
   return lines.join("\n");
 };
