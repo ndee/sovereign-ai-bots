@@ -154,5 +154,18 @@ describe("state/io", () => {
       await expect(caught).resolves.toContain("Timed out while waiting for the state lock");
       expect(action).not.toHaveBeenCalled();
     });
+
+    // CLI commands (feedback, list-alerts, policy) run concurrently with the
+    // background scanner. A single scan holds the lock through IMAP fetch +
+    // LLM classification, which routinely exceeds the original 10s window.
+    // Guard against an accidental revert: the retry budget must stay at or
+    // above 30 seconds so concurrent CLI calls don't time out.
+    it("retry budget covers at least 30 seconds of contention", async () => {
+      const { DEFAULT_STATE_LOCK_RETRY_ATTEMPTS, DEFAULT_STATE_LOCK_RETRY_DELAY_MS } = await import(
+        "../constants.js"
+      );
+      const windowMs = DEFAULT_STATE_LOCK_RETRY_ATTEMPTS * DEFAULT_STATE_LOCK_RETRY_DELAY_MS;
+      expect(windowMs).toBeGreaterThanOrEqual(30_000);
+    });
   });
 });

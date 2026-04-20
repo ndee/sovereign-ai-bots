@@ -104,6 +104,40 @@ describe("alerts/format", () => {
     expect(msg).toContain("mystery");
   });
 
+  it("opens the digest with the compact `Amber signals digest (N)` header", () => {
+    const msg = buildDigestMessage(
+      [
+        { ...sampleAlert, alertId: "a1", zone: "amber" },
+        { ...sampleAlert, alertId: "a2", zone: "amber" },
+        { ...sampleAlert, alertId: "a3", zone: "amber" },
+      ],
+      "6h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    const [first, second] = msg.split("\n");
+    expect(first).toBe("Amber signals digest (3)");
+    expect(second).toBe("Window: last 6h");
+  });
+
+  it("never renders an alertId, Alert ID label, or Message ID in the digest", () => {
+    const msg = buildDigestMessage(
+      [
+        { ...sampleAlert, alertId: "alert-abc-1", zone: "amber" },
+        { ...sampleAlert, alertId: "alert-abc-2", zone: "amber", messageId: "<xyz@ex>" },
+      ],
+      "12h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    expect(msg).not.toContain("alert-abc-1");
+    expect(msg).not.toContain("alert-abc-2");
+    expect(msg).not.toContain("Alert ID");
+    expect(msg).not.toContain("Message ID");
+    expect(msg).not.toContain("<xyz@ex>");
+    // The compact header must not retain the legacy `Mail Sentinel Digest`
+    // title either — we moved the signal count into the header line.
+    expect(msg).not.toContain("Mail Sentinel Digest");
+  });
+
   it("trims overly long digest subjects with an ellipsis", () => {
     const longSubject = `Re: ${"subject ".repeat(30)}end`;
     const msg = buildDigestMessage(
