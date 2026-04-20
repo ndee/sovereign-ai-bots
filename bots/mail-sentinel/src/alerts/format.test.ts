@@ -104,7 +104,7 @@ describe("alerts/format", () => {
     expect(msg).toContain("mystery");
   });
 
-  it("opens the digest with the compact `Amber signals digest (N)` header", () => {
+  it("opens the digest with the `AMBER DIGEST — N items` header", () => {
     const msg = buildDigestMessage(
       [
         { ...sampleAlert, alertId: "a1", zone: "amber" },
@@ -115,8 +115,34 @@ describe("alerts/format", () => {
       "2026-04-08T12:00:00.000Z",
     );
     const [first, second] = msg.split("\n");
-    expect(first).toBe("Amber signals digest (3)");
+    expect(first).toBe("AMBER DIGEST — 3 items");
     expect(second).toBe("Window: last 6h");
+  });
+
+  it("singularizes the header count when there is exactly one item", () => {
+    const msg = buildDigestMessage(
+      [{ ...sampleAlert, alertId: "a1", zone: "amber" }],
+      "12h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    expect(msg.split("\n")[0]).toBe("AMBER DIGEST — 1 item");
+  });
+
+  it("does not number digest items (subject is the entry headline)", () => {
+    const msg = buildDigestMessage(
+      [
+        { ...sampleAlert, alertId: "a1", zone: "amber", subject: "First subject" },
+        { ...sampleAlert, alertId: "a2", zone: "amber", subject: "Second subject" },
+      ],
+      "12h",
+      "2026-04-08T12:00:00.000Z",
+    );
+    // No leading `1. ` / `2. ` item markers on any line.
+    for (const line of msg.split("\n")) {
+      expect(line).not.toMatch(/^\d+\.\s/u);
+    }
+    expect(msg).toContain("\nFirst subject\n");
+    expect(msg).toContain("\nSecond subject\n");
   });
 
   it("never renders an alertId, Alert ID label, or Message ID in the digest", () => {
@@ -133,9 +159,9 @@ describe("alerts/format", () => {
     expect(msg).not.toContain("Alert ID");
     expect(msg).not.toContain("Message ID");
     expect(msg).not.toContain("<xyz@ex>");
-    // The compact header must not retain the legacy `Mail Sentinel Digest`
-    // title either — we moved the signal count into the header line.
+    // The header must not retain any legacy title or count wording.
     expect(msg).not.toContain("Mail Sentinel Digest");
+    expect(msg).not.toContain("Amber signals digest");
   });
 
   it("trims overly long digest subjects with an ellipsis", () => {
@@ -145,10 +171,11 @@ describe("alerts/format", () => {
       "12h",
       "2026-04-08T12:00:00.000Z",
     );
-    const line = msg.split("\n").find((entry) => entry.startsWith("1. "));
+    // The trimmed subject is the item leader line, not prefixed by a number.
+    const line = msg.split("\n").find((entry) => entry.startsWith("Re:"));
     expect(line).toBeDefined();
     expect((line as string).endsWith("…")).toBe(true);
-    expect((line as string).length).toBeLessThanOrEqual("1. ".length + 120);
+    expect((line as string).length).toBeLessThanOrEqual(120);
   });
 
   it("keeps short digest subjects intact (no trim)", () => {
@@ -157,7 +184,7 @@ describe("alerts/format", () => {
       "12h",
       "2026-04-08T12:00:00.000Z",
     );
-    expect(msg).toContain("1. Invoice #short");
+    expect(msg).toContain("\nInvoice #short\n");
     expect(msg).not.toContain("…");
   });
 
