@@ -38,22 +38,22 @@
     {
       "id": "financial-invoice-subject",
       "field": "subject",
-      "pattern": "\\b(rechnung|invoice|angebot|offer|zahlung|payment|vertrag|contract|preis|price)\\b",
+      "pattern": "\\b(rechnung|invoice|angebot|offer|zahlung|payment|vertrag|contract|preis|price|renewal|renewed|abonnement|subscription)\\b",
       "weight": 5,
       "categories": [
         "financial-relevance"
       ],
-      "reason": "subject mentions an invoice, offer, contract, or payment"
+      "reason": "subject mentions an invoice, offer, contract, payment, or subscription renewal"
     },
     {
       "id": "financial-payment-text",
       "field": "text",
-      "pattern": "\\b(betrag|amount\\s+(?:is\\s+|will\\s+be\\s+)?due|zahlbar|payment\\s+(?:is\\s+)?due|late\\s+fees?|ueberweisen|uberweisen|wire(?:d|\\s+transfer)|outstanding|rechnungssumme|invoice\\s+(?:total|number|overdue))\\b",
+      "pattern": "\\b(betrag|amount\\s+(?:is\\s+|will\\s+be\\s+)?due|zahlbar|payment\\s+(?:is\\s+)?due|late\\s+fees?|ueberweisen|uberweisen|wire(?:d|\\s+transfer)|outstanding|rechnungssumme|invoice\\s+(?:total|number|overdue)|billing\\s+cycle|renewal\\s+date|auto[- ]?renew(?:al|s|ed)?|scheduled\\s+to\\s+renew)\\b",
       "weight": 4,
       "categories": [
         "financial-relevance"
       ],
-      "reason": "body contains payment-related wording"
+      "reason": "body contains payment- or subscription-renewal wording"
     },
     {
       "id": "risk-escalation-subject",
