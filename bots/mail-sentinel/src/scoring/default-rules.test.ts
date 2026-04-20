@@ -77,3 +77,40 @@ describe("default-rules.json: finance vs risk tie-break on realistic bodies", ()
     expect(scored.category).toBe("decision-required");
   });
 });
+
+// A subscription-renewal notice ("renewal date", "billing cycle") has no
+// invoice/payment keywords but is still a financial event. Previously it
+// scored 0 on every rule, never became a candidate, and was silently
+// dropped as gray. The live e2e `Canonical AMBER business signals` scenario
+// timed out waiting 5min for the recorded alert that never arrived.
+describe("default-rules.json: subscription-renewal candidacy", () => {
+  it("classifies a Canva-style renewal notice as a financial-relevance candidate", () => {
+    const message = buildMessage({
+      subject: "Canva Pro renewal notice for April — subscription-renewal-e2e-1",
+      text: "Hello,\n\nYour Canva Pro subscription is scheduled to renew this month.\n\nRenewal date: April 21, 2026\nPlan: Canva Pro\nBilling cycle: Monthly\n\nNo immediate action is required unless you want to change or cancel the subscription before the renewal date.",
+    });
+    const scored = scoreMessage(message, baseState, defaultRules);
+    expect(scored.candidate).toBe(true);
+    expect(scored.category).toBe("financial-relevance");
+  });
+
+  it("classifies an auto-renewal confirmation body as financial-relevance", () => {
+    const message = buildMessage({
+      subject: "Your plan will auto-renew next week",
+      text: "Your annual plan will auto-renew on May 1. No action is required if you want to continue.",
+    });
+    const scored = scoreMessage(message, baseState, defaultRules);
+    expect(scored.candidate).toBe(true);
+    expect(scored.category).toBe("financial-relevance");
+  });
+
+  it("keeps a product-roundup newsletter below the candidate threshold", () => {
+    const message = buildMessage({
+      subject: "April product updates and feature roundup",
+      text: "Hello,\n\nHere is your monthly product roundup. This month we launched a new dashboard theme, improved export options, and updated collaboration tools.\n\nRead more on our blog.",
+      headers: { "list-unsubscribe": "<mailto:unsub@example.test>" },
+    });
+    const scored = scoreMessage(message, baseState, defaultRules);
+    expect(scored.candidate).toBe(false);
+  });
+});
