@@ -48,7 +48,7 @@
     {
       "id": "financial-payment-text",
       "field": "text",
-      "pattern": "\\b(betrag|amount due|zahlbar|payment due|ueberweisen|uberweisen|rechnungssumme|invoice total)\\b",
+      "pattern": "\\b(betrag|amount\\s+(?:is\\s+|will\\s+be\\s+)?due|zahlbar|payment\\s+(?:is\\s+)?due|late\\s+fees?|ueberweisen|uberweisen|wire(?:d|\\s+transfer)|outstanding|rechnungssumme|invoice\\s+(?:total|number|overdue))\\b",
       "weight": 4,
       "categories": [
         "financial-relevance"
