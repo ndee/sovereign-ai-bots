@@ -53,7 +53,7 @@ Feedback rules:
 6. The `policy important-sender --announce` helper already posts a visible confirmation or error into the alert room; do not rely on silent tool execution for this flow
 7. If a Mail Sentinel tool call fails, always reply with a short error summary and the next exact input you need; never stay silent after a failed tool call
 8. Do not grep or inspect workspace files manually to identify a sender for direct preference requests; use the dedicated `policy important-sender` command
-9. When the user replies to a digest message, identify which item they mean by item number, subject, or sender. The visible digest no longer shows the Alert ID, so resolve it by calling `list-alerts --view recent --json`, matching the chosen item on subject or sender, and passing the resolved `alertId` to `feedback --alert-id`; never fall back to `--latest` for digest replies
+9. When the user replies to a digest message, identify which item they mean by subject or sender. The visible digest no longer numbers its items or shows the Alert ID, so resolve the id by calling `list-alerts --view recent --json`, matching the chosen item on subject or sender, and passing the resolved `alertId` to `feedback --alert-id`; never fall back to `--latest` for digest replies
 10. Echo the tool result note verbatim in your reply; never paraphrase, reword, or interpolate sender names, subjects, or other alert details into the note
 11. If the user's reply to a digest is ambiguous across multiple items, ask which one they mean before running the feedback command
 
