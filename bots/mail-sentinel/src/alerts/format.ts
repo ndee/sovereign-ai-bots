@@ -109,16 +109,12 @@ export const buildDigestMessage = (
   interval: string,
   sentAt: string,
 ): string => {
-  const lines = [
-    "Mail Sentinel Digest",
-    `Window: last ${interval}`,
-    `Amber signals: ${String(alerts.length)}`,
-  ];
+  const lines = [`Amber signals digest (${String(alerts.length)})`, `Window: last ${interval}`];
   for (const [index, alert] of alerts.slice(0, DIGEST_VISIBLE_LIMIT).entries()) {
     lines.push(
       "",
       `${String(index + 1)}. ${trimSubject(cleanSubjectForDisplay(alert.subject))}`,
-      `   From: ${formatSenderDisplay(alert.from)}  ·  id ${alert.alertId}`,
+      `   From: ${formatSenderDisplay(alert.from)}`,
       `   ${formatCategoryConfidence(alert.category, alert.confidence)}`,
       `   Why it matters: ${alert.why}`,
     );

@@ -9,7 +9,13 @@ export const DEFAULT_DIGEST_INTERVAL = "12h";
 export const DEFAULT_IMAP_SEARCH_LIMIT = 50;
 export const DEFAULT_IMAP_READ_MAX_BYTES = 5 * 1024 * 1024;
 export const DEFAULT_STATE_LOCK_RETRY_DELAY_MS = 50;
-export const DEFAULT_STATE_LOCK_RETRY_ATTEMPTS = 200;
+// Retry window = RETRY_ATTEMPTS * RETRY_DELAY_MS. 600 * 50ms = 30s, chosen
+// so that a CLI command (feedback, list-alerts, policy) can outwait a
+// single scan cycle that holds the lock through IMAP fetch + LLM
+// classification. The prior 10s window (200 attempts) timed out on
+// contested scans once subscription-renewal and fixture traffic started
+// producing more per-scan LLM work.
+export const DEFAULT_STATE_LOCK_RETRY_ATTEMPTS = 600;
 export const DEFAULT_STATE_LOCK_STALE_MS = 5 * 60 * 1000;
 export const DEFAULT_TOOL_EXECUTABLE = "/usr/local/bin/sovereign-tool";
 export const DEFAULT_AGENT_ID = "mail-sentinel";
