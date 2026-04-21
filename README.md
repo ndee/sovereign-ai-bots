@@ -32,10 +32,16 @@ Each bot package lives under:
 
 `bots/<id>/`
 
-A package currently contains:
+A package can contain:
 
 - `sovereign-bot.json` — package manifest
 - `workspace/` — files copied into the managed bot workspace
+- `avatar.png` — optional Matrix avatar for that bot's dedicated account
+
+The repo root can also carry shared Matrix avatar assets used by the runtime:
+
+- `service-bot.png` — default avatar for the primary service bot
+- `alert-room.png` — avatar for the bundled Matrix alert room
 
 ## Current packages
 
