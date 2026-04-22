@@ -45,6 +45,7 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 
 ## Current packages
 
+- `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
 - `node-operator`
