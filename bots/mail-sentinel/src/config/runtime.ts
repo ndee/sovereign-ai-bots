@@ -42,6 +42,11 @@ import {
   resolveRelativeToBase,
 } from "../util/paths.js";
 
+const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+
 interface RuntimeConfigDocument {
   sovereignTools?: {
     instances?: Array<{
@@ -368,36 +373,47 @@ export class MailSentinelRuntime {
       "| json",
     ].join(" ");
     try {
-      const result = await execFileAsync("lobster", [pipeline], {
-        cwd: this.workspaceDir,
-        timeout: this.llmTimeoutMs,
-        maxBuffer: 10 * 1024 * 1024,
-        env: {
-          ...process.env,
-          CLAWD_URL: this.openclawUrl,
-          ...(this.openclawToken === undefined ? {} : { CLAWD_TOKEN: this.openclawToken }),
-        },
-      }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
-        const stdout = typeof error.stdout === "string" ? error.stdout : "";
-        const stderr = typeof error.stderr === "string" ? error.stderr : "";
-        throw new Error(`lobster classification failed: ${stderr || stdout || error.message}`);
-      });
-      const parsed = parseJsonSafely(String(result.stdout));
-      const first = Array.isArray(parsed)
-        ? (parsed[0] as Record<string, unknown>)
-        : (parsed as Record<string, unknown> | null);
-      const output = first?.output as { text?: unknown; data?: unknown } | undefined;
-      const rawText = typeof output?.text === "string" ? parseJsonSafely(output.text) : null;
-      const details = first?.details as { json?: unknown } | undefined;
-      const raw =
-        details?.json ?? rawText ?? output?.data ?? (first as { data?: unknown })?.data ?? first;
-      if (raw === null || typeof raw !== "object") {
-        throw new Error("lobster classification returned no structured JSON payload");
+      for (const backoffMs of CLASSIFY_RETRY_BACKOFF_MS) {
+        try {
+          return await this.runClassifyPipeline(pipeline);
+        } catch {
+          await delay(backoffMs);
+        }
       }
-      return normalizeLlmResult(raw as Parameters<typeof normalizeLlmResult>[0]);
+      return await this.runClassifyPipeline(pipeline);
     } finally {
       await rm(candidateFile, { force: true });
     }
+  }
+
+  private async runClassifyPipeline(pipeline: string): Promise<LlmResult> {
+    const result = await execFileAsync("lobster", [pipeline], {
+      cwd: this.workspaceDir,
+      timeout: this.llmTimeoutMs,
+      maxBuffer: 10 * 1024 * 1024,
+      env: {
+        ...process.env,
+        CLAWD_URL: this.openclawUrl,
+        ...(this.openclawToken === undefined ? {} : { CLAWD_TOKEN: this.openclawToken }),
+      },
+    }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
+      const stdout = typeof error.stdout === "string" ? error.stdout : "";
+      const stderr = typeof error.stderr === "string" ? error.stderr : "";
+      throw new Error(`lobster classification failed: ${stderr || stdout || error.message}`);
+    });
+    const parsed = parseJsonSafely(String(result.stdout));
+    const first = Array.isArray(parsed)
+      ? (parsed[0] as Record<string, unknown>)
+      : (parsed as Record<string, unknown> | null);
+    const output = first?.output as { text?: unknown; data?: unknown } | undefined;
+    const rawText = typeof output?.text === "string" ? parseJsonSafely(output.text) : null;
+    const details = first?.details as { json?: unknown } | undefined;
+    const raw =
+      details?.json ?? rawText ?? output?.data ?? (first as { data?: unknown })?.data ?? first;
+    if (raw === null || typeof raw !== "object") {
+      throw new Error("lobster classification returned no structured JSON payload");
+    }
+    return normalizeLlmResult(raw as Parameters<typeof normalizeLlmResult>[0]);
   }
 }
 
