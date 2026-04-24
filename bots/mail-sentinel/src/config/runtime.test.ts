@@ -414,7 +414,7 @@ describe("config/runtime", () => {
       return runtime;
     };
 
-    it("posts a JSON body via fetch", async () => {
+    it("posts a JSON body via fetch for a plain-text string message", async () => {
       const runtime = await loadRuntime();
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       vi.stubGlobal("fetch", fetchMock);
@@ -424,7 +424,32 @@ describe("config/runtime", () => {
         const [url, init] = fetchMock.mock.calls[0]!;
         expect(String(url)).toContain("/_matrix/client/v3/rooms/");
         expect(init.method).toBe("PUT");
-        expect(JSON.parse(init.body).body).toBe("hello world");
+        const payload = JSON.parse(init.body);
+        expect(payload.body).toBe("hello world");
+        expect(payload.msgtype).toBe("m.text");
+        expect(payload.format).toBeUndefined();
+        expect(payload.formatted_body).toBeUndefined();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("posts an HTML-formatted body when given a MatrixMessageBody", async () => {
+      const runtime = await loadRuntime();
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        await runtime.sendMatrixRoomMessage({
+          body: "plain fallback",
+          formattedBody: "<p><strong>HTML</strong></p>",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const init = fetchMock.mock.calls[0]![1];
+        const payload = JSON.parse(init.body);
+        expect(payload.msgtype).toBe("m.text");
+        expect(payload.body).toBe("plain fallback");
+        expect(payload.format).toBe("org.matrix.custom.html");
+        expect(payload.formatted_body).toBe("<p><strong>HTML</strong></p>");
       } finally {
         vi.unstubAllGlobals();
       }
