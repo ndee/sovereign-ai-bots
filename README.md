@@ -32,13 +32,20 @@ Each bot package lives under:
 
 `bots/<id>/`
 
-A package currently contains:
+A package can contain:
 
 - `sovereign-bot.json` — package manifest
 - `workspace/` — files copied into the managed bot workspace
+- `avatar.png` — optional Matrix avatar for that bot's dedicated account
+
+The repo root can also carry shared Matrix avatar assets used by the runtime:
+
+- `service-bot.png` — default avatar for the primary service bot
+- `alert-room.png` — avatar for the bundled Matrix alert room
 
 ## Current packages
 
+- `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
 - `node-operator`
@@ -52,10 +59,10 @@ Mail Sentinel is the first concrete module on Sovereign AI Node. It monitors an 
 ### What it looks like
 
 ![Mail Sentinel RED alert surfaced in Matrix](docs/img/mail-sentinel/01-hero-alert.png)
-Mail Sentinel surfaces high-signal messages in Matrix.
+Mail Sentinel surfaces high-signal messages in Matrix with a compact zone/category line and the subject as the headline.
 
 ![Mail Sentinel AMBER digest grouped in Matrix](docs/img/mail-sentinel/02-amber-digest.png)
-Mail Sentinel can group relevant messages into a calm digest.
+Mail Sentinel can group relevant messages into a calm digest with unnumbered items and feedback that references the item by subject or sender.
 
 ![Operator feedback updating Mail Sentinel routing policy](docs/img/mail-sentinel/04-feedback.png)
 Operator feedback updates local policy and influences future routing.
@@ -106,12 +113,14 @@ The current documented and tested path for Mail Sentinel is:
 
 Each classified message includes:
 
-- **Zone** — RED, AMBER, or GRAY
-- **Category** — e.g. Decision Required, Financial Relevance, Risk / Escalation
-- **Subject** / **From** — original message metadata
+- **Zone + category** — rendered together on one compact line, e.g. `RED · Risk / Escalation`
+- **Subject** — shown as the headline, not as a labelled `Subject:` field
+- **From** — normalized operator-facing sender display (display name when present, otherwise the email localpart)
 - **Why it matters** — short explanation of the routing decision
 - **Confidence** — model confidence in the classification
-- **Feedback** — operator action to refine future routing
+- **Feedback** — operator action to refine future routing; digest follow-ups reference the visible item by subject or sender
+
+Visible Matrix alerts and digests stay compact on purpose: internal alert IDs and raw message IDs are kept in local state, but are not shown in the rendered operator message.
 
 ---
 
