@@ -671,6 +671,66 @@ describe("config/runtime", () => {
         setExecFileAsync(previous);
       }
     });
+
+    it("retries after a transient failure and returns the successful result", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValueOnce(
+          Object.assign(new Error("boom"), { stdout: "", stderr: "transient 502" }),
+        )
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            {
+              details: {
+                json: {
+                  decision_required: false,
+                  financial_relevance: false,
+                  risk_escalation: false,
+                  confidence: 50,
+                  urgency: "low",
+                  reason: "recovered",
+                  deadline_detected: false,
+                  amount_detected: false,
+                  suggested_zone: "gray",
+                },
+              },
+            },
+          ]),
+          stderr: "",
+        });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const result = await runtime.classifyCandidate(sampleCandidate);
+        expect(result.reason).toBe("recovered");
+        expect(runner).toHaveBeenCalledTimes(2);
+        expect(rm).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("gives up after the retry budget is exhausted and surfaces the last error", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("boom"), { stdout: "", stderr: "upstream down" }),
+        );
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          "lobster classification failed: upstream down",
+        );
+        expect(runner).toHaveBeenCalledTimes(3);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
   });
 
   it("resolveToolRuntime returns a loaded runtime", async () => {
