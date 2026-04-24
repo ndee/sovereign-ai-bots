@@ -44,6 +44,9 @@ import {
 
 const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
 
+const MATRIX_TEXT_MSGTYPE = "m.text";
+const MATRIX_CUSTOM_HTML_FORMAT = "org.matrix.custom.html";
+
 const delay = (ms: number): Promise<void> =>
   new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 
@@ -324,7 +327,9 @@ export class MailSentinelRuntime {
     };
   }
 
-  async sendMatrixRoomMessage(text: string): Promise<void> {
+  async sendMatrixRoomMessage(
+    message: string | { body: string; formattedBody: string },
+  ): Promise<void> {
     const adminBaseUrl = this.matrix.adminBaseUrl;
     const roomId = this.matrix.roomId;
     if (adminBaseUrl === undefined || roomId === undefined) {
@@ -334,6 +339,15 @@ export class MailSentinelRuntime {
       `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${encodeURIComponent(randomUUID())}`,
       ensureTrailingSlash(adminBaseUrl),
     ).toString();
+    const payload: Record<string, string> =
+      typeof message === "string"
+        ? { msgtype: MATRIX_TEXT_MSGTYPE, body: message }
+        : {
+            msgtype: MATRIX_TEXT_MSGTYPE,
+            body: message.body,
+            format: MATRIX_CUSTOM_HTML_FORMAT,
+            formatted_body: message.formattedBody,
+          };
     const response = await fetch(endpoint, {
       method: "PUT",
       headers: {
@@ -341,10 +355,7 @@ export class MailSentinelRuntime {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        msgtype: "m.text",
-        body: text,
-      }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       throw new Error(`Failed to send Matrix room message (${response.status})`);

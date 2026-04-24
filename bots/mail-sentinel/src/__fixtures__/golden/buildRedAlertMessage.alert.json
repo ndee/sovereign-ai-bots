@@ -1,1 +1,4 @@
-"Mail Sentinel Alert\nRED · Financial Relevance\n\nInvoice $500\n\nFrom: Alice\nWhy it matters: invoice due today\nConfidence: high (85%)\n\nFeedback: Very important · Not important · Remind later · Always treat like this · Less of this"
+{
+  "body": "🔴 RED · Financial Relevance\n\nInvoice $500\n\nFrom: Alice\nWhy it matters: invoice due today\nConfidence: high (85%)\n\nReply in thread with:\nvery important · not important · remind later · always like this · less of this",
+  "formattedBody": "<p>🔴 <strong>RED · Financial Relevance</strong></p>\n<p><strong>Invoice $500</strong></p>\n<p>\n<strong>From:</strong> Alice<br>\n<strong>Why it matters:</strong> invoice due today<br>\n<strong>Confidence:</strong> high (85%)\n</p>\n<p>\nReply in thread with:<br>\n<code>very important</code> · <code>not important</code> · <code>remind later</code> · <code>always like this</code> · <code>less of this</code>\n</p>"
+}
