@@ -225,16 +225,18 @@ describe("alerts/format", () => {
   it("includes the feedback footer with code-wrapped options in both bodies", () => {
     const alertMsg = buildRedAlertMessage(sampleAlert, "new-alert");
     expect(alertMsg.body).toContain(
-      "very important · not important · remind later · always like this · less of this",
+      "very important · not important · remind later · always treat like this · less of this",
     );
     expect(alertMsg.formattedBody).toContain(
       "<code>very important</code> · <code>not important</code>",
     );
 
     const digestMsg = buildDigestMessage([{ ...sampleAlert, alertId: "a1", zone: "amber" }], "12h");
-    expect(digestMsg.body).toContain("more like this · less of this · digest only · not relevant");
+    expect(digestMsg.body).toContain(
+      "very important · not important · always treat like this · less of this · digest only",
+    );
     expect(digestMsg.formattedBody).toContain(
-      "<code>more like this</code> · <code>less of this</code>",
+      "<code>very important</code> · <code>not important</code>",
     );
   });
 
