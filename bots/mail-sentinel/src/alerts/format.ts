@@ -13,15 +13,16 @@ const ALERT_FEEDBACK_OPTIONS = [
   "very important",
   "not important",
   "remind later",
-  "always like this",
+  "always treat like this",
   "less of this",
 ] as const;
 
 const DIGEST_FEEDBACK_OPTIONS = [
-  "more like this",
+  "very important",
+  "not important",
+  "always treat like this",
   "less of this",
   "digest only",
-  "not relevant",
 ] as const;
 
 const ZONE_EMOJI: Record<string, string> = {
