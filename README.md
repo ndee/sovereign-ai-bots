@@ -49,6 +49,7 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 - `mail-sentinel`
 - `project-sentinel`
 - `node-operator`
+- `wealth-alignment` — experimental, private/local-first financial clarity bot. Not a current public product focus.
 
 ---
 

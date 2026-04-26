@@ -1,0 +1,266 @@
+{
+  "kind": "sovereign-bot-package",
+  "manifestVersion": 2,
+  "id": "wealth-alignment",
+  "version": "0.1.0",
+  "displayName": "Wealth Alignment",
+  "description": "Experimental private/local-first financial clarity bot. Ingests finance documents, builds structured income/expense/account/asset/liability records, and answers grounded overview questions and digests over Matrix.",
+  "defaultInstall": false,
+  "helloMessage": "Wealth Alignment. Private, local-first financial clarity. Drop documents into the inbox, then ask for overviews, snapshots, or weekly and monthly reviews.",
+  "matrixIdentity": {
+    "mode": "dedicated-account",
+    "localpartPrefix": "wealth-alignment"
+  },
+  "matrixRouting": {
+    "dm": {
+      "enabled": true
+    },
+    "alertRoom": {
+      "autoReply": true,
+      "requireMention": false
+    }
+  },
+  "configDefaults": {
+    "statePath": "data/wealth-alignment-state.json",
+    "inboxPath": "inbox"
+  },
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "wealth-alignment-tool",
+      "version": "0.1.0",
+      "description": "Local financial clarity helper for document intake, parsing, monthly snapshots, net worth, and digests.",
+      "capabilities": [
+        "wealth-alignment.documents.read",
+        "wealth-alignment.documents.write",
+        "wealth-alignment.snapshot.read",
+        "wealth-alignment.digest.read"
+      ],
+      "requiredSecretRefs": [],
+      "requiredConfigKeys": [
+        "agentId",
+        "statePath",
+        "inboxPath"
+      ],
+      "allowedCommands": [
+        "<agent-workspace>/bin/wealth-alignment.js help --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js document-types --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js import --instance <tool-instance-id> --path <path> --kind <kind> --json",
+        "<agent-workspace>/bin/wealth-alignment.js documents --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js parse --instance <tool-instance-id> --id <document-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js reparse --instance <tool-instance-id> --id <document-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js show-document --instance <tool-instance-id> --id <document-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js accounts --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js transactions --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js income --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js expenses --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js cashflow --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js net-worth --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js assets --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js liabilities --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js what-changed --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js summary --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js weekly-review --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js monthly-digest --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js recurring --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js top-categories --instance <tool-instance-id> --month <yyyy-mm> --json",
+        "<agent-workspace>/bin/wealth-alignment.js next-step --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js missing-data --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js parsing-issues --instance <tool-instance-id> --json"
+      ],
+      "openclawPlugins": [],
+      "openclawBundledPlugins": [],
+      "openclawToolNames": []
+    }
+  ],
+  "toolInstances": [
+    {
+      "id": "wealth-alignment-core",
+      "templateRef": "wealth-alignment-tool@0.1.0",
+      "config": {
+        "agentId": {
+          "from": "agent.id"
+        },
+        "statePath": {
+          "from": "instance.config.statePath"
+        },
+        "inboxPath": {
+          "from": "instance.config.inboxPath"
+        },
+        "matrixAlertRoomId": {
+          "from": "instance.matrix.alertRoom.roomId"
+        }
+      },
+      "secretRefs": {}
+    }
+  ],
+  "hostResources": [
+    {
+      "id": "workspace-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/README.md"
+          ]
+        },
+        "source": "workspace/README.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-agents",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/AGENTS.md"
+          ]
+        },
+        "source": "workspace/AGENTS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-tools",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/TOOLS.md"
+          ]
+        },
+        "source": "workspace/TOOLS.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-skill",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/skills/wealth-alignment-core/SKILL.md"
+          ]
+        },
+        "source": "workspace/skills/wealth-alignment-core/SKILL.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-bin",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/bin/wealth-alignment.js"
+          ]
+        },
+        "source": "workspace/bin/dist/wealth-alignment.js",
+        "mode": "0755",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-inbox-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/inbox/README.md"
+          ]
+        },
+        "source": "workspace/inbox/README.md",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-data-readme",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/README.md"
+          ]
+        },
+        "source": "workspace/data/README.md",
+        "writePolicy": "ifMissing"
+      }
+    },
+    {
+      "id": "workspace-state",
+      "kind": "stateFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/data/wealth-alignment-state.json"
+          ]
+        },
+        "source": "workspace/data/wealth-alignment-state.json",
+        "writePolicy": "ifMissing"
+      },
+      "status": {
+        "fields": {
+          "lastImportAt": {
+            "path": "lastImportAt",
+            "type": "timestamp"
+          },
+          "lastParseAt": {
+            "path": "lastParseAt",
+            "type": "timestamp"
+          },
+          "documentCount": {
+            "path": "counters.documents",
+            "type": "int",
+            "default": 0
+          },
+          "transactionCount": {
+            "path": "counters.transactions",
+            "type": "int",
+            "default": 0
+          }
+        }
+      },
+      "checks": []
+    }
+  ],
+  "agentTemplate": {
+    "id": "wealth-alignment",
+    "version": "0.1.0",
+    "description": "Private local-first financial clarity bot. Ingests documents, builds a structured financial view, and answers overview questions and digests in Matrix.",
+    "matrix": {
+      "localpartPrefix": "wealth-alignment"
+    },
+    "requiredToolTemplates": [
+      {
+        "id": "wealth-alignment-tool",
+        "version": "0.1.0"
+      }
+    ],
+    "optionalToolTemplates": []
+  }
+}
