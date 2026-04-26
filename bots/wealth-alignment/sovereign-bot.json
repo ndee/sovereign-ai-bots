@@ -22,7 +22,13 @@
   },
   "configDefaults": {
     "statePath": "data/wealth-alignment-state.json",
-    "inboxPath": "inbox"
+    "inboxPath": "inbox",
+    "pdfExtractor": "pdftotext",
+    "imageExtractor": "tesseract",
+    "pdfRenderer": "pdftoppm",
+    "visionEnabled": false,
+    "visionModel": "qwen/qwen2-vl-72b-instruct",
+    "visionMaxPages": 4
   },
   "toolTemplates": [
     {
@@ -46,9 +52,11 @@
         "<agent-workspace>/bin/wealth-alignment.js help --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js document-types --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js import --instance <tool-instance-id> --path <path> --kind <kind> --json",
+        "<agent-workspace>/bin/wealth-alignment.js import --instance <tool-instance-id> --path <path> --kind <kind> --use-vision --json",
         "<agent-workspace>/bin/wealth-alignment.js documents --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js parse --instance <tool-instance-id> --id <document-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js reparse --instance <tool-instance-id> --id <document-id> --json",
+        "<agent-workspace>/bin/wealth-alignment.js reparse --instance <tool-instance-id> --id <document-id> --use-vision --json",
         "<agent-workspace>/bin/wealth-alignment.js show-document --instance <tool-instance-id> --id <document-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js accounts --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/wealth-alignment.js transactions --instance <tool-instance-id> --json",
@@ -87,11 +95,33 @@
         "inboxPath": {
           "from": "instance.config.inboxPath"
         },
+        "pdfExtractor": {
+          "from": "instance.config.pdfExtractor"
+        },
+        "imageExtractor": {
+          "from": "instance.config.imageExtractor"
+        },
+        "pdfRenderer": {
+          "from": "instance.config.pdfRenderer"
+        },
+        "visionEnabled": {
+          "from": "instance.config.visionEnabled"
+        },
+        "visionModel": {
+          "from": "instance.config.visionModel"
+        },
+        "visionMaxPages": {
+          "from": "instance.config.visionMaxPages"
+        },
         "matrixAlertRoomId": {
           "from": "instance.matrix.alertRoom.roomId"
         }
       },
-      "secretRefs": {}
+      "secretRefs": {
+        "openrouterApiKey": {
+          "from": "instance.secretRefs.openrouterApiKey"
+        }
+      }
     }
   ],
   "hostResources": [

@@ -126,9 +126,7 @@ const normalizeAmount = (raw: string): number | undefined => {
   return round2(negative ? -value : value);
 };
 
-const tailAmount = (
-  line: string,
-): { amount: number; rest: string; raw: string } | undefined => {
+const tailAmount = (line: string): { amount: number; rest: string; raw: string } | undefined => {
   const matches = [...line.matchAll(AMOUNT_RE)];
   if (matches.length === 0) {
     return undefined;

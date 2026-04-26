@@ -18,6 +18,8 @@ export type AssetType = "cash" | "deposit" | "investment" | "real_estate" | "veh
 
 export type LiabilityType = "credit_card" | "loan" | "mortgage" | "tax" | "other";
 
+export type ExtractionMethod = "raw_text" | "pdftotext" | "tesseract" | "vision" | "fallback";
+
 export interface DocumentRecord {
   id: string;
   source_type: string;
@@ -28,6 +30,7 @@ export interface DocumentRecord {
   date_range_end?: string | undefined;
   raw_text?: string | undefined;
   extracted_text?: string | undefined;
+  extraction_method?: ExtractionMethod | undefined;
   parse_status: ParseStatus;
   notes?: string | undefined;
   source_path?: string | undefined;
@@ -125,4 +128,5 @@ export interface CommandOptions {
   currency?: string | undefined;
   institution?: string | undefined;
   notes?: string | undefined;
+  useVision?: boolean | undefined;
 }

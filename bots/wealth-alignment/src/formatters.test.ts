@@ -45,10 +45,14 @@ describe("wealth-alignment/formatters", () => {
         source_path: "/tmp/file.txt",
       },
       inferred: true,
+      extractionMethod: "raw_text",
+      extractionWarnings: ["heads up"],
     });
     expect(text).toContain("Document registered: doc-1");
     expect(text).toContain("(inferred)");
     expect(text).toContain("/tmp/file.txt");
+    expect(text).toContain("Extraction:");
+    expect(text).toContain("heads up");
 
     const explicit = formatImport({
       document: {
@@ -59,9 +63,12 @@ describe("wealth-alignment/formatters", () => {
         parse_status: "pending",
       },
       inferred: false,
+      extractionMethod: "fallback",
+      extractionWarnings: [],
     });
     expect(explicit).not.toContain("(inferred)");
     expect(explicit).not.toContain("Source:");
+    expect(explicit).toContain("no extractor");
   });
 
   it("formats document listings", () => {

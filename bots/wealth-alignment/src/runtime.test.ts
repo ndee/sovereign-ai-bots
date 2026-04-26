@@ -86,6 +86,161 @@ describe("wealth-alignment/runtime", () => {
     expect(runtime.instanceId).toBe("wealth-alignment-core");
   });
 
+  it("reads extractor config and resolves the openrouter env secret", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
+    const workspace = join(tempDir, "workspace");
+    await mkdir(workspace, { recursive: true });
+    const configPath = join(tempDir, "node-config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        sovereignTools: {
+          instances: [
+            {
+              id: "wealth-alignment-core",
+              config: {
+                pdfExtractor: "/usr/bin/pdftotext",
+                imageExtractor: "/usr/bin/tesseract",
+                pdfRenderer: "/usr/bin/pdftoppm",
+                visionEnabled: true,
+                visionModel: "qwen/qwen2-vl-72b-instruct",
+                visionMaxPages: "6",
+              },
+              secretRefs: {
+                openrouterApiKey: "env:WEALTH_TEST_OPENROUTER_KEY",
+              },
+            },
+          ],
+        },
+        openclawProfile: {
+          agents: [{ id: "wealth-alignment-core", workspace }],
+        },
+      }),
+    );
+    const original = process.env.WEALTH_TEST_OPENROUTER_KEY;
+    process.env.WEALTH_TEST_OPENROUTER_KEY = "secret-value";
+    try {
+      const runtime = await resolveRuntime("wealth-alignment-core", configPath);
+      expect(runtime.extractor.pdfExtractor).toBe("/usr/bin/pdftotext");
+      expect(runtime.extractor.imageExtractor).toBe("/usr/bin/tesseract");
+      expect(runtime.extractor.pdfRenderer).toBe("/usr/bin/pdftoppm");
+      expect(runtime.extractor.visionEnabled).toBe(true);
+      expect(runtime.extractor.visionModel).toBe("qwen/qwen2-vl-72b-instruct");
+      expect(runtime.extractor.visionMaxPages).toBe(6);
+      expect(runtime.extractor.openrouterApiKey).toBe("secret-value");
+    } finally {
+      if (original === undefined) {
+        delete process.env.WEALTH_TEST_OPENROUTER_KEY;
+      } else {
+        process.env.WEALTH_TEST_OPENROUTER_KEY = original;
+      }
+    }
+  });
+
+  it("normalizes extractor config branches", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
+    const configPath = join(tempDir, "node-config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        sovereignTools: {
+          instances: [
+            {
+              id: "wealth-alignment-core",
+              config: {
+                visionEnabled: "false",
+                visionMaxPages: "not-a-number",
+              },
+              secretRefs: { openrouterApiKey: "env:WEALTH_MISSING_SECRET" },
+            },
+          ],
+        },
+      }),
+    );
+    const runtime = await resolveRuntime("wealth-alignment-core", configPath);
+    expect(runtime.extractor.visionEnabled).toBe(false);
+    expect(runtime.extractor.visionMaxPages).toBe(4);
+    expect(runtime.extractor.openrouterApiKey).toBeUndefined();
+  });
+
+  it("falls through to inline secret values when ref does not start with env: or file:", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
+    const configPath = join(tempDir, "node-config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        sovereignTools: {
+          instances: [
+            {
+              id: "wealth-alignment-core",
+              config: {},
+              secretRefs: { openrouterApiKey: "literal-secret" },
+            },
+          ],
+        },
+      }),
+    );
+    const runtime = await resolveRuntime("wealth-alignment-core", configPath);
+    expect(runtime.extractor.openrouterApiKey).toBe("literal-secret");
+  });
+
+  it("treats an empty env-var secret as missing", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
+    const configPath = join(tempDir, "node-config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        sovereignTools: {
+          instances: [
+            {
+              id: "wealth-alignment-core",
+              config: {},
+              secretRefs: { openrouterApiKey: "env:WEALTH_TEST_EMPTY_SECRET" },
+            },
+          ],
+        },
+      }),
+    );
+    const original = process.env.WEALTH_TEST_EMPTY_SECRET;
+    process.env.WEALTH_TEST_EMPTY_SECRET = "";
+    try {
+      const runtime = await resolveRuntime("wealth-alignment-core", configPath);
+      expect(runtime.extractor.openrouterApiKey).toBeUndefined();
+    } finally {
+      if (original === undefined) {
+        delete process.env.WEALTH_TEST_EMPTY_SECRET;
+      } else {
+        process.env.WEALTH_TEST_EMPTY_SECRET = original;
+      }
+    }
+  });
+
+  it("accepts numeric and boolean config values directly", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
+    const configPath = join(tempDir, "node-config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        sovereignTools: {
+          instances: [
+            {
+              id: "wealth-alignment-core",
+              config: {
+                visionEnabled: "true",
+                visionMaxPages: 8,
+              },
+              secretRefs: { openrouterApiKey: "" },
+            },
+          ],
+        },
+      }),
+    );
+    const runtime = await resolveRuntime("wealth-alignment-core", configPath);
+    expect(runtime.extractor.visionEnabled).toBe(true);
+    expect(runtime.extractor.visionMaxPages).toBe(8);
+    expect(runtime.extractor.openrouterApiKey).toBeUndefined();
+  });
+
   it("reads SOVEREIGN_NODE_CONFIG from the environment when no path is provided", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "wealth-runtime-"));
     const configPath = join(tempDir, "node-config.json");

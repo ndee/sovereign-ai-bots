@@ -54,14 +54,30 @@ export const formatDocumentTypes = (result: DocumentTypesResult): string => {
   return lines.join("\n");
 };
 
+const EXTRACTION_LABEL: Record<string, string> = {
+  raw_text: "raw text",
+  pdftotext: "pdftotext (local)",
+  tesseract: "tesseract OCR (local)",
+  vision: "OpenRouter vision (network)",
+  fallback: "no extractor available",
+};
+
 export const formatImport = (result: ImportResult): string => {
   const lines = [
     `Document registered: ${result.document.id}`,
     `Type: ${DOCUMENT_KIND_LABELS[result.document.document_type]}${result.inferred ? " (inferred)" : ""}`,
+    /* v8 ignore next -- EXTRACTION_LABEL covers every ExtractionMethod variant */
+    `Extraction: ${EXTRACTION_LABEL[result.extractionMethod] ?? result.extractionMethod}`,
     `Status: ${result.document.parse_status}`,
   ];
   if (result.document.source_path !== undefined) {
     lines.push(`Source: ${result.document.source_path}`);
+  }
+  if (result.extractionWarnings.length > 0) {
+    lines.push("Extraction notes:");
+    for (const warning of result.extractionWarnings) {
+      lines.push(`  ${warning}`);
+    }
   }
   lines.push("Next step: run `parse --id " + result.document.id + "` to extract records.");
   return lines.join("\n");

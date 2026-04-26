@@ -52,4 +52,9 @@ describe("wealth-alignment/args", () => {
   it("returns undefined command for empty argv", () => {
     expect(parseArgs([]).command).toBeUndefined();
   });
+
+  it("parses --use-vision as a boolean flag", () => {
+    const result = parseArgs(["import", "--instance", "x", "--use-vision"]);
+    expect(result.options.useVision).toBe(true);
+  });
 });

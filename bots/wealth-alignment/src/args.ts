@@ -27,6 +27,10 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
       options.json = true;
       continue;
     }
+    if (token === "--use-vision") {
+      options.useVision = true;
+      continue;
+    }
     if (token === undefined || !KEYED_OPTIONS.has(token)) {
       throw new Error(`Unknown argument: ${String(token)}`);
     }

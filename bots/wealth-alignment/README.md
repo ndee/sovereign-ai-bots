@@ -37,6 +37,14 @@ Anything beyond that — partner workflows, projections, portfolio optimization,
 
 Local JSON state at `data/wealth-alignment-state.json`. Documents land in `inbox/` and parsed text is stored alongside the document record.
 
+## Supported inputs
+
+- Plain text: `.txt`, `.csv`, `.tsv`, `.md`, `.log`
+- PDFs: extracted locally via `pdftotext` (requires `poppler-utils`)
+- Images: `.png`, `.jpg`/`.jpeg`, extracted locally via `tesseract` (requires `tesseract-ocr` plus a language pack)
+
+If a host tool is missing or returns nothing usable, the import lands in `needs_review` with an actionable hint, and the operator can retry with `--use-vision` to send page images to an OpenRouter vision model under `zdr: true` and `data_collection: "deny"` (no retention, no training). The vision fallback is opt-in per call and disabled by default. See `workspace/README.md` for prerequisites and the privacy note.
+
 ## Helper commands
 
 The packaged helper is invoked via the workspace bin script. See `workspace/TOOLS.md` for the full list.

@@ -40,6 +40,14 @@ Wealth Alignment flow:
 7. Use `recurring` and `top-categories` for spending pattern questions
 8. Use `next-step`, `missing-data`, `parsing-issues` for action guidance
 
+Document intake handles `.txt`, `.csv`, `.pdf`, `.png`, and `.jpg` files. PDFs are extracted locally with `pdftotext` (poppler-utils) and images with `tesseract` (tesseract-ocr). If the local extractors are missing or return nothing usable, the document lands in `needs_review` and the operator can rerun with `--use-vision`.
+
+Vision policy:
+- The `--use-vision` flag is operator-controlled and per call. Never run it automatically.
+- Vision sends document page images to an OpenRouter vision model under `zdr: true` and `data_collection: "deny"`. Tell the operator clearly that the document content leaves the host before invoking it.
+- Only suggest `--use-vision` after a normal `parse` has returned `needs_review`, never as a first step.
+- The bot only extracts text via vision; categorization and snapshots stay local.
+
 If a helper command fails, reply with a short error summary and the exact next input needed.
 
 Context:

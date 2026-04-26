@@ -1,12 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 
-import {
-  DEFAULT_CURRENCY,
-  DOCUMENT_KIND_LABELS,
-  MAX_RAW_TEXT_BYTES,
-  SUPPORTED_DOCUMENT_KINDS,
-} from "./constants.js";
+import { DEFAULT_CURRENCY, DOCUMENT_KIND_LABELS, SUPPORTED_DOCUMENT_KINDS } from "./constants.js";
+import type { ExtractionResult } from "./extractors.js";
+import { extractText, extractTextWithVision } from "./extractors.js";
 import type { ParseResult } from "./parser.js";
 import { inferDocumentKind, parseDocumentText } from "./parser.js";
 import type { WealthRuntime } from "./runtime.js";
@@ -241,8 +238,10 @@ export const help = (): HelpResult => ({
     },
     {
       name: "import",
-      usage: "import --path <file> [--kind <kind>] [--institution <name>] [--notes <text>]",
-      description: "Register a document already placed in the inbox directory.",
+      usage:
+        "import --path <file> [--kind <kind>] [--institution <name>] [--notes <text>] [--use-vision]",
+      description:
+        "Register a document already placed in the inbox directory. Supports .txt/.csv/.pdf/.png/.jpg. `--use-vision` opts in to the OpenRouter vision fallback under no-retention routing.",
     },
     {
       name: "documents",
@@ -261,8 +260,9 @@ export const help = (): HelpResult => ({
     },
     {
       name: "reparse",
-      usage: "reparse --id <document-id>",
-      description: "Re-read the source file and re-extract structured records.",
+      usage: "reparse --id <document-id> [--use-vision]",
+      description:
+        "Re-read the source file and re-extract structured records. `--use-vision` retries via OpenRouter under no-retention routing (operator opt-in).",
     },
     { name: "accounts", usage: "accounts", description: "List known accounts." },
     {
@@ -348,21 +348,30 @@ export const documentTypes = (): DocumentTypesResult => ({
   })),
 });
 
-const safeReadText = async (filePath: string): Promise<string> => {
+const ensureRegularFile = async (filePath: string): Promise<void> => {
   const stats = await stat(filePath);
   if (!stats.isFile()) {
     throw new Error(`Not a file: ${filePath}`);
   }
-  if (stats.size > MAX_RAW_TEXT_BYTES) {
-    const buffer = await readFile(filePath);
-    return buffer.subarray(0, MAX_RAW_TEXT_BYTES).toString("utf8");
+};
+
+const runExtractor = async (
+  filePath: string,
+  runtime: WealthRuntime,
+  useVision: boolean | undefined,
+): Promise<ExtractionResult> => {
+  await ensureRegularFile(filePath);
+  if (useVision === true) {
+    return extractTextWithVision(filePath, runtime.extractor);
   }
-  return readFile(filePath, "utf8");
+  return extractText(filePath, runtime.extractor);
 };
 
 export interface ImportResult {
   document: DocumentRecord;
   inferred: boolean;
+  extractionMethod: ExtractionResult["method"];
+  extractionWarnings: string[];
 }
 
 export const importDocument = async (options: CommandOptions): Promise<ImportResult> => {
@@ -371,10 +380,13 @@ export const importDocument = async (options: CommandOptions): Promise<ImportRes
     throw new Error("Expected --path <file>");
   }
   const resolved = resolveRelativeToBase(options.path, runtime.inboxPath);
-  const text = await safeReadText(resolved);
+  const extraction = await runExtractor(resolved, runtime, options.useVision);
+  const text = extraction.text;
   const requestedKind = parseDocumentKind(options.kind);
   const inferred = requestedKind === "unknown";
   const finalKind = inferred ? inferDocumentKind(resolved, text) : requestedKind;
+  const initialStatus: DocumentRecord["parse_status"] =
+    extraction.method === "fallback" ? "needs_review" : "pending";
   const document: DocumentRecord = {
     id: `doc-${randomUUID().slice(0, 8)}`,
     source_type: "file",
@@ -383,16 +395,23 @@ export const importDocument = async (options: CommandOptions): Promise<ImportRes
     institution: options.institution,
     raw_text: text,
     extracted_text: text,
-    parse_status: "pending",
+    extraction_method: extraction.method,
+    parse_status: initialStatus,
     notes: options.notes,
     source_path: resolved,
+    parse_warnings: extraction.warnings.length > 0 ? [...extraction.warnings] : undefined,
   };
   const state = await runtime.readState();
   state.documents.push(document);
   state.counters.documents += 1;
   state.lastImportAt = document.uploaded_at;
   await runtime.writeState(state);
-  return { document, inferred };
+  return {
+    document,
+    inferred,
+    extractionMethod: extraction.method,
+    extractionWarnings: extraction.warnings,
+  };
 };
 
 export interface DocumentsResult {
@@ -465,11 +484,14 @@ export const reparseDocument = async (options: CommandOptions): Promise<ParseRes
   }
   const state = await runtime.readState();
   const document = findDocument(state, options.id);
+  const extractionWarnings: string[] = [];
   if (document.source_path !== undefined) {
     try {
-      const text = await safeReadText(document.source_path);
-      document.raw_text = text;
-      document.extracted_text = text;
+      const extraction = await runExtractor(document.source_path, runtime, options.useVision);
+      document.raw_text = extraction.text;
+      document.extracted_text = extraction.text;
+      document.extraction_method = extraction.method;
+      extractionWarnings.push(...extraction.warnings);
     } catch (error) {
       document.parse_status = "failed";
       document.parse_warnings = [`Could not re-read source file: ${(error as Error).message}`];
@@ -485,7 +507,11 @@ export const reparseDocument = async (options: CommandOptions): Promise<ParseRes
   const parse = parseDocumentText(document, text);
   const counts = applyParseResult(state, document, parse);
   await runtime.writeState(state);
-  return { document, extracted: counts, warnings: parse.warnings };
+  return {
+    document,
+    extracted: counts,
+    warnings: [...parse.warnings, ...extractionWarnings],
+  };
 };
 
 export interface AccountsResult {
