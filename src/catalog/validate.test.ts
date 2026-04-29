@@ -50,11 +50,7 @@ describe("catalog validator", () => {
       "bots/reality-alignment/workspace/bin/dist/reality-alignment.js",
       "#!/usr/bin/env node\n",
     );
-<<<<<<< HEAD
     await expect(lintCatalog(repoRoot)).resolves.toMatchObject({ errors: [], jsonFileCount: 15 });
-=======
-    await expect(lintCatalog(repoRoot)).resolves.toMatchObject({ errors: [], jsonFileCount: 14 });
->>>>>>> docs/drift-review-2026-04-19
     await expect(typecheckCatalog(repoRoot)).resolves.toMatchObject({
       errors: [],
       packageCount: 6,
