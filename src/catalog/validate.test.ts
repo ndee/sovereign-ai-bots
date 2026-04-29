@@ -40,15 +40,20 @@ describe("catalog validator", () => {
       "bots/project-sentinel/workspace/bin/dist/project-sentinel.js",
       "#!/usr/bin/env node\n",
     );
-    await expect(lintCatalog(repoRoot)).resolves.toMatchObject({ errors: [], jsonFileCount: 12 });
+    await ensureFile(
+      repoRoot,
+      "bots/reality-alignment/workspace/bin/dist/reality-alignment.js",
+      "#!/usr/bin/env node\n",
+    );
+    await expect(lintCatalog(repoRoot)).resolves.toMatchObject({ errors: [], jsonFileCount: 14 });
     await expect(typecheckCatalog(repoRoot)).resolves.toMatchObject({
       errors: [],
-      packageCount: 5,
+      packageCount: 6,
     });
-    await expect(testCatalog(repoRoot)).resolves.toMatchObject({ errors: [], packageCount: 5 });
+    await expect(testCatalog(repoRoot)).resolves.toMatchObject({ errors: [], packageCount: 6 });
     const smoke = await smokeCatalog(repoRoot);
     expect(smoke.errors).toEqual([]);
-    expect(smoke.lines).toHaveLength(5);
+    expect(smoke.lines).toHaveLength(6);
     expect(smoke.lines[0]).toContain("Smoked");
   });
 
@@ -67,7 +72,7 @@ describe("catalog validator", () => {
     const result = await lintCatalog(rootDir);
     expect(result.jsonFileCount).toBe(4);
     expect(result.errors).toEqual([
-      "bots/bad-bot/workspace/broken.json is not valid JSON: Expected property name or '}' in JSON at position 2 (line 2 column 1)",
+      "bots/bad-bot/workspace/broken.json is not valid JSON: Unexpected end of JSON input",
       "bots/bad-bot/workspace/invalid.json is not valid UTF-8 text",
       "bots/bad-bot/workspace/loose.json is not formatted with two-space canonical JSON",
     ]);
@@ -407,7 +412,7 @@ describe("catalog validator", () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(lines).toEqual(["Lint passed for 12 JSON files."]);
+    expect(lines).toEqual(["Lint passed for 14 JSON files."]);
     expect(errors).toEqual([]);
   });
 
@@ -496,6 +501,11 @@ describe("catalog validator", () => {
       "bots/project-sentinel/workspace/bin/dist/project-sentinel.js",
       "#!/usr/bin/env node\n",
     );
+    await ensureFile(
+      repoRoot,
+      "bots/reality-alignment/workspace/bin/dist/reality-alignment.js",
+      "#!/usr/bin/env node\n",
+    );
 
     const commandLines: string[] = [];
     const commandErrors: string[] = [];
@@ -529,8 +539,8 @@ describe("catalog validator", () => {
         },
       }),
     ).resolves.toBe(0);
-    expect(commandLines).toContain("Typecheck passed for 5 bot packages.");
-    expect(commandLines).toContain("Catalog tests passed for 5 bot packages.");
+    expect(commandLines).toContain("Typecheck passed for 6 bot packages.");
+    expect(commandLines).toContain("Catalog tests passed for 6 bot packages.");
     expect(commandLines.some((line) => line.startsWith("Smoked mail-sentinel@2.0.0"))).toBe(true);
     expect(commandLines.some((line) => line.startsWith("Smoked project-sentinel@2.0.0"))).toBe(
       true,

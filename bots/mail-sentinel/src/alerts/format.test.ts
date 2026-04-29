@@ -43,10 +43,10 @@ describe("alerts/format", () => {
   });
 
   it("matches the buildRedAlertMessage golden fixtures", () => {
-    expect(buildRedAlertMessage(sampleAlert, "new-alert")).toBe(
+    expect(buildRedAlertMessage(sampleAlert, "new-alert")).toEqual(
       loadGolden("buildRedAlertMessage.alert"),
     );
-    expect(buildRedAlertMessage({ ...sampleAlert, messageId: undefined }, "reminder")).toBe(
+    expect(buildRedAlertMessage({ ...sampleAlert, messageId: undefined }, "reminder")).toEqual(
       loadGolden("buildRedAlertMessage.reminder"),
     );
   });
@@ -58,9 +58,8 @@ describe("alerts/format", () => {
         { ...sampleAlert, alertId: "a2", zone: "amber", subject: "Invoice $600" },
       ],
       "12h",
-      "2026-04-08T12:00:00.000Z",
     );
-    expect(message).toBe(loadGolden("buildDigestMessage.few"));
+    expect(message).toEqual(loadGolden("buildDigestMessage.few"));
   });
 
   it("falls back to 'RED' when zone is undefined in formatAlertLine", () => {
@@ -79,7 +78,8 @@ describe("alerts/format", () => {
       { ...sampleAlert, zone: undefined as unknown as "red" },
       "new-alert",
     );
-    expect(msg).toContain("RED · ");
+    expect(msg.body).toContain("RED · ");
+    expect(msg.formattedBody).toContain("RED · ");
   });
 
   it("falls back to sentAt for reminders without a lastReminderAt", () => {
@@ -92,19 +92,20 @@ describe("alerts/format", () => {
       { ...sampleAlert, category: "mystery" as unknown as "financial-relevance" },
       "new-alert",
     );
-    expect(msg).toContain("· mystery");
+    expect(msg.body).toContain("· mystery");
+    expect(msg.formattedBody).toContain("· mystery");
   });
 
   it("uses raw category label in buildDigestMessage when unknown", () => {
     const msg = buildDigestMessage(
       [{ ...sampleAlert, category: "mystery" as unknown as "financial-relevance" }],
       "12h",
-      "2026-04-08T12:00:00.000Z",
     );
-    expect(msg).toContain("mystery");
+    expect(msg.body).toContain("mystery");
+    expect(msg.formattedBody).toContain("mystery");
   });
 
-  it("opens the digest with the `AMBER DIGEST — N items` header", () => {
+  it("opens the digest with the `AMBER DIGEST · N items` header and a window line", () => {
     const msg = buildDigestMessage(
       [
         { ...sampleAlert, alertId: "a1", zone: "amber" },
@@ -112,37 +113,32 @@ describe("alerts/format", () => {
         { ...sampleAlert, alertId: "a3", zone: "amber" },
       ],
       "6h",
-      "2026-04-08T12:00:00.000Z",
     );
-    const [first, second] = msg.split("\n");
-    expect(first).toBe("AMBER DIGEST — 3 items");
+    const [first, second] = msg.body.split("\n");
+    expect(first).toBe("🟠 AMBER DIGEST · 3 items");
     expect(second).toBe("Window: last 6h");
+    expect(msg.formattedBody).toContain("AMBER DIGEST · 3 items");
+    expect(msg.formattedBody).toContain("Window: last 6h");
   });
 
   it("singularizes the header count when there is exactly one item", () => {
-    const msg = buildDigestMessage(
-      [{ ...sampleAlert, alertId: "a1", zone: "amber" }],
-      "12h",
-      "2026-04-08T12:00:00.000Z",
-    );
-    expect(msg.split("\n")[0]).toBe("AMBER DIGEST — 1 item");
+    const msg = buildDigestMessage([{ ...sampleAlert, alertId: "a1", zone: "amber" }], "12h");
+    expect(msg.body.split("\n")[0]).toBe("🟠 AMBER DIGEST · 1 item");
+    expect(msg.formattedBody).toContain("AMBER DIGEST · 1 item");
   });
 
-  it("does not number digest items (subject is the entry headline)", () => {
+  it("numbers digest items in both plain-text and HTML", () => {
     const msg = buildDigestMessage(
       [
         { ...sampleAlert, alertId: "a1", zone: "amber", subject: "First subject" },
         { ...sampleAlert, alertId: "a2", zone: "amber", subject: "Second subject" },
       ],
       "12h",
-      "2026-04-08T12:00:00.000Z",
     );
-    // No leading `1. ` / `2. ` item markers on any line.
-    for (const line of msg.split("\n")) {
-      expect(line).not.toMatch(/^\d+\.\s/u);
-    }
-    expect(msg).toContain("\nFirst subject\n");
-    expect(msg).toContain("\nSecond subject\n");
+    expect(msg.body).toContain("\n1. First subject\n");
+    expect(msg.body).toContain("\n2. Second subject\n");
+    expect(msg.formattedBody).toContain("<strong>1. First subject</strong>");
+    expect(msg.formattedBody).toContain("<strong>2. Second subject</strong>");
   });
 
   it("never renders an alertId, Alert ID label, or Message ID in the digest", () => {
@@ -152,48 +148,96 @@ describe("alerts/format", () => {
         { ...sampleAlert, alertId: "alert-abc-2", zone: "amber", messageId: "<xyz@ex>" },
       ],
       "12h",
-      "2026-04-08T12:00:00.000Z",
     );
-    expect(msg).not.toContain("alert-abc-1");
-    expect(msg).not.toContain("alert-abc-2");
-    expect(msg).not.toContain("Alert ID");
-    expect(msg).not.toContain("Message ID");
-    expect(msg).not.toContain("<xyz@ex>");
-    // The header must not retain any legacy title or count wording.
-    expect(msg).not.toContain("Mail Sentinel Digest");
-    expect(msg).not.toContain("Amber signals digest");
+    for (const text of [msg.body, msg.formattedBody]) {
+      expect(text).not.toContain("alert-abc-1");
+      expect(text).not.toContain("alert-abc-2");
+      expect(text).not.toContain("Alert ID");
+      expect(text).not.toContain("Message ID");
+      expect(text).not.toContain("Mail Sentinel Digest");
+      expect(text).not.toContain("Amber signals digest");
+    }
+    expect(msg.body).not.toContain("<xyz@ex>");
+    // The raw id appears HTML-escaped in formatted_body only if present;
+    // neither the raw nor the escaped form should leak.
+    expect(msg.formattedBody).not.toContain("&lt;xyz@ex&gt;");
   });
 
   it("trims overly long digest subjects with an ellipsis", () => {
     const longSubject = `Re: ${"subject ".repeat(30)}end`;
-    const msg = buildDigestMessage(
-      [{ ...sampleAlert, subject: longSubject }],
-      "12h",
-      "2026-04-08T12:00:00.000Z",
-    );
-    // The trimmed subject is the item leader line, not prefixed by a number.
-    const line = msg.split("\n").find((entry) => entry.startsWith("Re:"));
+    const msg = buildDigestMessage([{ ...sampleAlert, subject: longSubject }], "12h");
+    const line = msg.body.split("\n").find((entry) => entry.startsWith("1. Re:"));
     expect(line).toBeDefined();
     expect((line as string).endsWith("…")).toBe(true);
-    expect((line as string).length).toBeLessThanOrEqual(120);
+    // "1. " prefix adds 3 chars beyond the 120-char subject cap.
+    expect((line as string).length).toBeLessThanOrEqual(123);
   });
 
   it("keeps short digest subjects intact (no trim)", () => {
-    const msg = buildDigestMessage(
-      [{ ...sampleAlert, subject: "Invoice #short" }],
-      "12h",
-      "2026-04-08T12:00:00.000Z",
-    );
-    expect(msg).toContain("\nInvoice #short\n");
-    expect(msg).not.toContain("…");
+    const msg = buildDigestMessage([{ ...sampleAlert, subject: "Invoice #short" }], "12h");
+    expect(msg.body).toContain("\n1. Invoice #short\n");
+    expect(msg.body).not.toContain("…");
   });
 
-  it("no longer renders an alertId bracket or zone bullet in the RED title", () => {
+  it("opens the RED message with the zone header and omits legacy titles", () => {
     const msg = buildRedAlertMessage(sampleAlert, "new-alert");
-    const firstLine = msg.split("\n")[0] ?? "";
-    expect(firstLine).toBe("Mail Sentinel Alert");
-    expect(msg).not.toContain(sampleAlert.alertId);
-    expect(msg).not.toContain("●");
+    const firstLine = msg.body.split("\n")[0] ?? "";
+    expect(firstLine).toBe("🔴 RED · Financial Relevance");
+    expect(msg.body).not.toContain("Mail Sentinel Alert");
+    expect(msg.body).not.toContain(sampleAlert.alertId);
+    expect(msg.body).not.toContain("●");
+    expect(msg.formattedBody).toContain("<strong>RED · Financial Relevance</strong>");
+    expect(msg.formattedBody).not.toContain("Mail Sentinel Alert");
+  });
+
+  it("marks reminder RED alerts with a ' · reminder' suffix on the zone header", () => {
+    const msg = buildRedAlertMessage(sampleAlert, "reminder");
+    const firstLine = msg.body.split("\n")[0] ?? "";
+    expect(firstLine).toBe("🔴 RED · Financial Relevance · reminder");
+    expect(msg.formattedBody).toContain("RED · Financial Relevance · reminder");
+  });
+
+  it("falls back to the RED emoji for unknown zone values", () => {
+    const msg = buildRedAlertMessage(
+      { ...sampleAlert, zone: "purple" as unknown as "red" },
+      "new-alert",
+    );
+    expect(msg.body.startsWith("🔴 PURPLE · ")).toBe(true);
+    expect(msg.formattedBody).toContain("🔴 <strong>PURPLE · ");
+  });
+
+  it("HTML-escapes untrusted alert fields in formatted_body", () => {
+    const malicious = {
+      ...sampleAlert,
+      subject: "<script>alert(1)</script> & trouble",
+      from: 'Mallory "hacker" <m@evil.example>',
+      why: "two & two < five",
+    };
+    const msg = buildRedAlertMessage(malicious, "new-alert");
+    // Plain body preserves the raw characters (it's plain text, no escaping).
+    expect(msg.body).toContain("<script>alert(1)</script> & trouble");
+    // HTML body escapes < > & and drops the script tag as literal text.
+    expect(msg.formattedBody).toContain("&lt;script&gt;alert(1)&lt;/script&gt; &amp; trouble");
+    expect(msg.formattedBody).not.toContain("<script>");
+    expect(msg.formattedBody).toContain("two &amp; two &lt; five");
+  });
+
+  it("includes the feedback footer with code-wrapped options in both bodies", () => {
+    const alertMsg = buildRedAlertMessage(sampleAlert, "new-alert");
+    expect(alertMsg.body).toContain(
+      "very important · not important · remind later · always treat like this · less of this",
+    );
+    expect(alertMsg.formattedBody).toContain(
+      "<code>very important</code> · <code>not important</code>",
+    );
+
+    const digestMsg = buildDigestMessage([{ ...sampleAlert, alertId: "a1", zone: "amber" }], "12h");
+    expect(digestMsg.body).toContain(
+      "very important · not important · always treat like this · less of this · digest only",
+    );
+    expect(digestMsg.formattedBody).toContain(
+      "<code>very important</code> · <code>not important</code>",
+    );
   });
 
   it("cleanSubjectForDisplay strips e2e run-id suffixes", () => {
@@ -246,8 +290,7 @@ describe("alerts/format", () => {
         subject: `Invoice #${i}`,
       })),
       "12h",
-      "2026-04-08T12:00:00.000Z",
     );
-    expect(message).toBe(loadGolden("buildDigestMessage.many"));
+    expect(message).toEqual(loadGolden("buildDigestMessage.many"));
   });
 });

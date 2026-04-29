@@ -4,8 +4,32 @@ import { formatConfidenceLabel } from "../util/time.js";
 
 type AlertKind = AlertSummary["kind"];
 
-const FEEDBACK_ROW =
-  "Feedback: Very important · Not important · Remind later · Always treat like this · Less of this";
+export interface MatrixMessageBody {
+  body: string;
+  formattedBody: string;
+}
+
+const ALERT_FEEDBACK_OPTIONS = [
+  "very important",
+  "not important",
+  "remind later",
+  "always treat like this",
+  "less of this",
+] as const;
+
+const DIGEST_FEEDBACK_OPTIONS = [
+  "very important",
+  "not important",
+  "always treat like this",
+  "less of this",
+  "digest only",
+] as const;
+
+const ZONE_EMOJI: Record<string, string> = {
+  red: "🔴",
+  amber: "🟠",
+  gray: "⚪",
+};
 
 const DIGEST_SUBJECT_MAX = 120;
 const DIGEST_VISIBLE_LIMIT = 10;
@@ -13,6 +37,13 @@ const DIGEST_VISIBLE_LIMIT = 10;
 const categoryLabel = (category: string): string => CATEGORY_LABELS[category] ?? category;
 
 const zoneLabel = (zone: unknown): string => String(zone ?? "red").toUpperCase();
+
+const DEFAULT_ZONE_EMOJI = "🔴";
+
+const zoneEmoji = (zone: unknown): string => {
+  const key = String(zone ?? "red").toLowerCase();
+  return ZONE_EMOJI[key] ?? DEFAULT_ZONE_EMOJI;
+};
 
 const formatCategoryConfidence = (category: string, confidence: unknown): string =>
   `${categoryLabel(category)} · ${formatConfidenceLabel(confidence)}`;
@@ -63,6 +94,19 @@ export const cleanSubjectForDisplay = (subject: string): string =>
     .replace(/\s{2,}/gu, " ")
     .trim();
 
+// HTML escape for interpolated user/sender/subject strings. Kept minimal
+// because Matrix clients render a small HTML subset.
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;")
+    .replace(/'/gu, "&#39;");
+
+const renderCodeOptions = (options: readonly string[]): string =>
+  options.map((option) => `<code>${escapeHtml(option)}</code>`).join(" · ");
+
 export const formatAlertLine = (
   alert: Pick<StoredAlert, "alertId" | "zone" | "category" | "from" | "subject">,
 ): string =>
@@ -87,43 +131,98 @@ export const mapAlertToSummary = (
   ...(alert.feedbackState === "pending" ? {} : { feedbackState: alert.feedbackState }),
 });
 
-export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): string => {
-  const title = kind === "reminder" ? "Mail Sentinel Reminder" : "Mail Sentinel Alert";
-  const lines = [
-    title,
-    `${zoneLabel(alert.zone)} · ${categoryLabel(alert.category)}`,
+export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): MatrixMessageBody => {
+  const subject = cleanSubjectForDisplay(alert.subject);
+  const sender = formatSenderDisplay(alert.from);
+  const confidence = formatConfidenceLabel(alert.confidence);
+  const category = categoryLabel(alert.category);
+  const zone = zoneLabel(alert.zone);
+  const emoji = zoneEmoji(alert.zone);
+  const reminderSuffix = kind === "reminder" ? " · reminder" : "";
+
+  const bodyLines = [
+    `${emoji} ${zone} · ${category}${reminderSuffix}`,
     "",
-    cleanSubjectForDisplay(alert.subject),
+    subject,
     "",
-    `From: ${formatSenderDisplay(alert.from)}`,
+    `From: ${sender}`,
     `Why it matters: ${alert.why}`,
-    `Confidence: ${formatConfidenceLabel(alert.confidence)}`,
+    `Confidence: ${confidence}`,
     "",
-    FEEDBACK_ROW,
+    "Reply in thread with:",
+    ALERT_FEEDBACK_OPTIONS.join(" · "),
   ];
-  return lines.join("\n");
+
+  const formattedBody = [
+    `<p>${emoji} <strong>${escapeHtml(`${zone} · ${category}${reminderSuffix}`)}</strong></p>`,
+    `<p><strong>${escapeHtml(subject)}</strong></p>`,
+    "<p>",
+    `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
+    `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}<br>`,
+    `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+    "</p>",
+    "<p>",
+    "Reply in thread with:<br>",
+    renderCodeOptions(ALERT_FEEDBACK_OPTIONS),
+    "</p>",
+  ].join("\n");
+
+  return { body: bodyLines.join("\n"), formattedBody };
 };
 
 export const buildDigestMessage = (
   alerts: readonly StoredAlert[],
   interval: string,
-  sentAt: string,
-): string => {
+): MatrixMessageBody => {
   const count = alerts.length;
-  const header = `AMBER DIGEST — ${String(count)} item${count === 1 ? "" : "s"}`;
-  const lines = [header, `Window: last ${interval}`];
-  for (const alert of alerts.slice(0, DIGEST_VISIBLE_LIMIT)) {
-    lines.push(
+  const zone = "AMBER";
+  const emoji = zoneEmoji("amber");
+  const headerText = `${zone} DIGEST · ${String(count)} item${count === 1 ? "" : "s"}`;
+  const windowLine = `Window: last ${interval}`;
+  const visible = alerts.slice(0, DIGEST_VISIBLE_LIMIT);
+
+  const bodyLines: string[] = [`${emoji} ${headerText}`, windowLine];
+  const htmlParts: string[] = [
+    `<p>${emoji} <strong>${escapeHtml(headerText)}</strong><br>`,
+    `${escapeHtml(windowLine)}</p>`,
+  ];
+
+  visible.forEach((alert, index) => {
+    const subject = trimSubject(cleanSubjectForDisplay(alert.subject));
+    const sender = formatSenderDisplay(alert.from);
+    const confidence = formatCategoryConfidence(alert.category, alert.confidence);
+    const position = String(index + 1);
+
+    bodyLines.push(
       "",
-      trimSubject(cleanSubjectForDisplay(alert.subject)),
-      `   From: ${formatSenderDisplay(alert.from)}`,
-      `   ${formatCategoryConfidence(alert.category, alert.confidence)}`,
-      `   Why it matters: ${alert.why}`,
+      `${position}. ${subject}`,
+      `From: ${sender}`,
+      confidence,
+      `Why it matters: ${alert.why}`,
     );
-  }
+    htmlParts.push(
+      "<p>",
+      `<strong>${position}. ${escapeHtml(subject)}</strong><br>`,
+      `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
+      `${escapeHtml(confidence)}<br>`,
+      `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}`,
+      "</p>",
+    );
+  });
+
   if (alerts.length > DIGEST_VISIBLE_LIMIT) {
-    lines.push("", `... and ${String(alerts.length - DIGEST_VISIBLE_LIMIT)} more.`);
+    const overflow = String(alerts.length - DIGEST_VISIBLE_LIMIT);
+    bodyLines.push("", `... and ${overflow} more.`);
+    htmlParts.push(`<p>… and ${escapeHtml(overflow)} more.</p>`);
   }
-  lines.push("", `${FEEDBACK_ROW} — reference by subject or sender.`, "", `Generated: ${sentAt}`);
-  return lines.join("\n");
+
+  bodyLines.push("", "Reply in thread with:", DIGEST_FEEDBACK_OPTIONS.join(" · "));
+  htmlParts.push(
+    "<p>",
+    "Reply in thread with:<br>",
+    renderCodeOptions(DIGEST_FEEDBACK_OPTIONS),
+    "</p>",
+  );
+
+  return { body: bodyLines.join("\n"), formattedBody: htmlParts.join("\n") };
 };
