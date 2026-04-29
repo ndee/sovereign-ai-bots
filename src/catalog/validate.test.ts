@@ -418,11 +418,7 @@ describe("catalog validator", () => {
     });
 
     expect(exitCode).toBe(0);
-<<<<<<< HEAD
     expect(lines).toEqual(["Lint passed for 15 JSON files."]);
-=======
-    expect(lines).toEqual(["Lint passed for 14 JSON files."]);
->>>>>>> docs/drift-review-2026-04-19
     expect(errors).toEqual([]);
   });
 
