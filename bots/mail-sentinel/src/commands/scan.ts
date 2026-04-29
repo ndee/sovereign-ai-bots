@@ -42,9 +42,7 @@ export const flushDigestIfDue = async (
   if (Date.now() < dueAt) {
     return { sent: false, count: 0, alerts: [] };
   }
-  await runtime.sendMatrixRoomMessage(
-    buildDigestMessage(pendingAlerts, runtime.digestInterval, scanAt),
-  );
+  await runtime.sendMatrixRoomMessage(buildDigestMessage(pendingAlerts, runtime.digestInterval));
   state.digest.lastDigestAt = scanAt;
   state.digest.pendingAmber = [];
   for (const alert of pendingAlerts) {

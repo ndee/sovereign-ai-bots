@@ -414,7 +414,7 @@ describe("config/runtime", () => {
       return runtime;
     };
 
-    it("posts a JSON body via fetch", async () => {
+    it("posts a JSON body via fetch for a plain-text string message", async () => {
       const runtime = await loadRuntime();
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       vi.stubGlobal("fetch", fetchMock);
@@ -424,7 +424,32 @@ describe("config/runtime", () => {
         const [url, init] = fetchMock.mock.calls[0]!;
         expect(String(url)).toContain("/_matrix/client/v3/rooms/");
         expect(init.method).toBe("PUT");
-        expect(JSON.parse(init.body).body).toBe("hello world");
+        const payload = JSON.parse(init.body);
+        expect(payload.body).toBe("hello world");
+        expect(payload.msgtype).toBe("m.text");
+        expect(payload.format).toBeUndefined();
+        expect(payload.formatted_body).toBeUndefined();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("posts an HTML-formatted body when given a MatrixMessageBody", async () => {
+      const runtime = await loadRuntime();
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        await runtime.sendMatrixRoomMessage({
+          body: "plain fallback",
+          formattedBody: "<p><strong>HTML</strong></p>",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const init = fetchMock.mock.calls[0]![1];
+        const payload = JSON.parse(init.body);
+        expect(payload.msgtype).toBe("m.text");
+        expect(payload.body).toBe("plain fallback");
+        expect(payload.format).toBe("org.matrix.custom.html");
+        expect(payload.formatted_body).toBe("<p><strong>HTML</strong></p>");
       } finally {
         vi.unstubAllGlobals();
       }
@@ -667,6 +692,66 @@ describe("config/runtime", () => {
         await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
           "lobster classification failed: crashed",
         );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("retries after a transient failure and returns the successful result", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValueOnce(
+          Object.assign(new Error("boom"), { stdout: "", stderr: "transient 502" }),
+        )
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            {
+              details: {
+                json: {
+                  decision_required: false,
+                  financial_relevance: false,
+                  risk_escalation: false,
+                  confidence: 50,
+                  urgency: "low",
+                  reason: "recovered",
+                  deadline_detected: false,
+                  amount_detected: false,
+                  suggested_zone: "gray",
+                },
+              },
+            },
+          ]),
+          stderr: "",
+        });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const result = await runtime.classifyCandidate(sampleCandidate);
+        expect(result.reason).toBe("recovered");
+        expect(runner).toHaveBeenCalledTimes(2);
+        expect(rm).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("gives up after the retry budget is exhausted and surfaces the last error", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("boom"), { stdout: "", stderr: "upstream down" }),
+        );
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          "lobster classification failed: upstream down",
+        );
+        expect(runner).toHaveBeenCalledTimes(3);
       } finally {
         setExecFileAsync(previous);
       }
