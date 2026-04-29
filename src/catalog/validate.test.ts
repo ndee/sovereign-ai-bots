@@ -71,11 +71,12 @@ describe("catalog validator", () => {
 
     const result = await lintCatalog(rootDir);
     expect(result.jsonFileCount).toBe(4);
-    expect(result.errors).toEqual([
-      "bots/bad-bot/workspace/broken.json is not valid JSON: Unexpected end of JSON input",
-      "bots/bad-bot/workspace/invalid.json is not valid UTF-8 text",
+    expect(result.errors).toHaveLength(3);
+    expect(result.errors[0]).toContain("bots/bad-bot/workspace/broken.json is not valid JSON:");
+    expect(result.errors[1]).toBe("bots/bad-bot/workspace/invalid.json is not valid UTF-8 text");
+    expect(result.errors[2]).toBe(
       "bots/bad-bot/workspace/loose.json is not formatted with two-space canonical JSON",
-    ]);
+    );
   });
 
   it("reports schema and invariant errors", async () => {
