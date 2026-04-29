@@ -56,7 +56,9 @@ export class FakeMailSentinelRuntime {
   runTool = async (_command: readonly string[], _args: readonly string[]): Promise<unknown> => ({});
 
   // Matrix surface
-  sendMatrixRoomMessage = async (_text: string): Promise<void> => undefined;
+  sendMatrixRoomMessage = async (
+    _message: string | { body: string; formattedBody: string },
+  ): Promise<void> => undefined;
 
   // LLM surface
   classifyCandidate = async (_candidate: LlmCandidate): Promise<LlmResult> => ({
