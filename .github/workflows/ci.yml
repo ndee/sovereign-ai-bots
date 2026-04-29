@@ -37,6 +37,8 @@ jobs:
             mail-sentinel
             node-operator
             bitcoin-skill-match
+            project-sentinel
+            reality-alignment
             catalog
             tooling
             deps
