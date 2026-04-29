@@ -50,4 +50,16 @@ export default defineConfig([
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
   },
+  {
+    entry: { "reality-alignment": "bots/reality-alignment/src/cli.ts" },
+    format: "esm",
+    dts: false,
+    outDir: "bots/reality-alignment/workspace/bin/dist",
+    target: "node22",
+    clean: true,
+    splitting: false,
+    sourcemap: true,
+    shims: false,
+    banner: { js: "#!/usr/bin/env node" },
+  },
 ]);

@@ -14,13 +14,15 @@ export default defineConfig({
         "src/probe/mail-sentinel-chat-model.ts",
         "bots/mail-sentinel/src/**/*.ts",
         "bots/project-sentinel/src/**/*.ts",
-        "bots/wealth-alignment/src/**/*.ts"
+        "bots/wealth-alignment/src/**/*.ts",
+        "bots/reality-alignment/src/**/*.ts"
       ],
       exclude: [
         "bots/mail-sentinel/src/**/*.test.ts",
         "bots/mail-sentinel/src/__fixtures__/**",
         "bots/project-sentinel/src/**/*.test.ts",
-        "bots/wealth-alignment/src/**/*.test.ts"
+        "bots/wealth-alignment/src/**/*.test.ts",
+        "bots/reality-alignment/src/**/*.test.ts"
       ],
       thresholds: {
         statements: 100,
