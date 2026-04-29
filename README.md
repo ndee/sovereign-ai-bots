@@ -48,6 +48,7 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 - `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
+- `reality-alignment`
 - `node-operator`
 
 ---
@@ -155,6 +156,24 @@ Node.
 Package README:
 
 - [`bots/project-sentinel/README.md`](bots/project-sentinel/README.md)
+
+---
+
+## Reality Alignment
+
+Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
+
+It tracks:
+
+- active wishes
+- daily alignment check-ins
+- recurring resistance patterns
+- one concrete next aligned step at a time
+- a weekly review digest
+
+It uses a dedicated Matrix account, supports DMs, and can also auto-reply in the alert room.
+
+This package is intentionally scoped for grounded self-reflection. It is **not** therapy and **not** a manifestation engine.
 
 ## Trust model
 
