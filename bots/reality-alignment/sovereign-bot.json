@@ -2,7 +2,7 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "reality-alignment",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "displayName": "Reality Alignment",
   "description": "Experimental local-first Matrix self-coaching bot that tracks active wishes, daily alignment check-ins, resistance patterns, next aligned steps, and a weekly review digest.",
   "defaultInstall": false,
@@ -27,7 +27,7 @@
     {
       "kind": "sovereign-tool-template",
       "id": "reality-alignment-tool",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "description": "Local self-coaching helper for wishes, alignment check-ins, resistance patterns, action steps, and weekly review digests.",
       "capabilities": [
         "reality-alignment.wish.read",
@@ -71,7 +71,7 @@
   "toolInstances": [
     {
       "id": "reality-alignment-core",
-      "templateRef": "reality-alignment-tool@0.1.1",
+      "templateRef": "reality-alignment-tool@0.1.2",
       "config": {
         "agentId": {
           "from": "agent.id"
@@ -152,6 +152,38 @@
       }
     },
     {
+      "id": "workspace-soul",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/SOUL.md"
+          ]
+        },
+        "source": "workspace/SOUL.md",
+        "writePolicy": "always"
+      }
+    },
+    {
+      "id": "workspace-identity",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/IDENTITY.md"
+          ]
+        },
+        "source": "workspace/IDENTITY.md",
+        "writePolicy": "always"
+      }
+    },
+    {
       "id": "workspace-bin",
       "kind": "managedFile",
       "spec": {
@@ -203,7 +235,7 @@
   ],
   "agentTemplate": {
     "id": "reality-alignment",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Personal self-coaching bot for active wishes, daily alignment check-ins, resistance patterns, next aligned steps, and weekly reviews. Reflective, grounded, action-oriented. Not therapy.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {
@@ -212,7 +244,7 @@
     "requiredToolTemplates": [
       {
         "id": "reality-alignment-tool",
-        "version": "0.1.1"
+        "version": "0.1.2"
       }
     ],
     "optionalToolTemplates": []
