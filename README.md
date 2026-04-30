@@ -45,11 +45,13 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 
 ## Current packages
 
+- `bali-compass`
 - `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
 - `reality-alignment`
 - `node-operator`
+- `wealth-alignment` — experimental, private/local-first financial clarity bot. Not a current public product focus.
 
 ---
 
@@ -91,12 +93,14 @@ Not every message reaches the LLM. Heuristic filters run first to discard obviou
 
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
+The packaged baseline rules file (`config/default-rules.json`) is installer-managed and reapplied on install/update so shipped heuristics stay aligned with the current bot version. Operator-specific preferences and feedback stay in local policy/state files instead of editing that packaged defaults file in place.
+
 ### Prerequisites
 
 Mail Sentinel requires:
 
 - an IMAP-accessible mailbox with credentials
-- Sovereign AI Node installed on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node installed on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - provider credentials (OpenRouter API key) configured at the node level — see [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node)
 
 If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bridge) must be installed and configured on the host to expose IMAP access. On the current self-hosted path, Proton Bridge is installed manually. It is not required for other IMAP providers.
@@ -105,7 +109,7 @@ If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bri
 
 The current documented and tested path for Mail Sentinel is:
 
-- Sovereign AI Node on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - Matrix as control plane (provisioned by the installer)
 - IMAP mailbox (any provider, or Proton Mail via Proton Bridge)
 - provider-backed runtime path with an OpenRouter API key (configured at node level)
@@ -163,7 +167,15 @@ Package README:
 
 Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
 
-It tracks active wishes, daily alignment check-ins, recurring resistance patterns, next aligned steps, and weekly review digests in local workspace state. It is intended for personal use, stays local-first, and is explicitly not therapy or a manifestation engine.
+It tracks:
+
+- active wishes
+- daily alignment check-ins
+- recurring resistance patterns
+- one concrete next aligned step at a time
+- a weekly review digest
+
+It uses a dedicated Matrix account, supports DMs, and can also auto-reply in the alert room. It is intended for personal use, stays local-first, and is explicitly not therapy or a manifestation engine.
 
 ## Trust model
 
@@ -189,8 +201,8 @@ Common commands:
 
 - `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` — TypeScript type-checking
-- `pnpm build` — build the root CLI entrypoints into `dist/` **and** every bot's
-  compiled bundle into `bots/*/workspace/bin/dist/`
+- `pnpm build` — build the root CLI entrypoints into `dist/` and the current
+  Mail Sentinel bot bundle into `bots/mail-sentinel/workspace/bin/dist/`
 - `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
   and every bot's TypeScript source tree
 - `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
