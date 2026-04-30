@@ -48,6 +48,7 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 - `bitcoin-skill-match`
 - `mail-sentinel`
 - `project-sentinel`
+- `reality-alignment`
 - `node-operator`
 
 ---
@@ -62,7 +63,7 @@ Mail Sentinel is the first concrete module on Sovereign AI Node. It monitors an 
 Mail Sentinel surfaces high-signal messages in Matrix with a compact zone/category line and the subject as the headline.
 
 ![Mail Sentinel AMBER digest grouped in Matrix](docs/img/mail-sentinel/02-amber-digest.png)
-Mail Sentinel can group relevant messages into a calm digest with unnumbered items and feedback that references the item by subject or sender.
+Mail Sentinel can group relevant messages into a calm digest with numbered visible items while still keeping internal alert IDs out of the rendered operator message.
 
 ![Operator feedback updating Mail Sentinel routing policy](docs/img/mail-sentinel/04-feedback.png)
 Operator feedback updates local policy and influences future routing.
@@ -155,6 +156,14 @@ Node.
 Package README:
 
 - [`bots/project-sentinel/README.md`](bots/project-sentinel/README.md)
+
+---
+
+## Reality Alignment
+
+Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
+
+It tracks active wishes, daily alignment check-ins, recurring resistance patterns, next aligned steps, and weekly review digests in local workspace state. It is intended for personal use, stays local-first, and is explicitly not therapy or a manifestation engine.
 
 ## Trust model
 
