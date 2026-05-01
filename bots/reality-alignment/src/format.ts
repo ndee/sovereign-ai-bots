@@ -13,7 +13,13 @@ import type {
   WishListResult,
   WishShowResult,
 } from "./commands.js";
+import { nearestNamedLevel } from "./levels.js";
 import type { CommandOptions } from "./types.js";
+
+const formatLevel = (level: number): string => {
+  const named = nearestNamedLevel(level);
+  return `${level} (~${named.label})`;
+};
 
 export const printOutput = <T>(
   value: T,
@@ -57,6 +63,8 @@ export const formatWishShow = (value: WishShowResult): string => {
   if (wish.description !== undefined) lines.push(`Description: ${wish.description}`);
   if (wish.emotionalCore !== undefined) lines.push(`Emotional core: ${wish.emotionalCore}`);
   if (wish.desiredState !== undefined) lines.push(`Desired state: ${wish.desiredState}`);
+  if (wish.desiredLevel !== undefined)
+    lines.push(`Desired level: ${formatLevel(wish.desiredLevel)}`);
   if (wish.timeframe !== undefined) lines.push(`Timeframe: ${wish.timeframe}`);
   return lines.join("\n");
 };
@@ -66,10 +74,12 @@ const formatCheckinLine = (checkin: {
   clarityScore: number;
   congruenceScore: number;
   resistanceScore: number;
+  level?: number | undefined;
   createdAt: string;
   note?: string | undefined;
 }): string =>
   `${checkin.createdAt} energy ${checkin.energyScore} clarity ${checkin.clarityScore} congruence ${checkin.congruenceScore} resistance ${checkin.resistanceScore}` +
+  (checkin.level !== undefined ? ` level ${formatLevel(checkin.level)}` : "") +
   (checkin.note !== undefined ? `\n  note: ${checkin.note}` : "");
 
 export const formatCheckinAdd = (value: CheckinAddResult): string =>

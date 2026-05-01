@@ -109,6 +109,20 @@ describe("reality-alignment/commands", () => {
     );
   });
 
+  it("propagates desired level on wish add and level on check-in add", async () => {
+    const added = await wishAdd({ ...baseOptions(), title: "Live in joy", desiredLevel: 540 });
+    expect(added.wish.desiredLevel).toBe(540);
+    const checkin = await checkinAdd({
+      ...baseOptions(),
+      energy: 3,
+      clarity: 3,
+      congruence: 3,
+      resistance: 3,
+      level: 200,
+    });
+    expect(checkin.checkin.level).toBe(200);
+  });
+
   it("manages check-ins with optional wish linkage", async () => {
     const wish = await wishAdd({ ...baseOptions(), title: "Ship it" });
     const empty = await checkinLatest(baseOptions());

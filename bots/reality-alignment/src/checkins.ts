@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { validateLevel } from "./levels.js";
 import type { AlignmentCheckin, RealityAlignmentState, Score } from "./types.js";
 import { nowIso } from "./util.js";
 
@@ -10,10 +11,12 @@ export const addCheckin = (
     clarity: Score;
     congruence: Score;
     resistance: Score;
+    level?: number | undefined;
     note?: string | undefined;
     linkedWishIds?: string[] | undefined;
   },
 ): AlignmentCheckin => {
+  const level = input.level === undefined ? undefined : validateLevel(input.level);
   const at = nowIso();
   const checkin: AlignmentCheckin = {
     id: randomUUID(),
@@ -22,6 +25,7 @@ export const addCheckin = (
     clarityScore: input.clarity,
     congruenceScore: input.congruence,
     resistanceScore: input.resistance,
+    ...(level === undefined ? {} : { level }),
     ...(input.note !== undefined && input.note.trim().length > 0
       ? { note: input.note.trim() }
       : {}),

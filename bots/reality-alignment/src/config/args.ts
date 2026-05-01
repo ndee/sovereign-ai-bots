@@ -19,11 +19,20 @@ const KEYED_OPTIONS = new Set([
   "--clarity",
   "--congruence",
   "--resistance",
+  "--level",
+  "--desired-level",
   "--wish",
   "--rationale",
 ]);
 
-const NUMERIC_OPTIONS = new Set(["--energy", "--clarity", "--congruence", "--resistance"]);
+const NUMERIC_OPTIONS = new Set([
+  "--energy",
+  "--clarity",
+  "--congruence",
+  "--resistance",
+  "--level",
+  "--desired-level",
+]);
 
 export const parseArgs = (argv: readonly string[]): ParsedArgs => {
   const args = [...argv];
@@ -68,6 +77,8 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
       else if (token === "--clarity") options.clarity = numeric;
       else if (token === "--congruence") options.congruence = numeric;
       else if (token === "--resistance") options.resistance = numeric;
+      else if (token === "--level") options.level = numeric;
+      else if (token === "--desired-level") options.desiredLevel = numeric;
     }
   }
   return { command, options };
