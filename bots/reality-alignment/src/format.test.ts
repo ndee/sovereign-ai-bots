@@ -88,6 +88,10 @@ describe("reality-alignment/format", () => {
       timeframe: undefined,
     };
     expect(formatWishShow({ instanceId: "core", wish: minimal })).not.toMatch(/Emotional core/);
+    const withLevel = { ...wish, desiredLevel: 540 };
+    expect(formatWishShow({ instanceId: "core", wish: withLevel })).toMatch(
+      /Desired level: 540 \(~joy\)/,
+    );
   });
 
   it("formats check-in add, list, and latest", () => {
@@ -101,6 +105,10 @@ describe("reality-alignment/format", () => {
     ).toMatch(/energy 3/);
     expect(formatCheckinLatest({ instanceId: "core", checkin: undefined })).toMatch(/No check-ins/);
     expect(formatCheckinLatest({ instanceId: "core", checkin })).toMatch(/note: noted/);
+    const withLevel = { ...checkin, level: 200 };
+    expect(formatCheckinLatest({ instanceId: "core", checkin: withLevel })).toMatch(
+      /level 200 \(~courage\)/,
+    );
   });
 
   it("formats resistance add, list, and resolve", () => {

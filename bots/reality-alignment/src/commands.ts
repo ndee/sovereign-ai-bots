@@ -60,6 +60,7 @@ export const wishAdd = async (options: CommandOptions): Promise<WishAddResult> =
     addWish(state, {
       title,
       ...(options.description !== undefined ? { description: options.description } : {}),
+      ...(options.desiredLevel !== undefined ? { desiredLevel: options.desiredLevel } : {}),
     }),
   );
   return { instanceId, wish: result };
@@ -131,6 +132,7 @@ export const checkinAdd = async (options: CommandOptions): Promise<CheckinAddRes
       clarity,
       congruence,
       resistance,
+      ...(options.level !== undefined ? { level: options.level } : {}),
       ...(options.note !== undefined ? { note: options.note } : {}),
       linkedWishIds,
     });

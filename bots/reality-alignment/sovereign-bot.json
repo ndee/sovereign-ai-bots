@@ -2,7 +2,7 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "reality-alignment",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "displayName": "Reality Alignment",
   "description": "Experimental local-first Matrix self-coaching bot that tracks active wishes, daily alignment check-ins, resistance patterns, next aligned steps, and a weekly review digest.",
   "defaultInstall": false,
@@ -27,7 +27,7 @@
     {
       "kind": "sovereign-tool-template",
       "id": "reality-alignment-tool",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "description": "Local self-coaching helper for wishes, alignment check-ins, resistance patterns, action steps, and weekly review digests.",
       "capabilities": [
         "reality-alignment.wish.read",
@@ -71,7 +71,7 @@
   "toolInstances": [
     {
       "id": "reality-alignment-core",
-      "templateRef": "reality-alignment-tool@0.1.3",
+      "templateRef": "reality-alignment-tool@0.1.4",
       "config": {
         "agentId": {
           "from": "agent.id"
@@ -235,7 +235,7 @@
   ],
   "agentTemplate": {
     "id": "reality-alignment",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "description": "Personal self-coaching bot working in Frederick Dodson's reality-creation frame. Clarifies active wishes and the level each lives at, runs daily alignment check-ins of current state, tracks recurring resistance as pointers to lower-state beliefs, suggests one aligned act at a time matched to the wish's desired state, and produces a weekly state-trajectory review. Reflective, grounded, action-oriented. Not therapy. Not magical thinking.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {
@@ -244,7 +244,7 @@
     "requiredToolTemplates": [
       {
         "id": "reality-alignment-tool",
-        "version": "0.1.3"
+        "version": "0.1.4"
       }
     ],
     "optionalToolTemplates": []

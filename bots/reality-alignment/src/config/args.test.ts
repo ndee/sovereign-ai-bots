@@ -101,4 +101,35 @@ describe("reality-alignment/config/args", () => {
       "Expected a number for --energy",
     );
   });
+
+  it("parses --level on check-ins and --desired-level on wishes", () => {
+    const { options: checkinOptions } = parseArgs([
+      "checkin",
+      "add",
+      "--instance",
+      "core",
+      "--energy",
+      "3",
+      "--clarity",
+      "3",
+      "--congruence",
+      "3",
+      "--resistance",
+      "3",
+      "--level",
+      "200",
+    ]);
+    expect(checkinOptions.level).toBe(200);
+    const { options: wishOptions } = parseArgs([
+      "wish",
+      "add",
+      "--instance",
+      "core",
+      "--title",
+      "Live in joy",
+      "--desired-level",
+      "540",
+    ]);
+    expect(wishOptions.desiredLevel).toBe(540);
+  });
 });
