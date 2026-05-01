@@ -102,6 +102,29 @@ describe("reality-alignment/config/args", () => {
     );
   });
 
+  it("recognises the Dodson technique commands as subcommand hosts", () => {
+    expect(parseArgs(["level", "next", "--instance", "core"])).toMatchObject({
+      command: "level",
+      options: { subcommand: "next", instance: "core" },
+    });
+    expect(parseArgs(["act", "as", "--instance", "core", "--query", "wish"])).toMatchObject({
+      command: "act",
+      options: { subcommand: "as", query: "wish" },
+    });
+    expect(parseArgs(["future", "self", "--instance", "core", "--query", "wish"])).toMatchObject({
+      command: "future",
+      options: { subcommand: "self", query: "wish" },
+    });
+    expect(parseArgs(["look", "20s", "--instance", "core"])).toMatchObject({
+      command: "look",
+      options: { subcommand: "20s" },
+    });
+    expect(parseArgs(["appreciation", "--instance", "core"])).toMatchObject({
+      command: "appreciation",
+      options: { instance: "core" },
+    });
+  });
+
   it("parses --level on check-ins and --desired-level on wishes", () => {
     const { options: checkinOptions } = parseArgs([
       "checkin",

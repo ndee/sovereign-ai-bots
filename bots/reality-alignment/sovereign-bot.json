@@ -2,7 +2,7 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "reality-alignment",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "displayName": "Reality Alignment",
   "description": "Experimental local-first Matrix self-coaching bot that tracks active wishes, daily alignment check-ins, resistance patterns, next aligned steps, and a weekly review digest.",
   "defaultInstall": false,
@@ -27,7 +27,7 @@
     {
       "kind": "sovereign-tool-template",
       "id": "reality-alignment-tool",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "description": "Local self-coaching helper for wishes, alignment check-ins, resistance patterns, action steps, and weekly review digests.",
       "capabilities": [
         "reality-alignment.wish.read",
@@ -47,12 +47,14 @@
       ],
       "allowedCommands": [
         "<agent-workspace>/bin/reality-alignment.js wish add --instance <tool-instance-id> --title <title> --json",
+        "<agent-workspace>/bin/reality-alignment.js wish add --instance <tool-instance-id> --title <title> --desired-level <level> --json",
         "<agent-workspace>/bin/reality-alignment.js wish list --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/reality-alignment.js wish show --instance <tool-instance-id> --query <query> --json",
         "<agent-workspace>/bin/reality-alignment.js wish archive --instance <tool-instance-id> --query <query> --json",
         "<agent-workspace>/bin/reality-alignment.js wish complete --instance <tool-instance-id> --query <query> --json",
         "<agent-workspace>/bin/reality-alignment.js wish pause --instance <tool-instance-id> --query <query> --json",
         "<agent-workspace>/bin/reality-alignment.js checkin add --instance <tool-instance-id> --energy <score> --clarity <score> --congruence <score> --resistance <score> --json",
+        "<agent-workspace>/bin/reality-alignment.js checkin add --instance <tool-instance-id> --energy <score> --clarity <score> --congruence <score> --resistance <score> --level <level> --json",
         "<agent-workspace>/bin/reality-alignment.js checkin list --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/reality-alignment.js checkin latest --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/reality-alignment.js resistance add --instance <tool-instance-id> --label <label> --json",
@@ -61,7 +63,13 @@
         "<agent-workspace>/bin/reality-alignment.js step next --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/reality-alignment.js step list --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/reality-alignment.js step complete --instance <tool-instance-id> --query <query> --json",
-        "<agent-workspace>/bin/reality-alignment.js review weekly --instance <tool-instance-id> --json"
+        "<agent-workspace>/bin/reality-alignment.js review weekly --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/reality-alignment.js level next --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/reality-alignment.js level next --instance <tool-instance-id> --level <level> --json",
+        "<agent-workspace>/bin/reality-alignment.js act as --instance <tool-instance-id> --query <query> --json",
+        "<agent-workspace>/bin/reality-alignment.js future self --instance <tool-instance-id> --query <query> --json",
+        "<agent-workspace>/bin/reality-alignment.js look 20s --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/reality-alignment.js appreciation --instance <tool-instance-id> --json"
       ],
       "openclawPlugins": [],
       "openclawBundledPlugins": [],
@@ -71,7 +79,7 @@
   "toolInstances": [
     {
       "id": "reality-alignment-core",
-      "templateRef": "reality-alignment-tool@0.1.4",
+      "templateRef": "reality-alignment-tool@0.1.5",
       "config": {
         "agentId": {
           "from": "agent.id"
@@ -184,6 +192,22 @@
       }
     },
     {
+      "id": "workspace-reference",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/REFERENCE.md"
+          ]
+        },
+        "source": "workspace/REFERENCE.md",
+        "writePolicy": "always"
+      }
+    },
+    {
       "id": "workspace-bin",
       "kind": "managedFile",
       "spec": {
@@ -235,7 +259,7 @@
   ],
   "agentTemplate": {
     "id": "reality-alignment",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Personal self-coaching bot working in Frederick Dodson's reality-creation frame. Clarifies active wishes and the level each lives at, runs daily alignment check-ins of current state, tracks recurring resistance as pointers to lower-state beliefs, suggests one aligned act at a time matched to the wish's desired state, and produces a weekly state-trajectory review. Reflective, grounded, action-oriented. Not therapy. Not magical thinking.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {
@@ -244,7 +268,7 @@
     "requiredToolTemplates": [
       {
         "id": "reality-alignment-tool",
-        "version": "0.1.4"
+        "version": "0.1.5"
       }
     ],
     "optionalToolTemplates": []

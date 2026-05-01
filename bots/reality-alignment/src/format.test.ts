@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  formatActAsIf,
+  formatAppreciation,
   formatCheckinAdd,
   formatCheckinLatest,
   formatCheckinList,
+  formatFutureSelf,
+  formatLevelNext,
+  formatLook20s,
   formatResistanceAdd,
   formatResistanceList,
   formatResistanceResolve,
@@ -152,5 +157,82 @@ describe("reality-alignment/format", () => {
         formatted: "RAW",
       }),
     ).toBe("RAW");
+  });
+
+  it("formats Dodson technique exercises with title, steps, quotes, guardrail, source", () => {
+    const baseExercise = {
+      technique: "x",
+      title: "Title",
+      context: "Context line",
+      steps: ["step one", "step two"],
+      quotes: ['"a quote"'],
+      source: "Book, ch.",
+      guardrail: "Be careful with X.",
+    };
+    const formatted = formatLevelNext({
+      instanceId: "core",
+      exercise: {
+        ...baseExercise,
+        technique: "practicing-the-next-higher-state",
+        current: { value: 100, label: "fear" },
+        oneStep: { value: 125, label: "desire" },
+        twoSteps: { value: 150, label: "anger" },
+      },
+    });
+    expect(formatted).toMatch(/Title/);
+    expect(formatted).toMatch(/Context line/);
+    expect(formatted).toMatch(/- step one/);
+    expect(formatted).toMatch(/"a quote"/);
+    expect(formatted).toMatch(/Be careful with X/);
+    expect(formatted).toMatch(/Source: Book, ch\./);
+  });
+
+  it("omits the context, quotes, and guardrail sections when absent", () => {
+    const minimalLook = formatLook20s({
+      instanceId: "core",
+      exercise: {
+        technique: "twenty-second-look",
+        title: "Look",
+        steps: ["look"],
+        quotes: [],
+        source: "src",
+      },
+    });
+    expect(minimalLook).not.toMatch(/Context/);
+    expect(minimalLook).toMatch(/Source: src/);
+  });
+
+  it("renders act-as-if, future-self, and appreciation through the same exercise formatter", () => {
+    const wishLocal = {
+      id: "w1",
+      title: "Live in joy",
+      status: "active" as const,
+      createdAt: "2026-04-26T10:00:00.000Z",
+      updatedAt: "2026-04-26T10:00:00.000Z",
+    };
+    const exerciseBase = {
+      title: "T",
+      steps: ["s"],
+      quotes: [],
+      source: "src",
+    };
+    expect(
+      formatActAsIf({
+        instanceId: "core",
+        exercise: { ...exerciseBase, technique: "magical-action", wish: wishLocal },
+      }),
+    ).toMatch(/T/);
+    expect(
+      formatFutureSelf({
+        instanceId: "core",
+        exercise: { ...exerciseBase, technique: "future-into-present-2", wish: wishLocal },
+      }),
+    ).toMatch(/T/);
+    expect(
+      formatAppreciation({
+        instanceId: "core",
+        exercise: { ...exerciseBase, technique: "appreciation" },
+      }),
+    ).toMatch(/T/);
   });
 });

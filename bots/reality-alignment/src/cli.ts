@@ -2,9 +2,14 @@ import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  actAsIf,
+  appreciation,
   checkinAdd,
   checkinLatest,
   checkinList,
+  futureSelf,
+  levelNext,
+  look20s,
   resistanceAdd,
   resistanceList,
   resistanceResolve,
@@ -21,9 +26,14 @@ import {
 } from "./commands.js";
 import { parseArgs } from "./config/args.js";
 import {
+  formatActAsIf,
+  formatAppreciation,
   formatCheckinAdd,
   formatCheckinLatest,
   formatCheckinList,
+  formatFutureSelf,
+  formatLevelNext,
+  formatLook20s,
   formatResistanceAdd,
   formatResistanceList,
   formatResistanceResolve,
@@ -134,16 +144,63 @@ const runReview = async (options: CommandOptions): Promise<void> => {
   throw new Error(`Unknown review subcommand: ${sub}`);
 };
 
+const runLevel = async (options: CommandOptions): Promise<void> => {
+  const sub = requireSubcommand(options, "level");
+  if (sub === "next") {
+    printOutput(await levelNext(options), options, formatLevelNext);
+    return;
+  }
+  throw new Error(`Unknown level subcommand: ${sub}`);
+};
+
+const runAct = async (options: CommandOptions): Promise<void> => {
+  const sub = requireSubcommand(options, "act");
+  if (sub === "as") {
+    printOutput(await actAsIf(options), options, formatActAsIf);
+    return;
+  }
+  throw new Error(`Unknown act subcommand: ${sub}`);
+};
+
+const runFuture = async (options: CommandOptions): Promise<void> => {
+  const sub = requireSubcommand(options, "future");
+  if (sub === "self") {
+    printOutput(await futureSelf(options), options, formatFutureSelf);
+    return;
+  }
+  throw new Error(`Unknown future subcommand: ${sub}`);
+};
+
+const runLook = async (options: CommandOptions): Promise<void> => {
+  const sub = requireSubcommand(options, "look");
+  if (sub === "20s") {
+    printOutput(await look20s(options), options, formatLook20s);
+    return;
+  }
+  throw new Error(`Unknown look subcommand: ${sub}`);
+};
+
+const runAppreciation = async (options: CommandOptions): Promise<void> => {
+  printOutput(await appreciation(options), options, formatAppreciation);
+};
+
 export const runCli = async (argv: readonly string[]): Promise<void> => {
   const { command, options } = parseArgs(argv);
   if (typeof command !== "string" || command.length === 0) {
-    throw new Error("Expected a command: wish, checkin, resistance, step, or review");
+    throw new Error(
+      "Expected a command: wish, checkin, resistance, step, review, level, act, future, look, or appreciation",
+    );
   }
   if (command === "wish") return runWish(options);
   if (command === "checkin") return runCheckin(options);
   if (command === "resistance") return runResistance(options);
   if (command === "step") return runStep(options);
   if (command === "review") return runReview(options);
+  if (command === "level") return runLevel(options);
+  if (command === "act") return runAct(options);
+  if (command === "future") return runFuture(options);
+  if (command === "look") return runLook(options);
+  if (command === "appreciation") return runAppreciation(options);
   throw new Error(`Unknown command: ${command}`);
 };
 
