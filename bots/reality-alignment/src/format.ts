@@ -1,7 +1,12 @@
 import type {
+  ActAsIfResult,
+  AppreciationResult,
   CheckinAddResult,
   CheckinLatestResult,
   CheckinListResult,
+  FutureSelfResult,
+  LevelNextResult,
+  Look20sResult,
   ResistanceAddResult,
   ResistanceListResult,
   ResistanceResolveResult,
@@ -14,7 +19,32 @@ import type {
   WishShowResult,
 } from "./commands.js";
 import { nearestNamedLevel } from "./levels.js";
+import type { TechniqueExercise } from "./techniques.js";
 import type { CommandOptions } from "./types.js";
+
+const formatExercise = (exercise: TechniqueExercise): string => {
+  const lines: string[] = [exercise.title];
+  if (exercise.context !== undefined) {
+    lines.push(exercise.context);
+  }
+  lines.push("");
+  for (const step of exercise.steps) {
+    lines.push(`- ${step}`);
+  }
+  if (exercise.quotes.length > 0) {
+    lines.push("");
+    for (const quote of exercise.quotes) {
+      lines.push(quote);
+    }
+  }
+  if (exercise.guardrail !== undefined) {
+    lines.push("");
+    lines.push(exercise.guardrail);
+  }
+  lines.push("");
+  lines.push(`Source: ${exercise.source}`);
+  return lines.join("\n");
+};
 
 const formatLevel = (level: number): string => {
   const named = nearestNamedLevel(level);
@@ -139,3 +169,14 @@ export const formatStepComplete = (value: StepCompleteResult): string =>
   `Step completed: ${value.step.title}`;
 
 export const formatReviewWeekly = (value: ReviewWeeklyResult): string => value.formatted;
+
+export const formatLevelNext = (value: LevelNextResult): string => formatExercise(value.exercise);
+
+export const formatActAsIf = (value: ActAsIfResult): string => formatExercise(value.exercise);
+
+export const formatFutureSelf = (value: FutureSelfResult): string => formatExercise(value.exercise);
+
+export const formatAppreciation = (value: AppreciationResult): string =>
+  formatExercise(value.exercise);
+
+export const formatLook20s = (value: Look20sResult): string => formatExercise(value.exercise);

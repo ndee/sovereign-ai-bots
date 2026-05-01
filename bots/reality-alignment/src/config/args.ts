@@ -5,7 +5,17 @@ export interface ParsedArgs {
   options: CommandOptions;
 }
 
-const SUBCOMMAND_HOSTS = new Set(["wish", "checkin", "resistance", "step", "review"]);
+const SUBCOMMAND_HOSTS = new Set([
+  "wish",
+  "checkin",
+  "resistance",
+  "step",
+  "review",
+  "level",
+  "act",
+  "future",
+  "look",
+]);
 
 const KEYED_OPTIONS = new Set([
   "--instance",
