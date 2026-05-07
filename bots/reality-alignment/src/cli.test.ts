@@ -17,6 +17,11 @@ const commandMocks = vi.hoisted(() => ({
   stepList: vi.fn(),
   stepComplete: vi.fn(),
   reviewWeekly: vi.fn(),
+  levelNext: vi.fn(),
+  actAsIf: vi.fn(),
+  futureSelf: vi.fn(),
+  appreciation: vi.fn(),
+  look20s: vi.fn(),
 }));
 
 vi.mock("./commands.js", () => commandMocks);
@@ -86,6 +91,26 @@ describe("reality-alignment/cli", () => {
       review: {},
       formatted: "REVIEW",
     });
+    const exercise = {
+      technique: "x",
+      title: "Title",
+      steps: ["one"],
+      quotes: [],
+      source: "source",
+    };
+    const levelExercise = {
+      ...exercise,
+      technique: "practicing-the-next-higher-state",
+      current: { value: 100, label: "fear" },
+      oneStep: { value: 125, label: "desire" },
+      twoSteps: { value: 150, label: "anger" },
+    };
+    const wishExercise = { ...exercise, wish };
+    commandMocks.levelNext.mockResolvedValue({ instanceId: "core", exercise: levelExercise });
+    commandMocks.actAsIf.mockResolvedValue({ instanceId: "core", exercise: wishExercise });
+    commandMocks.futureSelf.mockResolvedValue({ instanceId: "core", exercise: wishExercise });
+    commandMocks.appreciation.mockResolvedValue({ instanceId: "core", exercise });
+    commandMocks.look20s.mockResolvedValue({ instanceId: "core", exercise });
     const baseArgs = ["--instance", "core"];
     await runCli(["wish", "add", ...baseArgs, "--title", "x"]);
     await runCli(["wish", "list", ...baseArgs]);
@@ -115,6 +140,11 @@ describe("reality-alignment/cli", () => {
     await runCli(["step", "list", ...baseArgs]);
     await runCli(["step", "complete", ...baseArgs, "--query", "x"]);
     await runCli(["review", "weekly", ...baseArgs]);
+    await runCli(["level", "next", ...baseArgs]);
+    await runCli(["act", "as", ...baseArgs, "--query", "x"]);
+    await runCli(["future", "self", ...baseArgs, "--query", "x"]);
+    await runCli(["look", "20s", ...baseArgs]);
+    await runCli(["appreciation", ...baseArgs]);
 
     for (const [, mock] of Object.entries(commandMocks)) {
       expect(mock).toHaveBeenCalled();
@@ -140,6 +170,18 @@ describe("reality-alignment/cli", () => {
     );
     await expect(runCli(["review", "bogus", "--instance", "core"])).rejects.toThrow(
       "Unknown review subcommand: bogus",
+    );
+    await expect(runCli(["level", "bogus", "--instance", "core"])).rejects.toThrow(
+      "Unknown level subcommand: bogus",
+    );
+    await expect(runCli(["act", "bogus", "--instance", "core"])).rejects.toThrow(
+      "Unknown act subcommand: bogus",
+    );
+    await expect(runCli(["future", "bogus", "--instance", "core"])).rejects.toThrow(
+      "Unknown future subcommand: bogus",
+    );
+    await expect(runCli(["look", "bogus", "--instance", "core"])).rejects.toThrow(
+      "Unknown look subcommand: bogus",
     );
   });
 

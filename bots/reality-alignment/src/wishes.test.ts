@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDefaultState } from "./state.js";
 import type { RealityAlignmentState } from "./types.js";
-import { activeWishes, addWish, findWish, setWishStatus } from "./wishes.js";
+import { activeWishes, addWish, findWish, setWishDesiredLevel, setWishStatus } from "./wishes.js";
 
 const baseState = (): RealityAlignmentState => createDefaultState();
 
@@ -56,5 +56,25 @@ describe("reality-alignment/wishes", () => {
     addWish(state, { title: "Wish two" });
     setWishStatus(state, "Wish one", "archived");
     expect(activeWishes(state).map((wish) => wish.title)).toEqual(["Wish two"]);
+  });
+
+  it("accepts and validates a desired level on add", () => {
+    const state = baseState();
+    const wish = addWish(state, { title: "Live in joy", desiredLevel: 540 });
+    expect(wish.desiredLevel).toBe(540);
+    expect(() => addWish(state, { title: "Out of range", desiredLevel: 2000 })).toThrow(
+      "Level must be between 0 and 1000",
+    );
+  });
+
+  it("updates the desired level after creation", async () => {
+    const state = baseState();
+    const wish = addWish(state, { title: "Live in joy" });
+    const before = wish.updatedAt;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const updated = setWishDesiredLevel(state, wish.id, 500);
+    expect(updated.desiredLevel).toBe(500);
+    expect(updated.updatedAt > before).toBe(true);
+    expect(() => setWishDesiredLevel(state, "missing", 500)).toThrow("No wish matched 'missing'");
   });
 });

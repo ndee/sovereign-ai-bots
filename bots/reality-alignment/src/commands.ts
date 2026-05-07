@@ -8,6 +8,18 @@ import {
   generateNextStep,
   openSteps as openStepsEntity,
 } from "./steps.js";
+import {
+  type AppreciationExercise,
+  buildAppreciationExercise,
+  buildFutureSelfExercise,
+  buildMagicalActionExercise,
+  buildNextHigherStateExercise,
+  buildTwentySecondLookExercise,
+  type FutureSelfExercise,
+  type MagicalActionExercise,
+  type NextHigherStateExercise,
+  type TwentySecondLookExercise,
+} from "./techniques.js";
 import type {
   ActionStep,
   AlignmentCheckin,
@@ -60,6 +72,7 @@ export const wishAdd = async (options: CommandOptions): Promise<WishAddResult> =
     addWish(state, {
       title,
       ...(options.description !== undefined ? { description: options.description } : {}),
+      ...(options.desiredLevel !== undefined ? { desiredLevel: options.desiredLevel } : {}),
     }),
   );
   return { instanceId, wish: result };
@@ -131,6 +144,7 @@ export const checkinAdd = async (options: CommandOptions): Promise<CheckinAddRes
       clarity,
       congruence,
       resistance,
+      ...(options.level !== undefined ? { level: options.level } : {}),
       ...(options.note !== undefined ? { note: options.note } : {}),
       linkedWishIds,
     });
@@ -242,4 +256,62 @@ export const reviewWeekly = async (options: CommandOptions): Promise<ReviewWeekl
   const { state, instanceId } = await readState(options);
   const review = buildWeeklyReview(state);
   return { instanceId, review, formatted: formatWeeklyReview(review) };
+};
+
+export interface LevelNextResult extends InstanceContext {
+  exercise: NextHigherStateExercise;
+}
+export const levelNext = async (options: CommandOptions): Promise<LevelNextResult> => {
+  const { state, instanceId } = await readState(options);
+  const exercise = buildNextHigherStateExercise(state, {
+    ...(options.level !== undefined ? { level: options.level } : {}),
+  });
+  return { instanceId, exercise };
+};
+
+const requireActiveWish = (state: RealityAlignmentState, query: string): Wish => {
+  const wish = findWish(state, query);
+  if (wish === undefined) {
+    throw new Error(`No wish matched '${query}'`);
+  }
+  if (wish.status !== "active") {
+    throw new Error(`Wish '${wish.title}' is not active (status: ${wish.status})`);
+  }
+  return wish;
+};
+
+export interface ActAsIfResult extends InstanceContext {
+  exercise: MagicalActionExercise;
+}
+export const actAsIf = async (options: CommandOptions): Promise<ActAsIfResult> => {
+  const query = ensureNonEmptyString(options.query, "--query");
+  const { state, instanceId } = await readState(options);
+  const wish = requireActiveWish(state, query);
+  return { instanceId, exercise: buildMagicalActionExercise(wish) };
+};
+
+export interface FutureSelfResult extends InstanceContext {
+  exercise: FutureSelfExercise;
+}
+export const futureSelf = async (options: CommandOptions): Promise<FutureSelfResult> => {
+  const query = ensureNonEmptyString(options.query, "--query");
+  const { state, instanceId } = await readState(options);
+  const wish = requireActiveWish(state, query);
+  return { instanceId, exercise: buildFutureSelfExercise(wish) };
+};
+
+export interface AppreciationResult extends InstanceContext {
+  exercise: AppreciationExercise;
+}
+export const appreciation = async (options: CommandOptions): Promise<AppreciationResult> => {
+  const { instanceId } = await readState(options);
+  return { instanceId, exercise: buildAppreciationExercise() };
+};
+
+export interface Look20sResult extends InstanceContext {
+  exercise: TwentySecondLookExercise;
+}
+export const look20s = async (options: CommandOptions): Promise<Look20sResult> => {
+  const { instanceId } = await readState(options);
+  return { instanceId, exercise: buildTwentySecondLookExercise() };
 };
