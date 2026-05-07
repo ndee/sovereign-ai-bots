@@ -30,6 +30,28 @@ describe("reality-alignment/checkins", () => {
     });
     expect(checkin.note).toBeUndefined();
     expect(checkin.linkedWishIds).toEqual([]);
+    expect(checkin.level).toBeUndefined();
+  });
+
+  it("records and validates a level on add", () => {
+    const state = createDefaultState();
+    const checkin = addCheckin(state, {
+      energy: 3,
+      clarity: 3,
+      congruence: 3,
+      resistance: 3,
+      level: 200,
+    });
+    expect(checkin.level).toBe(200);
+    expect(() =>
+      addCheckin(state, {
+        energy: 3,
+        clarity: 3,
+        congruence: 3,
+        resistance: 3,
+        level: 1500,
+      }),
+    ).toThrow("Level must be between 0 and 1000");
   });
 
   it("returns the latest check-in or undefined when empty", () => {
