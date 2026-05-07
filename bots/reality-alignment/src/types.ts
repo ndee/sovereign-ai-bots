@@ -13,6 +13,7 @@ export interface Wish {
   emotionalCore?: string | undefined;
   desiredState?: string | undefined;
   timeframe?: string | undefined;
+  desiredLevel?: number | undefined;
   status: WishStatus;
   createdAt: string;
   updatedAt: string;
@@ -25,6 +26,7 @@ export interface AlignmentCheckin {
   clarityScore: Score;
   congruenceScore: Score;
   resistanceScore: Score;
+  level?: number | undefined;
   note?: string | undefined;
   linkedWishIds: string[];
   createdAt: string;
@@ -79,6 +81,8 @@ export interface CommandOptions {
   clarity?: number | undefined;
   congruence?: number | undefined;
   resistance?: number | undefined;
+  level?: number | undefined;
+  desiredLevel?: number | undefined;
   wish?: string | undefined;
   rationale?: string | undefined;
 }
