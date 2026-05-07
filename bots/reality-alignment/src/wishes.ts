@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { validateLevel } from "./levels.js";
 import type { RealityAlignmentState, Wish, WishStatus } from "./types.js";
 import { ensureNonEmptyString, nowIso } from "./util.js";
 
@@ -22,19 +23,40 @@ export const findWish = (state: RealityAlignmentState, query: string): Wish | un
 
 export const addWish = (
   state: RealityAlignmentState,
-  input: { title: string; description?: string | undefined },
+  input: {
+    title: string;
+    description?: string | undefined;
+    desiredLevel?: number | undefined;
+  },
 ): Wish => {
   const title = ensureNonEmptyString(input.title, "title");
+  const desiredLevel =
+    input.desiredLevel === undefined ? undefined : validateLevel(input.desiredLevel);
   const at = nowIso();
   const wish: Wish = {
     id: randomUUID(),
     title,
     ...(input.description !== undefined ? { description: input.description } : {}),
+    ...(desiredLevel === undefined ? {} : { desiredLevel }),
     status: "active",
     createdAt: at,
     updatedAt: at,
   };
   state.wishes.push(wish);
+  return wish;
+};
+
+export const setWishDesiredLevel = (
+  state: RealityAlignmentState,
+  query: string,
+  level: number,
+): Wish => {
+  const wish = findWish(state, query);
+  if (wish === undefined) {
+    throw new Error(`No wish matched '${query}'`);
+  }
+  wish.desiredLevel = validateLevel(level);
+  wish.updatedAt = nowIso();
   return wish;
 };
 
