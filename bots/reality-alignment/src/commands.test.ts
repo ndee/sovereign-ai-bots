@@ -5,9 +5,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  actAsIf,
+  appreciation,
   checkinAdd,
   checkinLatest,
   checkinList,
+  futureSelf,
+  levelNext,
+  look20s,
   resistanceAdd,
   resistanceList,
   resistanceResolve,
@@ -109,6 +114,20 @@ describe("reality-alignment/commands", () => {
     );
   });
 
+  it("propagates desired level on wish add and level on check-in add", async () => {
+    const added = await wishAdd({ ...baseOptions(), title: "Live in joy", desiredLevel: 540 });
+    expect(added.wish.desiredLevel).toBe(540);
+    const checkin = await checkinAdd({
+      ...baseOptions(),
+      energy: 3,
+      clarity: 3,
+      congruence: 3,
+      resistance: 3,
+      level: 200,
+    });
+    expect(checkin.checkin.level).toBe(200);
+  });
+
   it("manages check-ins with optional wish linkage", async () => {
     const wish = await wishAdd({ ...baseOptions(), title: "Ship it" });
     const empty = await checkinLatest(baseOptions());
@@ -188,5 +207,57 @@ describe("reality-alignment/commands", () => {
     const review = await reviewWeekly(baseOptions());
     expect(review.review.activeWishes).toHaveLength(1);
     expect(review.formatted).toMatch(/Weekly Review/);
+  });
+
+  it("returns the next-higher-state exercise from latest check-in or explicit level", async () => {
+    await checkinAdd({
+      ...baseOptions(),
+      energy: 3,
+      clarity: 3,
+      congruence: 3,
+      resistance: 3,
+      level: 100,
+    });
+    const fromCheckin = await levelNext(baseOptions());
+    expect(fromCheckin.exercise.current.label).toBe("fear");
+    expect(fromCheckin.exercise.oneStep?.label).toBe("desire");
+    const explicit = await levelNext({ ...baseOptions(), level: 200 });
+    expect(explicit.exercise.current.label).toBe("courage");
+  });
+
+  it("returns the act-as-if exercise scoped to an active wish", async () => {
+    const wish = await wishAdd({
+      ...baseOptions(),
+      title: "Live in joy",
+      desiredLevel: 540,
+    });
+    const exercise = await actAsIf({ ...baseOptions(), query: wish.wish.id });
+    expect(exercise.exercise.wish.id).toBe(wish.wish.id);
+    expect(exercise.exercise.context).toMatch(/Desired level: 540 \(~joy\)/);
+    await expect(actAsIf({ ...baseOptions(), query: "missing" })).rejects.toThrow(
+      "No wish matched 'missing'",
+    );
+  });
+
+  it("rejects act-as-if for a non-active wish", async () => {
+    const wish = await wishAdd({ ...baseOptions(), title: "Pause me" });
+    await wishPause({ ...baseOptions(), query: wish.wish.id });
+    await expect(actAsIf({ ...baseOptions(), query: wish.wish.id })).rejects.toThrow(
+      "is not active (status: paused)",
+    );
+  });
+
+  it("returns the future-self exercise for an active wish", async () => {
+    const wish = await wishAdd({ ...baseOptions(), title: "Build calm" });
+    const exercise = await futureSelf({ ...baseOptions(), query: wish.wish.id });
+    expect(exercise.exercise.wish.id).toBe(wish.wish.id);
+    expect(exercise.exercise.steps[0]).toMatch(/wise, more expanded/);
+  });
+
+  it("returns the appreciation and 20-second-look exercises without a wish", async () => {
+    const ack = await appreciation(baseOptions());
+    expect(ack.exercise.technique).toBe("appreciation");
+    const look = await look20s(baseOptions());
+    expect(look.exercise.technique).toBe("twenty-second-look");
   });
 });
