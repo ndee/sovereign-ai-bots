@@ -1,7 +1,12 @@
 import type {
+  ActAsIfResult,
+  AppreciationResult,
   CheckinAddResult,
   CheckinLatestResult,
   CheckinListResult,
+  FutureSelfResult,
+  LevelNextResult,
+  Look20sResult,
   ResistanceAddResult,
   ResistanceListResult,
   ResistanceResolveResult,
@@ -13,7 +18,38 @@ import type {
   WishListResult,
   WishShowResult,
 } from "./commands.js";
+import { nearestNamedLevel } from "./levels.js";
+import type { TechniqueExercise } from "./techniques.js";
 import type { CommandOptions } from "./types.js";
+
+const formatExercise = (exercise: TechniqueExercise): string => {
+  const lines: string[] = [exercise.title];
+  if (exercise.context !== undefined) {
+    lines.push(exercise.context);
+  }
+  lines.push("");
+  for (const step of exercise.steps) {
+    lines.push(`- ${step}`);
+  }
+  if (exercise.quotes.length > 0) {
+    lines.push("");
+    for (const quote of exercise.quotes) {
+      lines.push(quote);
+    }
+  }
+  if (exercise.guardrail !== undefined) {
+    lines.push("");
+    lines.push(exercise.guardrail);
+  }
+  lines.push("");
+  lines.push(`Source: ${exercise.source}`);
+  return lines.join("\n");
+};
+
+const formatLevel = (level: number): string => {
+  const named = nearestNamedLevel(level);
+  return `${level} (~${named.label})`;
+};
 
 export const printOutput = <T>(
   value: T,
@@ -57,6 +93,8 @@ export const formatWishShow = (value: WishShowResult): string => {
   if (wish.description !== undefined) lines.push(`Description: ${wish.description}`);
   if (wish.emotionalCore !== undefined) lines.push(`Emotional core: ${wish.emotionalCore}`);
   if (wish.desiredState !== undefined) lines.push(`Desired state: ${wish.desiredState}`);
+  if (wish.desiredLevel !== undefined)
+    lines.push(`Desired level: ${formatLevel(wish.desiredLevel)}`);
   if (wish.timeframe !== undefined) lines.push(`Timeframe: ${wish.timeframe}`);
   return lines.join("\n");
 };
@@ -66,10 +104,12 @@ const formatCheckinLine = (checkin: {
   clarityScore: number;
   congruenceScore: number;
   resistanceScore: number;
+  level?: number | undefined;
   createdAt: string;
   note?: string | undefined;
 }): string =>
   `${checkin.createdAt} energy ${checkin.energyScore} clarity ${checkin.clarityScore} congruence ${checkin.congruenceScore} resistance ${checkin.resistanceScore}` +
+  (checkin.level !== undefined ? ` level ${formatLevel(checkin.level)}` : "") +
   (checkin.note !== undefined ? `\n  note: ${checkin.note}` : "");
 
 export const formatCheckinAdd = (value: CheckinAddResult): string =>
@@ -129,3 +169,14 @@ export const formatStepComplete = (value: StepCompleteResult): string =>
   `Step completed: ${value.step.title}`;
 
 export const formatReviewWeekly = (value: ReviewWeeklyResult): string => value.formatted;
+
+export const formatLevelNext = (value: LevelNextResult): string => formatExercise(value.exercise);
+
+export const formatActAsIf = (value: ActAsIfResult): string => formatExercise(value.exercise);
+
+export const formatFutureSelf = (value: FutureSelfResult): string => formatExercise(value.exercise);
+
+export const formatAppreciation = (value: AppreciationResult): string =>
+  formatExercise(value.exercise);
+
+export const formatLook20s = (value: Look20sResult): string => formatExercise(value.exercise);
