@@ -47,8 +47,9 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 
 - `bitcoin-skill-match`
 - `mail-sentinel`
-- `project-sentinel`
 - `node-operator`
+- `project-sentinel`
+- `reality-alignment`
 
 ---
 
@@ -133,6 +134,26 @@ It:
 - inspects node state
 - assists with operator-facing tasks
 - exposes controlled operational functionality
+
+---
+
+## Reality Alignment
+
+Reality Alignment is an experimental local-first Matrix self-coaching bot.
+
+It helps the operator:
+
+- track active wishes and the desired level each wish lives at
+- record daily alignment check-ins and current level
+- capture recurring resistance patterns
+- generate one next aligned step at a time
+- run a weekly review digest
+- invoke built-in Dodson technique cards such as `level next`, `act as`, `future self`, `appreciation`, and `look 20s`
+
+Workspace docs:
+
+- [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
 
 ---
 
