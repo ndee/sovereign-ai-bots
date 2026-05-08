@@ -47,9 +47,9 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 
 - `bitcoin-skill-match`
 - `mail-sentinel`
+- `node-operator`
 - `project-sentinel`
 - `reality-alignment`
-- `node-operator`
 
 ---
 
@@ -153,6 +153,11 @@ It helps the operator:
 The package ships a dedicated `REFERENCE.md` and helper command surface for the
 current Frederick Dodson-inspired techniques, including `level next`, `act as`,
 `future self`, `appreciation`, and `look 20s`.
+
+Workspace docs:
+
+- [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
 
 ---
 
