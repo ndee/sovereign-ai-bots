@@ -137,6 +137,30 @@ It:
 
 ---
 
+## Reality Alignment
+
+Reality Alignment is an experimental local-first self-coaching bot for private
+Matrix conversations on Sovereign AI Node.
+
+It helps the operator:
+
+- track active wishes and the desired level each wish lives at
+- record daily alignment check-ins and current level
+- surface recurring resistance patterns
+- generate one next aligned act at a time
+- run a weekly review digest
+
+The package ships a dedicated `REFERENCE.md` and helper command surface for the
+current Frederick Dodson-inspired techniques, including `level next`, `act as`,
+`future self`, `appreciation`, and `look 20s`.
+
+Workspace docs:
+
+- [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
+
+---
+
 ## Project Sentinel
 
 Project Sentinel is a project intelligence bot for Sovereign AI Node.
