@@ -26,6 +26,7 @@ export const createDefaultState = (): MailSentinelState => ({
   consecutiveFailures: 0,
   mailbox: {
     lastSeenUid: undefined,
+    uidValidity: undefined,
   },
   messages: {},
   alerts: [],
