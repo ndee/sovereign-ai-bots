@@ -123,6 +123,7 @@ export interface DigestState {
 
 export interface MailboxState {
   lastSeenUid?: number | undefined;
+  uidValidity?: string | undefined;
 }
 
 export interface StateErrorInfo {

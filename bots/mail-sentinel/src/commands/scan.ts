@@ -105,7 +105,7 @@ export const scan = async (
 
     try {
       const rules = await runtime.readRules();
-      const previousLastSeenUid = state.mailbox.lastSeenUid;
+      let previousLastSeenUid = state.mailbox.lastSeenUid;
       const reminderAlerts: AlertSummary[] = [];
       for (const alert of state.alerts) {
         if (
@@ -127,6 +127,18 @@ export const scan = async (
         ? searchResult.messages.slice().sort((left, right) => left.uid - right.uid)
         : [];
       const warnings: string[] = [];
+      const observedUidValidity = searchResult.uidValidity;
+      if (observedUidValidity !== undefined) {
+        const previousUidValidity = state.mailbox.uidValidity;
+        if (previousUidValidity !== undefined && previousUidValidity !== observedUidValidity) {
+          warnings.push(
+            `IMAP UIDVALIDITY changed from ${previousUidValidity} to ${observedUidValidity}; resetting lastSeenUid to re-scan the mailbox.`,
+          );
+          state.mailbox.lastSeenUid = undefined;
+          previousLastSeenUid = undefined;
+        }
+        state.mailbox.uidValidity = observedUidValidity;
+      }
       let redAlertsSent = 0;
       let amberQueued = 0;
       const alerts: AlertSummary[] = [...reminderAlerts];
