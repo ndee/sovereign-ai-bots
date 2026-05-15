@@ -240,6 +240,71 @@ describe("commands/scan", () => {
     expect(result.processedMessages).toBeGreaterThan(0);
   });
 
+  it("resets lastSeenUid when IMAP UIDVALIDITY changes", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 999; // would normally suppress UID 10
+    runtime.state.mailbox.uidValidity = "111";
+    runtime.searchMail = async () => ({
+      uidValidity: "222",
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+        },
+      ],
+    });
+    const result = await scan({ instance: "ms-core" });
+    expect(result.newMessages).toBe(1);
+    expect(runtime.state.mailbox.uidValidity).toBe("222");
+    expect(result.note).toContain("UIDVALIDITY changed from 111 to 222");
+    expect(runtime.state.mailbox.lastSeenUid).toBe(10);
+  });
+
+  it("records uidValidity on first sighting without resetting lastSeenUid", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.state.mailbox.uidValidity = undefined;
+    runtime.searchMail = async () => ({
+      uidValidity: "333",
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+        },
+      ],
+    });
+    const result = await scan({ instance: "ms-core" });
+    expect(runtime.state.mailbox.uidValidity).toBe("333");
+    expect(result.newMessages).toBe(1);
+    expect(result.note ?? "").not.toContain("UIDVALIDITY");
+  });
+
+  it("leaves lastSeenUid alone when UIDVALIDITY is unchanged", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.state.mailbox.uidValidity = "444";
+    runtime.searchMail = async () => ({
+      uidValidity: "444",
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+        },
+      ],
+    });
+    await scan({ instance: "ms-core" });
+    expect(runtime.state.mailbox.uidValidity).toBe("444");
+  });
+
   it("falls back to the default why when zone reasons are empty", async () => {
     const runtime = setupRuntimeForScan();
     // Create a scenario where determineZone returns empty reasons.

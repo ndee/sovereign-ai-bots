@@ -267,6 +267,7 @@ export class MailSentinelRuntime {
       from?: unknown;
       subject?: unknown;
     }>;
+    uidValidity?: string;
   }> {
     return (await this.runTool(
       ["imap-search-mail"],
@@ -289,6 +290,7 @@ export class MailSentinelRuntime {
         from?: unknown;
         subject?: unknown;
       }>;
+      uidValidity?: string;
     };
   }
 
