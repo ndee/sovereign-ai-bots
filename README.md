@@ -48,10 +48,9 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 - `bali-compass`
 - `bitcoin-skill-match`
 - `mail-sentinel`
+- `node-operator`
 - `project-sentinel`
 - `reality-alignment`
-- `node-operator`
-- `wealth-alignment` — experimental, private/local-first financial clarity bot. Not a current public product focus.
 
 ---
 
@@ -141,6 +140,30 @@ It:
 
 ---
 
+## Reality Alignment
+
+Reality Alignment is an experimental local-first self-coaching bot for private
+Matrix conversations on Sovereign AI Node.
+
+It helps the operator:
+
+- track active wishes and the desired level each wish lives at
+- record daily alignment check-ins and current level
+- surface recurring resistance patterns
+- generate one next aligned act at a time
+- run a weekly review digest
+
+The package ships a dedicated `REFERENCE.md` and helper command surface for the
+current Frederick Dodson-inspired techniques, including `level next`, `act as`,
+`future self`, `appreciation`, and `look 20s`.
+
+Workspace docs:
+
+- [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
+
+---
+
 ## Project Sentinel
 
 Project Sentinel is a project intelligence bot for Sovereign AI Node.
@@ -167,17 +190,23 @@ Package README:
 
 Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
 
-It tracks:
+It helps the operator:
 
-- active wishes
-- daily alignment check-ins
-- recurring resistance patterns
-- one concrete next aligned step at a time
-- a weekly review digest
+- track active wishes
+- record daily alignment check-ins, including the current Dodson level
+- capture recurring resistance patterns
+- suggest one next aligned act at a time
+- produce a weekly review digest
 
-It uses a dedicated Matrix account, supports DMs, and can also auto-reply in the alert room.
+The package also ships a workspace `REFERENCE.md` with the verbatim exercise cards behind its built-in Dodson technique commands:
 
-This package is intentionally scoped for grounded self-reflection. It is **not** therapy and **not** a manifestation engine.
+- `level next`
+- `act as`
+- `future self`
+- `appreciation`
+- `look 20s`
+
+This bot is experimental and intended for personal self-coaching use. It is not therapy and not a manifestation engine.
 
 ## Trust model
 
