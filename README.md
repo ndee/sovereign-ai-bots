@@ -157,6 +157,8 @@ current Frederick Dodson-inspired techniques, including `level next`, `act as`,
 Workspace docs:
 
 - [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/IDENTITY.md`](bots/reality-alignment/workspace/IDENTITY.md)
+- [`bots/reality-alignment/workspace/SOUL.md`](bots/reality-alignment/workspace/SOUL.md)
 - [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
 
 ---
@@ -180,30 +182,6 @@ Node.
 Package README:
 
 - [`bots/project-sentinel/README.md`](bots/project-sentinel/README.md)
-
----
-
-## Reality Alignment
-
-Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
-
-It helps the operator:
-
-- track active wishes
-- record daily alignment check-ins, including the current Dodson level
-- capture recurring resistance patterns
-- suggest one next aligned act at a time
-- produce a weekly review digest
-
-The package also ships a workspace `REFERENCE.md` with the verbatim exercise cards behind its built-in Dodson technique commands:
-
-- `level next`
-- `act as`
-- `future self`
-- `appreciation`
-- `look 20s`
-
-This bot is experimental and intended for personal self-coaching use. It is not therapy and not a manifestation engine.
 
 ## Trust model
 
