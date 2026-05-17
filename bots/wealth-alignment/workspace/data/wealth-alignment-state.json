@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "counters": {
+    "documents": 0,
+    "transactions": 0
+  },
+  "documents": [],
+  "accounts": [],
+  "transactions": [],
+  "assets": [],
+  "liabilities": [],
+  "snapshots": []
+}
