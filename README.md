@@ -89,6 +89,8 @@ flowchart TD
 
 Not every message reaches the LLM. Heuristic filters run first to discard obvious noise. Messages that pass the prefilter get a semantic second pass, then route through a local policy layer that controls zone assignment (RED, AMBER, GRAY). Operator feedback — submitted directly in Matrix — updates local scoring rules and preferences, which shifts future routing. Matrix is the delivery surface for all alerts and digests.
 
+Mail Sentinel also keeps IMAP cursor state locally. It tracks both the last seen UID and the mailbox `UIDVALIDITY`; if the provider resets `UIDVALIDITY` after a mailbox rebuild or bridge reset, the next scan drops the old UID cursor and re-scans instead of silently skipping newer mail.
+
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
 ### Prerequisites

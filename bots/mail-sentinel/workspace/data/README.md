@@ -6,6 +6,7 @@ This directory is the default packaged location for instance state. Active insta
 override the exact state path per Mail Sentinel instance through the installed tool config.
 
 - Seen messages
+- IMAP cursor state (`lastSeenUid` and `UIDVALIDITY`)
 - Sent alerts
 - User feedback
 - Learned score adjustments
