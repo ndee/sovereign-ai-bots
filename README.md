@@ -45,11 +45,13 @@ The repo root can also carry shared Matrix avatar assets used by the runtime:
 
 ## Current packages
 
+- `bali-compass`
 - `bitcoin-skill-match`
 - `mail-sentinel`
 - `node-operator`
 - `project-sentinel`
 - `reality-alignment`
+- `wealth-alignment` — experimental, private/local-first financial clarity bot. Not a current public product focus.
 
 ---
 
@@ -93,12 +95,14 @@ Mail Sentinel also keeps IMAP cursor state locally. It tracks both the last seen
 
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
+The packaged baseline rules file (`config/default-rules.json`) is installer-managed and reapplied on install/update so shipped heuristics stay aligned with the current bot version. Operator-specific preferences and feedback stay in local policy/state files instead of editing that packaged defaults file in place.
+
 ### Prerequisites
 
 Mail Sentinel requires:
 
 - an IMAP-accessible mailbox with credentials
-- Sovereign AI Node installed on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node installed on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - provider credentials (OpenRouter API key) configured at the node level — see [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node)
 
 If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bridge) must be installed and configured on the host to expose IMAP access. On the current self-hosted path, Proton Bridge is installed manually. It is not required for other IMAP providers.
@@ -107,7 +111,7 @@ If the mailbox source is Proton Mail, [Proton Bridge](https://proton.me/mail/bri
 
 The current documented and tested path for Mail Sentinel is:
 
-- Sovereign AI Node on a dedicated Ubuntu host (VM, bare metal, or VPS)
+- Sovereign AI Node on a dedicated Ubuntu or Debian host (VM, bare metal, or VPS)
 - Matrix as control plane (provisioned by the installer)
 - IMAP mailbox (any provider, or Proton Mail via Proton Bridge)
 - provider-backed runtime path with an OpenRouter API key (configured at node level)
@@ -156,10 +160,18 @@ The package ships a dedicated `REFERENCE.md` and helper command surface for the
 current Frederick Dodson-inspired techniques, including `level next`, `act as`,
 `future self`, `appreciation`, and `look 20s`.
 
+This bot is experimental and intended for personal self-coaching use. It is not
+therapy and not a manifestation engine.
+
 Workspace docs:
 
 - [`bots/reality-alignment/workspace/README.md`](bots/reality-alignment/workspace/README.md)
+- [`bots/reality-alignment/workspace/IDENTITY.md`](bots/reality-alignment/workspace/IDENTITY.md)
+- [`bots/reality-alignment/workspace/SOUL.md`](bots/reality-alignment/workspace/SOUL.md)
 - [`bots/reality-alignment/workspace/REFERENCE.md`](bots/reality-alignment/workspace/REFERENCE.md)
+
+This bot is experimental and intended for personal self-coaching use. It is not
+therapy and not a manifestation engine.
 
 ---
 
@@ -182,30 +194,6 @@ Node.
 Package README:
 
 - [`bots/project-sentinel/README.md`](bots/project-sentinel/README.md)
-
----
-
-## Reality Alignment
-
-Reality Alignment is an experimental personal self-coaching bot for Sovereign AI Node.
-
-It helps the operator:
-
-- track active wishes
-- record daily alignment check-ins, including the current Dodson level
-- capture recurring resistance patterns
-- suggest one next aligned act at a time
-- produce a weekly review digest
-
-The package also ships a workspace `REFERENCE.md` with the verbatim exercise cards behind its built-in Dodson technique commands:
-
-- `level next`
-- `act as`
-- `future self`
-- `appreciation`
-- `look 20s`
-
-This bot is experimental and intended for personal self-coaching use. It is not therapy and not a manifestation engine.
 
 ## Trust model
 
@@ -231,8 +219,8 @@ Common commands:
 
 - `pnpm lint` — Biome checks for `src/` and `bots/*/src/`
 - `pnpm typecheck` — TypeScript type-checking
-- `pnpm build` — build the root CLI entrypoints into `dist/` **and** every bot's
-  compiled bundle into `bots/*/workspace/bin/dist/`
+- `pnpm build` — build the root CLI entrypoints into `dist/` and the current
+  Mail Sentinel bot bundle into `bots/mail-sentinel/workspace/bin/dist/`
 - `pnpm test:coverage:unit` — Vitest with 100% coverage on catalog tooling
   and every bot's TypeScript source tree
 - `pnpm catalog:lint` — validate all `bots/**/*.json` files and canonical
