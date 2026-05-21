@@ -39,6 +39,18 @@ export default defineConfig([
     banner: { js: "#!/usr/bin/env node" },
   },
   {
+    entry: { "wealth-alignment": "bots/wealth-alignment/src/cli.ts" },
+    format: "esm",
+    dts: false,
+    outDir: "bots/wealth-alignment/workspace/bin/dist",
+    target: "node22",
+    clean: true,
+    splitting: false,
+    sourcemap: true,
+    shims: false,
+    banner: { js: "#!/usr/bin/env node" },
+  },
+  {
     entry: { "reality-alignment": "bots/reality-alignment/src/cli.ts" },
     format: "esm",
     dts: false,
