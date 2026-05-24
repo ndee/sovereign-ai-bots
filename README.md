@@ -123,6 +123,8 @@ Each classified message includes:
 
 Visible Matrix alerts and digests stay compact on purpose: internal alert IDs and raw message IDs are kept in local state, but are not shown in the rendered operator message.
 
+Mail Sentinel also tracks the mailbox `UIDVALIDITY` value in local state. If the IMAP server rotates that value, the next scan resets the stored `lastSeenUid` checkpoint and re-scans the mailbox instead of trusting the old UID cursor.
+
 ---
 
 ## node-operator
