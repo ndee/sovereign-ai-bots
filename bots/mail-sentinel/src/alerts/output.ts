@@ -81,6 +81,17 @@ export interface PolicyListResult {
   policies: readonly FlattenedPolicyEntry[];
 }
 
+const describePolicyEntry = (entry: FlattenedPolicyEntry): string => {
+  // Content rules carry a regex (and optional subject/body scope); every other
+  // policy type is described by its match/category/schedule. `pattern` is handled
+  // here only via the content branch, so it is not part of the fallback chain.
+  if (entry.type === "content" && typeof entry.pattern === "string") {
+    const scope = entry.scope ?? "any";
+    return `${scope}:/${entry.pattern}/`;
+  }
+  return String(entry.match ?? entry.category ?? entry.schedule);
+};
+
 export const formatPolicyResult = (result: PolicyListResult): string => {
   if (result.policies.length === 0) {
     return "No Mail Sentinel policies are configured.";
@@ -88,10 +99,7 @@ export const formatPolicyResult = (result: PolicyListResult): string => {
   return [
     "Mail Sentinel policies:",
     ...result.policies.map(
-      (entry) =>
-        `- [${entry.id}] ${entry.type} ${
-          entry.match ?? entry.category ?? entry.schedule ?? entry.pattern
-        }`,
+      (entry) => `- [${entry.id}] ${entry.type} ${describePolicyEntry(entry)}`,
     ),
   ].join("\n");
 };

@@ -103,9 +103,26 @@ describe("alerts/output", () => {
           { id: "p2", type: "category", category: "risk-escalation" },
           { id: "p3", type: "time", schedule: "09:00-17:00" },
           { id: "p4", type: "content", pattern: "invoice" },
+          { id: "p5", type: "content", pattern: "freigegeben", scope: "subject" },
         ],
       }),
     ).toBe(loadGolden("formatPolicyResult.mixed"));
+  });
+
+  it("renders content-policy scope and pattern in the listing", () => {
+    const rendered = formatPolicyResult({
+      policies: [
+        { id: "c-sub", type: "content", pattern: "DOWN", scope: "subject" },
+        { id: "c-body", type: "content", pattern: "approved", scope: "body" },
+        { id: "c-any", type: "content", pattern: "invoice", scope: "any" },
+        { id: "c-bare", type: "content", pattern: "overdue" },
+      ],
+    });
+    expect(rendered).toContain("- [c-sub] content subject:/DOWN/");
+    expect(rendered).toContain("- [c-body] content body:/approved/");
+    expect(rendered).toContain("- [c-any] content any:/invoice/");
+    // A content entry without an explicit scope renders as "any".
+    expect(rendered).toContain("- [c-bare] content any:/overdue/");
   });
 
   it("matches the formatPolicyActionResult golden fixtures", () => {

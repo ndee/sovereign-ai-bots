@@ -155,10 +155,13 @@ export interface MailSentinelState {
   zoneHistory: ZoneHistoryEntry[];
 }
 
+export type PolicyScope = "subject" | "body" | "any";
+
 export interface PolicyEntryBase {
   id?: string | undefined;
   match?: string | undefined;
   pattern?: string | undefined;
+  scope?: PolicyScope | undefined;
   flags?: string | undefined;
   category?: Category | string | undefined;
   schedule?: string | undefined;
@@ -291,6 +294,8 @@ export interface CommandOptions {
   category?: string | undefined;
   schedule?: string | undefined;
   pattern?: string | undefined;
+  scope?: PolicyScope | string | undefined;
+  contains?: string | undefined;
   amountThreshold?: string | undefined;
   query?: string | undefined;
   announce?: boolean | undefined;

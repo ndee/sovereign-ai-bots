@@ -32,6 +32,8 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
     "--category",
     "--schedule",
     "--pattern",
+    "--scope",
+    "--contains",
     "--amount-threshold",
     "--query",
   ]);
@@ -73,6 +75,8 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
     if (token === "--category") options.category = value;
     if (token === "--schedule") options.schedule = value;
     if (token === "--pattern") options.pattern = value;
+    if (token === "--scope") options.scope = value;
+    if (token === "--contains") options.contains = value;
     if (token === "--amount-threshold") options.amountThreshold = value;
     if (token === "--query") options.query = value;
   }

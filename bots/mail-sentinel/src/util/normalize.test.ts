@@ -6,6 +6,7 @@ import {
   compactText,
   createRegex,
   ensureTrailingSlash,
+  escapeRegExp,
   extractDomain,
   matchGlob,
   normalizeEmailAddress,
@@ -122,5 +123,21 @@ describe("util/normalize", () => {
   it("normalizeThreadSubject handles nullish input", () => {
     expect(normalizeThreadSubject(null)).toBe("");
     expect(normalizeThreadSubject(undefined)).toBe("");
+  });
+
+  it("escapeRegExp escapes every regex metacharacter as a literal", () => {
+    // Every escaped metachar plus a literal asterisk (matchGlob would turn this
+    // into a wildcard; escapeRegExp must not).
+    expect(escapeRegExp("a.b*c+d?e^f$g{h}i(j)k|l[m]n\\o")).toBe(
+      "a\\.b\\*c\\+d\\?e\\^f\\$g\\{h\\}i\\(j\\)k\\|l\\[m\\]n\\\\o",
+    );
+    // A literal-substring pattern only matches the exact text, not a wildcard.
+    const regex = new RegExp(escapeRegExp("invoice (final).pdf"), "iu");
+    expect(regex.test("Re: invoice (final).pdf attached")).toBe(true);
+    expect(regex.test("invoice XfinalY.pdf")).toBe(false);
+  });
+
+  it("escapeRegExp leaves plain text untouched", () => {
+    expect(escapeRegExp("freigegeben")).toBe("freigegeben");
   });
 });

@@ -15,9 +15,15 @@ import type {
   CommandOptions,
   FlattenedPolicyEntry,
   PolicyEntryBase,
+  PolicyScope,
   PolicyType,
 } from "../types.js";
-import { compactText } from "../util/normalize.js";
+import { compactText, escapeRegExp } from "../util/normalize.js";
+
+const POLICY_SCOPES: readonly PolicyScope[] = ["subject", "body", "any"];
+
+const isPolicyScope = (value: unknown): value is PolicyScope =>
+  typeof value === "string" && (POLICY_SCOPES as readonly string[]).includes(value);
 
 export interface PolicyListCommandResult {
   instanceId: string;
@@ -68,13 +74,36 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
   if (options.type === "time" && typeof options.schedule !== "string") {
     throw new Error("Policy type 'time' requires --schedule <HH:MM-HH:MM>");
   }
-  if (options.type === "content" && typeof options.pattern !== "string") {
-    throw new Error("Policy type 'content' requires --pattern <regex>");
+  if (
+    options.type === "content" &&
+    typeof options.pattern !== "string" &&
+    typeof options.contains !== "string"
+  ) {
+    throw new Error("Policy type 'content' requires --pattern <regex> or --contains <text>");
   }
+  if (options.scope !== undefined && !isPolicyScope(options.scope)) {
+    throw new Error("Option --scope must be one of subject|body|any");
+  }
+  // Explicit --pattern wins; otherwise --contains is escaped into a literal-match
+  // regex so users never hand-write regex. Literal --contains rules default to the
+  // subject scope (the issue's "subject contains …" use cases); raw --pattern rules
+  // keep the existing subject+body ("any") behaviour unless --scope is given.
+  const resolvedPattern =
+    typeof options.pattern === "string"
+      ? options.pattern
+      : typeof options.contains === "string"
+        ? escapeRegExp(options.contains)
+        : undefined;
+  const resolvedScope: PolicyScope | undefined = isPolicyScope(options.scope)
+    ? options.scope
+    : typeof options.pattern !== "string" && typeof options.contains === "string"
+      ? "subject"
+      : undefined;
   const entry: PolicyEntryBase = {
     id: randomUUID(),
     ...(typeof options.match === "string" ? { match: options.match } : {}),
-    ...(typeof options.pattern === "string" ? { pattern: options.pattern } : {}),
+    ...(resolvedPattern === undefined ? {} : { pattern: resolvedPattern }),
+    ...(resolvedScope === undefined ? {} : { scope: resolvedScope }),
     ...(typeof options.category === "string" ? { category: options.category } : {}),
     ...(typeof options.schedule === "string" ? { schedule: options.schedule } : {}),
     ...(typeof options.minZone === "string"

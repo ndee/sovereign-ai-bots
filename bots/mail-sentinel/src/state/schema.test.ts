@@ -110,4 +110,16 @@ describe("state/schema", () => {
       } as unknown),
     ).toEqual(createDefaultPolicy());
   });
+
+  it("preserves the content-policy scope through a normalize round-trip", () => {
+    const normalized = normalizePolicy({
+      contentPolicies: [{ id: "c1", pattern: "freigegeben", scope: "subject", maxZone: "gray" }],
+    });
+    expect(normalized.contentPolicies[0]).toEqual({
+      id: "c1",
+      pattern: "freigegeben",
+      scope: "subject",
+      maxZone: "gray",
+    });
+  });
 });
