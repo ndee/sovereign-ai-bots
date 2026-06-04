@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { sampleMessage, samplePolicy } from "../__fixtures__/inputs.js";
 import { loadGolden } from "../__fixtures__/load.js";
-import { evaluatePolicy, isTimeInSchedule, matchesPolicyEntry } from "./engine.js";
+import {
+  contentHaystack,
+  defaultContentReason,
+  evaluatePolicy,
+  isTimeInSchedule,
+  matchesPolicyEntry,
+} from "./engine.js";
 
 describe("policy/engine", () => {
   it("matches the matchesPolicyEntry golden fixture", () => {
@@ -383,5 +389,211 @@ describe("policy/engine", () => {
       new Date("2026-04-08T12:00:00Z"),
     );
     expect(result.matchedPolicyIds).toEqual([]);
+  });
+});
+
+describe("policy/engine subject-scoped content policies", () => {
+  // Distinct tokens: "freigegeben" only in the subject, "approveinbody" only in
+  // the body, so subject/body scoping is unambiguous.
+  const scopedMessage = {
+    ...sampleMessage,
+    subject: "Auftrag freigegeben",
+    text: "Internal note: approveinbody marker",
+  };
+  const emptyPolicy = {
+    version: 1,
+    senderPolicies: [],
+    domainPolicies: [],
+    receiverPolicies: [],
+    categoryPolicies: [],
+    contentPolicies: [],
+    timePolicies: [],
+    mutePolicies: [],
+  };
+  const referenceDate = new Date("2026-04-08T12:00:00Z");
+
+  it("selects the haystack per scope", () => {
+    expect(contentHaystack(scopedMessage, "subject")).toBe("Auftrag freigegeben");
+    expect(contentHaystack(scopedMessage, "body")).toBe("Internal note: approveinbody marker");
+    expect(contentHaystack(scopedMessage, "any")).toBe(
+      "Auftrag freigegeben\nInternal note: approveinbody marker",
+    );
+    expect(contentHaystack(scopedMessage, undefined)).toBe(
+      "Auftrag freigegeben\nInternal note: approveinbody marker",
+    );
+  });
+
+  it("builds a scope-aware default reason", () => {
+    expect(defaultContentReason({ scope: "subject", pattern: "freigegeben" })).toBe(
+      "subject matches /freigegeben/",
+    );
+    expect(defaultContentReason({ scope: "body", pattern: "x" })).toBe("body matches /x/");
+    expect(defaultContentReason({ pattern: "y" })).toBe("content matches /y/");
+    expect(defaultContentReason({})).toBe("content matches //");
+  });
+
+  it("NFC-normalizes the haystack so decomposed accents fold to precomposed", () => {
+    // Subject carries a decomposed umlaut: "u" + U+0308 COMBINING DIAERESIS.
+    const decomposed = { ...sampleMessage, subject: "Auftrag überfällig" };
+    const haystack = contentHaystack(decomposed, "subject");
+    expect(haystack).toBe("Auftrag überfällig");
+    expect(haystack).toBe("Auftrag überfällig".normalize("NFC"));
+  });
+
+  // Build the matcher exactly like policyAdd does for `--contains`.
+  const subjectRule = (id: string, term: string) => ({
+    id,
+    pattern: term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    scope: "subject" as const,
+    maxZone: "gray" as const,
+  });
+  const evalSubject = (subject: string, term: string) =>
+    evaluatePolicy(
+      { ...sampleMessage, subject },
+      { category: "financial-relevance" },
+      { ...emptyPolicy, contentPolicies: [subjectRule("c-de", term)] },
+      referenceDate,
+    ).matchedPolicyIds;
+
+  it("matches German subjects regardless of case (umlaut case-folding)", () => {
+    expect(evalSubject("Rechnung freigegeben", "freigegeben")).toEqual(["c-de"]);
+    expect(evalSubject("Rechnung FREIGEGEBEN", "freigegeben")).toEqual(["c-de"]);
+    // Umlaut case folds: Ä/Ö/Ü <-> ä/ö/ü under the regex `i` flag.
+    expect(evalSubject("ÜBERFÄLLIG zahlung", "überfällig")).toEqual(["c-de"]);
+    expect(evalSubject("Große Überweisung", "große")).toEqual(["c-de"]);
+  });
+
+  it("matches a decomposed subject against a precomposed German rule term", () => {
+    // Precomposed rule term vs subject with decomposed umlauts — this is the
+    // cross-normalization case NFC closes.
+    expect(evalSubject("Rechnung überfällig", "überfällig")).toEqual(["c-de"]);
+    // And the mirror: precomposed subject vs a decomposed rule term.
+    expect(evalSubject("Rechnung überfällig", "überfällig")).toEqual(["c-de"]);
+  });
+
+  it("does not match a German term that is absent from the subject", () => {
+    expect(evalSubject("Routine update", "freigegeben")).toEqual([]);
+  });
+
+  it("matches a subject-scoped rule on the subject but not the body", () => {
+    const subjectHit = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-subject", pattern: "freigegeben", scope: "subject", maxZone: "gray" },
+        ],
+      },
+      referenceDate,
+    );
+    expect(subjectHit.matchedPolicyIds).toEqual(["c-subject"]);
+    expect(subjectHit.reasons).toEqual(["subject matches /freigegeben/"]);
+    expect(subjectHit.zoneCeiling).toBe("gray");
+
+    const bodyTokenInSubjectScope = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [{ id: "c-subject-miss", pattern: "approveinbody", scope: "subject" }],
+      },
+      referenceDate,
+    );
+    expect(bodyTokenInSubjectScope.matchedPolicyIds).toEqual([]);
+  });
+
+  it("matches a body-scoped rule on the body but not the subject", () => {
+    const bodyHit = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-body", pattern: "approveinbody", scope: "body", minZone: "red" },
+        ],
+      },
+      referenceDate,
+    );
+    expect(bodyHit.matchedPolicyIds).toEqual(["c-body"]);
+    expect(bodyHit.reasons).toEqual(["body matches /approveinbody/"]);
+    expect(bodyHit.zoneFloor).toBe("red");
+
+    const subjectTokenInBodyScope = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [{ id: "c-body-miss", pattern: "freigegeben", scope: "body" }],
+      },
+      referenceDate,
+    );
+    expect(subjectTokenInBodyScope.matchedPolicyIds).toEqual([]);
+  });
+
+  it("treats any/absent scope as subject+body combined", () => {
+    const anyHit = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-any-subject", pattern: "freigegeben", scope: "any" },
+          { id: "c-absent-body", pattern: "approveinbody" },
+        ],
+      },
+      referenceDate,
+    );
+    expect(anyHit.matchedPolicyIds).toEqual(["c-any-subject", "c-absent-body"]);
+  });
+
+  it("honours an explicit reason over the scope-aware default", () => {
+    const result = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-reason", pattern: "freigegeben", scope: "subject", reason: "release notice" },
+        ],
+      },
+      referenceDate,
+    );
+    expect(result.reasons).toEqual(["release notice"]);
+  });
+
+  it("applies the amount threshold against the scoped haystack only", () => {
+    // The subject carries no amount, so a subject-scoped amount rule never fires
+    // even though the body mentions a large amount.
+    const amountMessage = {
+      ...sampleMessage,
+      subject: "Payment freigegeben",
+      text: "Total due: $5000",
+    };
+    const subjectAmountMiss = evaluatePolicy(
+      amountMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-amt-subject", pattern: "freigegeben", scope: "subject", amountThreshold: 100 },
+        ],
+      },
+      referenceDate,
+    );
+    expect(subjectAmountMiss.matchedPolicyIds).toEqual([]);
+
+    const bodyAmountHit = evaluatePolicy(
+      amountMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-amt-body", pattern: "due", scope: "body", amountThreshold: 100 },
+        ],
+      },
+      referenceDate,
+    );
+    expect(bodyAmountHit.matchedPolicyIds).toEqual(["c-amt-body"]);
   });
 });

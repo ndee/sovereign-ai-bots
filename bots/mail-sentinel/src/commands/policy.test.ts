@@ -119,6 +119,71 @@ describe("commands/policy", () => {
       expect(runtime.policy.contentPolicies[0]?.amountThreshold).toBe(250);
     });
 
+    it("derives a subject-scoped literal rule from --contains", async () => {
+      const runtime = getFakeRuntime();
+      const result = await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "content",
+        contains: "freigegeben (final)",
+        maxZone: "gray",
+      });
+      const entry = runtime.policy.contentPolicies[0];
+      // --contains is escaped to a literal-match regex and defaults to the subject scope.
+      expect(entry?.pattern).toBe("freigegeben \\(final\\)");
+      expect(entry?.scope).toBe("subject");
+      expect(entry?.maxZone).toBe("gray");
+      expect(result.policy.type).toBe("content");
+    });
+
+    it("honours an explicit --scope with a raw --pattern", async () => {
+      const runtime = getFakeRuntime();
+      await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "content",
+        pattern: "DOWN",
+        scope: "subject",
+        minZone: "red",
+      });
+      const entry = runtime.policy.contentPolicies[0];
+      expect(entry?.pattern).toBe("DOWN");
+      expect(entry?.scope).toBe("subject");
+      expect(entry?.minZone).toBe("red");
+    });
+
+    it("lets --pattern win over --contains and keeps the any scope by default", async () => {
+      const runtime = getFakeRuntime();
+      await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "content",
+        pattern: "raw.*regex",
+        contains: "ignored literal",
+      });
+      const entry = runtime.policy.contentPolicies[0];
+      expect(entry?.pattern).toBe("raw.*regex");
+      expect(entry?.scope).toBeUndefined();
+    });
+
+    it("rejects a content policy without --pattern or --contains", async () => {
+      await expect(
+        policyAdd({ instance: "ms-core", json: false, type: "content" }),
+      ).rejects.toThrow("requires --pattern <regex> or --contains <text>");
+    });
+
+    it("rejects an invalid --scope value", async () => {
+      await expect(
+        policyAdd({
+          instance: "ms-core",
+          json: false,
+          type: "content",
+          pattern: "x",
+          scope: "header",
+        }),
+      ).rejects.toThrow("--scope must be one of subject|body|any");
+    });
+
     it("adds a category policy", async () => {
       const runtime = getFakeRuntime();
       await policyAdd({

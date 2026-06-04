@@ -98,6 +98,10 @@ describe("config/args", () => {
       "09:00-17:00",
       "--pattern",
       "invoice",
+      "--scope",
+      "subject",
+      "--contains",
+      "freigegeben",
       "--amount-threshold",
       "100",
       "--query",
@@ -110,6 +114,8 @@ describe("config/args", () => {
     expect(parsed.command).toBe("policy");
     expect(parsed.options.subcommand).toBe("add");
     expect(parsed.options.instance).toBe("ms");
+    expect(parsed.options.scope).toBe("subject");
+    expect(parsed.options.contains).toBe("freigegeben");
     expect(parsed.options.announce).toBe(true);
     expect(parsed.options.latest).toBe(true);
     expect(parsed.options.json).toBe(true);

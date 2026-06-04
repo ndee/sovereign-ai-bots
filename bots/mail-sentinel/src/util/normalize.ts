@@ -62,3 +62,10 @@ export const matchGlob = (value: unknown, pattern: unknown): boolean => {
 
 export const createRegex = (rule: { pattern: string; flags?: string | undefined }): RegExp =>
   new RegExp(rule.pattern, rule.flags ?? "iu");
+
+/**
+ * Escape every regex metacharacter in user-supplied text so it can be used as a
+ * literal substring pattern. Unlike {@link matchGlob}, `*` is escaped literally
+ * (no wildcard semantics) — this powers `policy add --contains <text>`.
+ */
+export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
