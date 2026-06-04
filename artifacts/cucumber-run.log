@@ -1,0 +1,29 @@
+=== re-running subject-policy scenarios (tag-scoped) after zone-case fix ===
+Use of `require-module` option normally means you should specify your support code paths with `require`; see https://github.com/cucumber/cucumber-js/blob/main/docs/configuration.md#finding-your-code
+[e2e] Operator logged into Matrix and joined alert room
+[e2e] Mail Sentinel state reset; removed 0 orphan e2e policies
+[e2e] Bot Matrix token is valid
+[e2e] Run ID: e2e-1780611436096
+[e2e] Alert room: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
+[e2e] Scan timer overridden to 1min
+..[e2e] Mail Sentinel startup: timer active, policy profile loaded (0 policies)
+.[e2e] Added subject contains policy id=592216e1-a4b1-46ae-9634-1e61b354643b term="subjectrule-e2e-1780611436096" minZone=RED maxZone=-
+.[e2e] Sent subject-escalate email with run ID e2e-1780611436096
+.[e2e] Waiting up to 5min for "subject-escalate" (subject pattern="subjectrule-") to be ingested and classified...
+[e2e] Found zone history for "subject-escalate" messageKey=msg:<e2e-1780611436096-subject-escalate@e2e.sovereign-ai> zone=red reason="e2e:subject-policy contains e2e-1780611436096"
+...[e2e] Removed temporary subject policy 592216e1-a4b1-46ae-9634-1e61b354643b
+....[e2e] Added subject contains policy id=0e66966b-7175-4e50-81da-ae9a013402cc term="subjectquiet-e2e-1780611436096" minZone=- maxZone=GRAY
+.[e2e] Sent subject-suppress email with run ID e2e-1780611436096
+.[e2e] Waiting up to 5min for "subject-suppress" (subject pattern="subjectquiet-") to be ingested and classified...
+[e2e] Found zone history for "subject-suppress" messageKey=msg:<e2e-1780611436096-subject-suppress@e2e.sovereign-ai> zone=gray reason="e2e:subject-policy contains e2e-1780611436096"
+...[e2e] Removed temporary subject policy 0e66966b-7175-4e50-81da-ae9a013402cc
+....[e2e] Added subject matches policy id=ea36ba23-e50f-4ad8-a1c7-5ca8eccbca4d term="subjectrule-e2e-1780611436096" minZone=RED maxZone=-
+..[e2e] Policy listing includes subject rule: type=content scope=subject pattern="subjectrule-e2e-1780611436096"
+.[e2e] Removed temporary subject policy ea36ba23-e50f-4ad8-a1c7-5ca8eccbca4d
+.[e2e] Scan timer restored
+
+
+3 scenarios (3 passed)
+19 steps (19 passed)
+5m30.624s (executing steps: 4m44.337s)
+CUKE_EXIT=

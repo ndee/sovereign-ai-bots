@@ -1,0 +1,52 @@
+Mail Sentinel — subject-based policy rules (issue #98)
+Live E2E validation summary — 3/3 scenarios passed.
+
+Acceptance criteria exercised:
+  1. Create + inspect subject rules (subject "contains" and subject "matches").
+  2. Subject rules applied during classification (real mail through a live mailbox).
+  3. Rules visible in `show policies` + audit output.
+
+------------------------------------------------------------------
+SHOW POLICIES + FORCED-CLASSIFICATION (AUDIT)
+------------------------------------------------------------------
+### show policies (policy list) — subject-scoped rule present ###
+{
+    "instanceId": "mail-sentinel-core",
+    "count": 1,
+    "policies": [
+        {
+            "type": "content",
+            "id": "e6ad3488-3f0f-4a6a-87fc-0c606d2b8032",
+            "pattern": "subjshot-1780612097",
+            "scope": "subject",
+            "minZone": "red",
+            "reason": "e2e:subject-policy-screenshot"
+        }
+    ]
+}
+
+### classification proof: the subjshot-1780612097 email forced to RED by the subject rule ###
+{
+  "subject": "subjshot-1780612097: nightly status — node DOWN",
+  "zone": "red",
+  "category": "risk-escalation",
+  "policyModifiers": [
+    "e2e:subject-policy-screenshot"
+  ],
+  "why": "Automated status alert indicates node outage; explicitly informational with no action required."
+}
+
+------------------------------------------------------------------
+RESULTING RED ALERT (operator-facing, in the alert room)
+------------------------------------------------------------------
+ROOM: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
+🔴 RED · Risk / Escalation
+
+subjshot-1780612097: nightly status — node DOWN
+
+From: Status Monitor
+Why it matters: Automated status alert indicates node outage; explicitly informational with no action required.
+Confidence: high (75%)
+
+Reply in thread with:
+very important · not important · remind later · always treat like this · less of this
