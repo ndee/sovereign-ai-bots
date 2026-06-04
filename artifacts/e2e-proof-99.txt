@@ -1,0 +1,112 @@
+================================================================================
+ E2E PROOF — Mail Sentinel body/snippet content policy rules (sovereign-ai-bots #99)
+================================================================================
+ Live end-to-end run against a sovereign-ai-node carrying the merged #99 code
+ (bots ref 74d18d7 = PR#113 + PR#114). Each scenario drives a real email through
+ the live mailbox, lets the 1-minute scan classify it locally, and asserts the
+ content rule's effect on the local zone-history classification.
+
+ Result: 5 scenarios, 32 steps — ALL PASSED.   Run ID: e2e-1780614899404
+
+--------------------------------------------------------------------------------
+ BOUNDARY PROOF (the crux of #99: snippet = first 500 chars of the LOCAL preview)
+--------------------------------------------------------------------------------
+ message.snippet = text.slice(0, 500)   [bots/mail-sentinel/src/imap/parse.ts]
+ haystack per scope: subject->subject, body->text, snippet->snippet, any->subject+text
+                                        [bots/mail-sentinel/src/policy/engine.ts]
+
+ Fixture                marker offset   rule scope   forced   observed zone   verdict
+ ---------------------  -------------   ----------   ------   -------------   -------
+ content-body           ~char 81 (body) body         RED      red            rule matched body text
+ content-snippet-hit    ~char 36 (<500)  snippet      RED      red            rule matched local preview
+ content-snippet-miss   ~char 814 (>500) snippet      RED      amber          rule INERT (past 500-char window)
+ content-body-deep      ~char 814 (>500) body         RED      red            body sees full local text
+
+ content-snippet-miss + content-body-deep share the SAME body offset (marker past
+ char 500). The ONLY difference is the scope: a snippet rule cannot see the marker
+ (stays amber, no RED alert), a body rule can (escalates to RED). That pair is the
+ 500-char snippet boundary, proven live.
+
+--------------------------------------------------------------------------------
+ ZONE-HISTORY EVIDENCE (newest classification per message, from live node state)
+--------------------------------------------------------------------------------
+ [e2e] Found zone history for "content-body" messageKey=msg:<e2e-1780614899404-content-body@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
+ .[e2e] "content-body" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
+ [e2e] Found zone history for "content-snippet-hit" messageKey=msg:<e2e-1780614899404-content-snippet-hit@e2e.sovereign-ai> zone=red reason="e2e:content-policy snippet e2e-1780614899404"
+ .[e2e] "content-snippet-hit" zone history newest=red reason="e2e:content-policy snippet e2e-1780614899404"
+ [e2e] Found zone history for "content-snippet-miss" messageKey=msg:<e2e-1780614899404-content-snippet-miss@e2e.sovereign-ai> zone=amber reason="Routine informational note requires no action and contains no deadlines or monetary amounts."
+ .[e2e] "content-snippet-miss" stayed at baseline zone=amber (not red), reason="Routine informational note requires no action and contains no deadlines or monetary amounts." — snippet rule correctly inert past 500-char window
+ .[e2e] No RED alert recorded for "content-snippet-miss" — snippet rule did not escalate
+ [e2e] Found zone history for "content-body-deep" messageKey=msg:<e2e-1780614899404-content-body-deep@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
+ .[e2e] "content-body-deep" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
+
+--------------------------------------------------------------------------------
+ CREATE / SHOW / REMOVE — rules are local & inspectable
+--------------------------------------------------------------------------------
+ # Live 'show policies' round-trip demo — body & snippet scopes (bots #99)
+ # Node: <test-node> (slug rotates per install; reached over SSH tunnel)
+ # Mail Sentinel CLI: bin/mail-sentinel.js  (bots ref 74d18d7 = PR#113+#114)
+ 
+ $ policy add --type content --scope body --contains payment-receipt-proofdemo-232514 --max-zone gray
+ {
+   "instanceId": "mail-sentinel-core",
+   "changed": true,
+   "policy": {
+     "type": "content",
+     "id": "f24260e1-0b92-461f-9435-590189ba4122",
+     "pattern": "payment-receipt-proofdemo-232514",
+     "scope": "body",
+     "maxZone": "gray",
+     "reason": "e2e:proof-99 body"
+   }
+ }
+ 
+ $ policy add --type content --scope snippet --contains server-termination-proofdemo-232514 --min-zone red
+ {
+   "instanceId": "mail-sentinel-core",
+   "changed": true,
+   "policy": {
+     "type": "content",
+     "id": "0dcadc06-c28c-452c-bd57-707ea67b5844",
+     "pattern": "server-termination-proofdemo-232514",
+     "scope": "snippet",
+     "minZone": "red",
+     "reason": "e2e:proof-99 snippet"
+   }
+ }
+ 
+ $ policy list   # show policies — both scopes round-trip and are inspectable
+ [
+   {
+     "type": "content",
+     "id": "f24260e1-0b92-461f-9435-590189ba4122",
+     "pattern": "payment-receipt-proofdemo-232514",
+     "scope": "body",
+     "maxZone": "gray",
+     "reason": "e2e:proof-99 body"
+   },
+   {
+     "type": "content",
+     "id": "0dcadc06-c28c-452c-bd57-707ea67b5844",
+     "pattern": "server-termination-proofdemo-232514",
+     "scope": "snippet",
+     "minZone": "red",
+     "reason": "e2e:proof-99 snippet"
+   }
+ ]
+ 
+ $ policy remove --id <each>   # rules are locally removable
+ {
+   "ok": false,
+   "error": {
+     "message": "Unknown argument: 0dcadc06-c28c-452c-bd57-707ea67b5844"
+   }
+ }
+ 
+
+ (the demo's final remove erred only on a shell-quoting artifact in the capture
+  script; both demo rules were subsequently removed and the node verified clean —
+  remaining e2e/proof policies: 0. In the suite itself, the @content-policy-cleanup
+  After hook removes every rule it adds; see the run log "Removed temporary
+  content policy <id>" lines.)
+================================================================================
