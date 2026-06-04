@@ -394,11 +394,13 @@ describe("policy/engine", () => {
 
 describe("policy/engine subject-scoped content policies", () => {
   // Distinct tokens: "freigegeben" only in the subject, "approveinbody" only in
-  // the body, so subject/body scoping is unambiguous.
+  // the body, "snippetonly" only in the preview snippet, so subject/body/snippet
+  // scoping is unambiguous.
   const scopedMessage = {
     ...sampleMessage,
     subject: "Auftrag freigegeben",
     text: "Internal note: approveinbody marker",
+    snippet: "Preview: snippetonly marker",
   };
   const emptyPolicy = {
     version: 1,
@@ -415,6 +417,7 @@ describe("policy/engine subject-scoped content policies", () => {
   it("selects the haystack per scope", () => {
     expect(contentHaystack(scopedMessage, "subject")).toBe("Auftrag freigegeben");
     expect(contentHaystack(scopedMessage, "body")).toBe("Internal note: approveinbody marker");
+    expect(contentHaystack(scopedMessage, "snippet")).toBe("Preview: snippetonly marker");
     expect(contentHaystack(scopedMessage, "any")).toBe(
       "Auftrag freigegeben\nInternal note: approveinbody marker",
     );
@@ -428,6 +431,7 @@ describe("policy/engine subject-scoped content policies", () => {
       "subject matches /freigegeben/",
     );
     expect(defaultContentReason({ scope: "body", pattern: "x" })).toBe("body matches /x/");
+    expect(defaultContentReason({ scope: "snippet", pattern: "z" })).toBe("snippet matches /z/");
     expect(defaultContentReason({ pattern: "y" })).toBe("content matches /y/");
     expect(defaultContentReason({})).toBe("content matches //");
   });
@@ -529,6 +533,55 @@ describe("policy/engine subject-scoped content policies", () => {
       referenceDate,
     );
     expect(subjectTokenInBodyScope.matchedPolicyIds).toEqual([]);
+  });
+
+  it("matches a snippet-scoped rule on the preview but not the subject or body", () => {
+    const snippetHit = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [
+          { id: "c-snippet", pattern: "snippetonly", scope: "snippet", maxZone: "gray" },
+        ],
+      },
+      referenceDate,
+    );
+    expect(snippetHit.matchedPolicyIds).toEqual(["c-snippet"]);
+    expect(snippetHit.reasons).toEqual(["snippet matches /snippetonly/"]);
+    expect(snippetHit.zoneCeiling).toBe("gray");
+
+    const bodyTokenInSnippetScope = evaluatePolicy(
+      scopedMessage,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [{ id: "c-snippet-miss", pattern: "approveinbody", scope: "snippet" }],
+      },
+      referenceDate,
+    );
+    expect(bodyTokenInSnippetScope.matchedPolicyIds).toEqual([]);
+  });
+
+  it("confines a snippet-scoped rule to the local preview, not the full body", () => {
+    // A token that lives only in the full body past the preview window must not
+    // match a snippet-scoped rule: the haystack is the local snippet alone, never
+    // the rest of the body (and never a remote fetch).
+    const longBody = {
+      ...scopedMessage,
+      snippet: "Preview text without the tail token",
+      text: "Preview text without the tail token ... beyondsnippet marker",
+    };
+    const result = evaluatePolicy(
+      longBody,
+      { category: "financial-relevance" },
+      {
+        ...emptyPolicy,
+        contentPolicies: [{ id: "c-snippet-tail", pattern: "beyondsnippet", scope: "snippet" }],
+      },
+      referenceDate,
+    );
+    expect(result.matchedPolicyIds).toEqual([]);
   });
 
   it("treats any/absent scope as subject+body combined", () => {

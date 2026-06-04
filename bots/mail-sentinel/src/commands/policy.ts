@@ -20,7 +20,7 @@ import type {
 } from "../types.js";
 import { compactText, escapeRegExp } from "../util/normalize.js";
 
-const POLICY_SCOPES: readonly PolicyScope[] = ["subject", "body", "any"];
+const POLICY_SCOPES: readonly PolicyScope[] = ["subject", "body", "snippet", "any"];
 
 const isPolicyScope = (value: unknown): value is PolicyScope =>
   typeof value === "string" && (POLICY_SCOPES as readonly string[]).includes(value);
@@ -82,7 +82,7 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
     throw new Error("Policy type 'content' requires --pattern <regex> or --contains <text>");
   }
   if (options.scope !== undefined && !isPolicyScope(options.scope)) {
-    throw new Error("Option --scope must be one of subject|body|any");
+    throw new Error("Option --scope must be one of subject|body|snippet|any");
   }
   // Explicit --pattern wins; otherwise --contains is escaped into a literal-match
   // regex so users never hand-write regex. Literal --contains rules default to the

@@ -43,7 +43,7 @@ export const isTimeInSchedule = (date: Date, schedule: unknown): boolean => {
 };
 
 export const contentHaystack = (
-  message: Pick<ParsedMessage, "subject" | "text">,
+  message: Pick<ParsedMessage, "subject" | "text" | "snippet">,
   scope: PolicyScope | undefined,
 ): string => {
   // NFC-normalize so that subjects carrying decomposed accents (e.g. an umlaut
@@ -57,12 +57,25 @@ export const contentHaystack = (
   if (scope === "body") {
     return message.text.normalize("NFC");
   }
+  if (scope === "snippet") {
+    // The snippet is the locally-derived preview (text.slice(0, 500)); matching
+    // against it keeps a rule confined to the preview text without scanning the
+    // full body. No remote fetch is involved — both fields are populated locally
+    // during the scan.
+    return message.snippet.normalize("NFC");
+  }
   return `${message.subject}\n${message.text}`.normalize("NFC");
 };
 
 export const defaultContentReason = (entry: PolicyEntryBase): string => {
   const target =
-    entry.scope === "subject" ? "subject" : entry.scope === "body" ? "body" : "content";
+    entry.scope === "subject"
+      ? "subject"
+      : entry.scope === "body"
+        ? "body"
+        : entry.scope === "snippet"
+          ? "snippet"
+          : "content";
   return `${target} matches /${entry.pattern ?? ""}/`;
 };
 
@@ -156,10 +169,13 @@ export const evaluatePolicy = (
         continue;
       }
     }
-    // Scoped (subject/body) rules get a descriptive audit reason when the user
-    // gave none; scope-less ("any") rules keep noteMatch's existing fallback so
-    // the audit trail for legacy content policies is unchanged.
-    if (entry.reason === undefined && (entry.scope === "subject" || entry.scope === "body")) {
+    // Scoped (subject/body/snippet) rules get a descriptive audit reason when the
+    // user gave none; scope-less ("any") rules keep noteMatch's existing fallback
+    // so the audit trail for legacy content policies is unchanged.
+    if (
+      entry.reason === undefined &&
+      (entry.scope === "subject" || entry.scope === "body" || entry.scope === "snippet")
+    ) {
       noteMatch(entry, defaultContentReason(entry));
     } else {
       noteMatch(entry);
