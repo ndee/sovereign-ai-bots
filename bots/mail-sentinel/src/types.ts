@@ -155,7 +155,7 @@ export interface MailSentinelState {
   zoneHistory: ZoneHistoryEntry[];
 }
 
-export type PolicyScope = "subject" | "body" | "any";
+export type PolicyScope = "subject" | "body" | "snippet" | "any";
 
 export interface PolicyEntryBase {
   id?: string | undefined;

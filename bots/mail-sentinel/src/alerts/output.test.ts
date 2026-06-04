@@ -114,12 +114,14 @@ describe("alerts/output", () => {
       policies: [
         { id: "c-sub", type: "content", pattern: "DOWN", scope: "subject" },
         { id: "c-body", type: "content", pattern: "approved", scope: "body" },
+        { id: "c-snip", type: "content", pattern: "receipt", scope: "snippet" },
         { id: "c-any", type: "content", pattern: "invoice", scope: "any" },
         { id: "c-bare", type: "content", pattern: "overdue" },
       ],
     });
     expect(rendered).toContain("- [c-sub] content subject:/DOWN/");
     expect(rendered).toContain("- [c-body] content body:/approved/");
+    expect(rendered).toContain("- [c-snip] content snippet:/receipt/");
     expect(rendered).toContain("- [c-any] content any:/invoice/");
     // A content entry without an explicit scope renders as "any".
     expect(rendered).toContain("- [c-bare] content any:/overdue/");

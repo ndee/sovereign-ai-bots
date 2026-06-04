@@ -152,6 +152,23 @@ describe("commands/policy", () => {
       expect(entry?.minZone).toBe("red");
     });
 
+    it("accepts a snippet-scoped content policy", async () => {
+      const runtime = getFakeRuntime();
+      const result = await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "content",
+        contains: "payment receipt",
+        scope: "snippet",
+        maxZone: "amber",
+      });
+      const entry = runtime.policy.contentPolicies[0];
+      expect(entry?.scope).toBe("snippet");
+      expect(entry?.pattern).toBe("payment receipt");
+      expect(entry?.maxZone).toBe("amber");
+      expect(result.policy.scope).toBe("snippet");
+    });
+
     it("lets --pattern win over --contains and keeps the any scope by default", async () => {
       const runtime = getFakeRuntime();
       await policyAdd({
@@ -181,7 +198,7 @@ describe("commands/policy", () => {
           pattern: "x",
           scope: "header",
         }),
-      ).rejects.toThrow("--scope must be one of subject|body|any");
+      ).rejects.toThrow("--scope must be one of subject|body|snippet|any");
     });
 
     it("adds a category policy", async () => {
