@@ -432,6 +432,49 @@ describe("policy/engine subject-scoped content policies", () => {
     expect(defaultContentReason({})).toBe("content matches //");
   });
 
+  it("NFC-normalizes the haystack so decomposed accents fold to precomposed", () => {
+    // Subject carries a decomposed umlaut: "u" + U+0308 COMBINING DIAERESIS.
+    const decomposed = { ...sampleMessage, subject: "Auftrag überfällig" };
+    const haystack = contentHaystack(decomposed, "subject");
+    expect(haystack).toBe("Auftrag überfällig");
+    expect(haystack).toBe("Auftrag überfällig".normalize("NFC"));
+  });
+
+  // Build the matcher exactly like policyAdd does for `--contains`.
+  const subjectRule = (id: string, term: string) => ({
+    id,
+    pattern: term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    scope: "subject" as const,
+    maxZone: "gray" as const,
+  });
+  const evalSubject = (subject: string, term: string) =>
+    evaluatePolicy(
+      { ...sampleMessage, subject },
+      { category: "financial-relevance" },
+      { ...emptyPolicy, contentPolicies: [subjectRule("c-de", term)] },
+      referenceDate,
+    ).matchedPolicyIds;
+
+  it("matches German subjects regardless of case (umlaut case-folding)", () => {
+    expect(evalSubject("Rechnung freigegeben", "freigegeben")).toEqual(["c-de"]);
+    expect(evalSubject("Rechnung FREIGEGEBEN", "freigegeben")).toEqual(["c-de"]);
+    // Umlaut case folds: Ä/Ö/Ü <-> ä/ö/ü under the regex `i` flag.
+    expect(evalSubject("ÜBERFÄLLIG zahlung", "überfällig")).toEqual(["c-de"]);
+    expect(evalSubject("Große Überweisung", "große")).toEqual(["c-de"]);
+  });
+
+  it("matches a decomposed subject against a precomposed German rule term", () => {
+    // Precomposed rule term vs subject with decomposed umlauts — this is the
+    // cross-normalization case NFC closes.
+    expect(evalSubject("Rechnung überfällig", "überfällig")).toEqual(["c-de"]);
+    // And the mirror: precomposed subject vs a decomposed rule term.
+    expect(evalSubject("Rechnung überfällig", "überfällig")).toEqual(["c-de"]);
+  });
+
+  it("does not match a German term that is absent from the subject", () => {
+    expect(evalSubject("Routine update", "freigegeben")).toEqual([]);
+  });
+
   it("matches a subject-scoped rule on the subject but not the body", () => {
     const subjectHit = evaluatePolicy(
       scopedMessage,

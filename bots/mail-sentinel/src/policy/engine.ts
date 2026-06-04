@@ -46,13 +46,18 @@ export const contentHaystack = (
   message: Pick<ParsedMessage, "subject" | "text">,
   scope: PolicyScope | undefined,
 ): string => {
+  // NFC-normalize so that subjects carrying decomposed accents (e.g. an umlaut
+  // sent as "u" + combining diaeresis, as some clients do) match a rule term
+  // typed with the precomposed character. Combined with the regex `iu` flags
+  // this makes subject/body matching language-agnostic for German and other
+  // non-ASCII mail. The rule pattern is normalized the same way at compile time.
   if (scope === "subject") {
-    return message.subject;
+    return message.subject.normalize("NFC");
   }
   if (scope === "body") {
-    return message.text;
+    return message.text.normalize("NFC");
   }
-  return `${message.subject}\n${message.text}`;
+  return `${message.subject}\n${message.text}`.normalize("NFC");
 };
 
 export const defaultContentReason = (entry: PolicyEntryBase): string => {
@@ -139,7 +144,9 @@ export const evaluatePolicy = (
       continue;
     }
     const haystack = contentHaystack(message, entry.scope);
-    const regex = new RegExp(entry.pattern, entry.flags ?? "iu");
+    // Normalize the pattern to the same canonical form as the haystack so a
+    // precomposed rule term matches a decomposed accent in the subject/body.
+    const regex = new RegExp(entry.pattern.normalize("NFC"), entry.flags ?? "iu");
     if (!regex.test(haystack)) {
       continue;
     }
