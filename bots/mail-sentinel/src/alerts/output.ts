@@ -54,6 +54,8 @@ export interface FeedbackResult {
   shortRef?: string;
   subject?: string;
   from?: string;
+  /** Canonical action in plain words, echoed as the interpreted intent. */
+  actionLabel?: string;
   nextReminderAt?: string;
   policyId?: string;
   status?: "ambiguous";
@@ -85,12 +87,18 @@ export const formatFeedbackResult = (result: FeedbackResult): string => {
     ].join("\n");
   }
   const target = describeTarget(result);
+  // Echo the canonical interpretation first so the user always sees *what the
+  // system understood* in plain words, then the exact item it was applied to.
+  const interpreted =
+    typeof result.actionLabel === "string" && result.actionLabel.length > 0
+      ? `Interpreted as "${result.actionLabel}". `
+      : "";
   if (result.policyId !== undefined) {
-    return `${result.note} Applied to: ${target}. Policy ${result.policyId} created.`;
+    return `${interpreted}${result.note} Applied to: ${target}. Policy ${result.policyId} created.`;
   }
   return result.nextReminderAt === undefined
-    ? `${result.note} Applied to: ${target}.`
-    : `${result.note} Applied to: ${target}. Will be revisited at ${result.nextReminderAt}.`;
+    ? `${interpreted}${result.note} Applied to: ${target}.`
+    : `${interpreted}${result.note} Applied to: ${target}. Will be revisited at ${result.nextReminderAt}.`;
 };
 
 export interface ListAlertsResult {

@@ -6,6 +6,7 @@ import {
   applyLearningAdjustment,
   derivePolicyFromFeedback,
 } from "../policy/actions.js";
+import { feedbackActionLabel } from "../policy/feedback-vocab.js";
 import { withLockedState } from "../state/io.js";
 import type { CommandOptions, FeedbackAction, StoredAlert } from "../types.js";
 import { nowIso, parseDurationMs, sortAlertsNewestFirst } from "../util/time.js";
@@ -18,6 +19,13 @@ export interface FeedbackCommandResult {
   subject: string;
   from: string;
   action: FeedbackAction;
+  /**
+   * The canonical action in plain words ("hide these", "digest only", …) so the
+   * confirmation can echo *what the system understood* before/after applying —
+   * never just the internal kebab-case id. Derived from the single vocabulary
+   * source of truth in `feedback-vocab.ts`.
+   */
+  actionLabel: string;
   changed: boolean;
   note: string;
   nextReminderAt?: string;
@@ -123,7 +131,12 @@ export const applyFeedback = async (
       nextReminderAt = new Date(Date.now() + parseDurationMs(delay)).toISOString();
       alert.reminderDueAt = nextReminderAt;
       note = "Reminder scheduled.";
-    } else if (action === "always-like-this" || action === "reduce" || action === "digest-only") {
+    } else if (
+      action === "always-like-this" ||
+      action === "reduce" ||
+      action === "digest-only" ||
+      action === "mute"
+    ) {
       const policy = await runtime.readPolicy();
       const derived = derivePolicyFromFeedback(alert, action);
       if (derived === null) {
@@ -135,6 +148,8 @@ export const applyFeedback = async (
         note = "Policy updated locally. Sender routing pattern locked.";
       } else if (action === "digest-only") {
         note = "Policy updated locally. Similar signals routed to digest only.";
+      } else if (action === "mute") {
+        note = "Policy updated locally. Similar mail will be hidden.";
       } else {
         note = "Policy updated locally. Similar signals reduced.";
       }
@@ -167,6 +182,7 @@ export const applyFeedback = async (
       subject: alert.subject,
       from: alert.from,
       action: action as FeedbackAction,
+      actionLabel: feedbackActionLabel(action as FeedbackAction),
       changed: true,
       note,
       ...(nextReminderAt === undefined ? {} : { nextReminderAt }),

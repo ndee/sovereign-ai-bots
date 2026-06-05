@@ -108,6 +108,64 @@ describe("alerts/output", () => {
     );
   });
 
+  it("echoes the canonical interpretation when actionLabel is present", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Policy updated locally. Similar mail will be hidden.",
+        actionLabel: "hide these",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        policyId: "pol-1",
+      }),
+    ).toBe(
+      "Interpreted as \"hide these\". Policy updated locally. Similar mail will be hidden. Applied to: [a1b2c3] 'Invoice overdue' from billing@example.com. Policy pol-1 created.",
+    );
+  });
+
+  it("prefixes the interpretation on a plain applied confirmation", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback applied. Alert marked as important.",
+        actionLabel: "important",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "Billing <billing@example.com>",
+      }),
+    ).toBe(
+      "Interpreted as \"important\". Feedback applied. Alert marked as important. Applied to: [a1b2c3] 'Invoice overdue' from Billing <billing@example.com>.",
+    );
+  });
+
+  it("prefixes the interpretation on a reminder confirmation", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Reminder scheduled.",
+        actionLabel: "remind me later",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        nextReminderAt: "2026-04-08T16:00:00Z",
+      }),
+    ).toBe(
+      "Interpreted as \"remind me later\". Reminder scheduled. Applied to: [a1b2c3] 'Invoice overdue'. Will be revisited at 2026-04-08T16:00:00Z.",
+    );
+  });
+
+  it("omits the interpretation prefix when actionLabel is empty", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback recorded.",
+        actionLabel: "",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+      }),
+    ).toBe("Feedback recorded. Applied to: [a1b2c3] 'Invoice overdue'.");
+  });
+
   it("lists candidates with their short refs for ambiguous feedback", () => {
     expect(
       formatFeedbackResult({
