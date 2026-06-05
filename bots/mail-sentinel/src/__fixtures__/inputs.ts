@@ -67,6 +67,7 @@ export const sampleRules: RulesDocument = {
   },
   senderWeights: { "alice@example.com": 2 },
   domainWeights: { "example.com": 1 },
+  bulk: { enabled: true, minSignals: 2, minLinks: 8, grayConfidence: 0.7 },
   rules: [
     {
       id: "rule-invoice",

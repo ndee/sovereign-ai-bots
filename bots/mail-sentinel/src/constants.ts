@@ -41,3 +41,12 @@ export const ZONE_ORDER: Record<string, number> = {
   amber: 1,
   red: 2,
 };
+
+// Conservative, default-on bulk/newsletter suppression. Requiring two distinct
+// signals keeps transactional mail riding bulk infrastructure (e.g. a receipt
+// from noreply@ with a lone list-unsubscribe header) out of the suppression
+// path. Tunable via the `bulk` block in the rules document.
+export const DEFAULT_BULK_ENABLED = true;
+export const DEFAULT_BULK_MIN_SIGNALS = 2;
+export const DEFAULT_BULK_MIN_LINKS = 8;
+export const DEFAULT_BULK_GRAY_CONFIDENCE = 0.7;

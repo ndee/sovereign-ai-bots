@@ -37,6 +37,7 @@ export class FakeMailSentinelRuntime {
     },
     senderWeights: {},
     domainWeights: {},
+    bulk: { enabled: true, minSignals: 2, minLinks: 8, grayConfidence: 0.7 },
     rules: [],
   };
 
