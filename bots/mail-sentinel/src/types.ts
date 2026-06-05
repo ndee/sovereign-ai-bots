@@ -37,7 +37,25 @@ export interface ParsedMessage {
   text: string;
   snippet: string;
   headers: Record<string, string>;
+  /**
+   * Union of every recipient address (To + Cc fields and the to/cc/delivered-to
+   * headers). Kept as the backward-compatible surface an untargeted receiver
+   * rule matches against and the list `scan.ts` persists onto the message.
+   */
   toAddresses: string[];
+  /** Cc recipients only (Cc field + `cc` header). Matched by `target: "cc"`. */
+  ccAddresses?: string[] | undefined;
+  /**
+   * Addresses from the `Delivered-To` header only — the mailbox the MTA handed
+   * the message to. Matched by `target: "delivered_to"`.
+   */
+  deliveredToAddresses?: string[] | undefined;
+  /**
+   * Alias / catch-all the message was routed to, recovered from alias-revealing
+   * headers (`x-original-to`, `envelope-to`, `x-forwarded-to`). Matched by
+   * `target: "alias"`.
+   */
+  aliasTargets?: string[] | undefined;
   amountSignal: AmountSignal | null;
   deadlineDetected: boolean;
 }
@@ -179,11 +197,18 @@ export interface MailSentinelState {
 
 export type PolicyScope = "subject" | "body" | "snippet" | "any";
 
+/**
+ * Which recipient field a `receiver` policy matches against. Omitting the target
+ * keeps the legacy union behaviour (match any recipient in `toAddresses`).
+ */
+export type ReceiverTarget = "to" | "cc" | "delivered_to" | "alias";
+
 export interface PolicyEntryBase {
   id?: string | undefined;
   match?: string | undefined;
   pattern?: string | undefined;
   scope?: PolicyScope | undefined;
+  target?: ReceiverTarget | undefined;
   flags?: string | undefined;
   category?: Category | string | undefined;
   schedule?: string | undefined;
@@ -318,6 +343,7 @@ export interface CommandOptions {
   schedule?: string | undefined;
   pattern?: string | undefined;
   scope?: PolicyScope | string | undefined;
+  target?: ReceiverTarget | string | undefined;
   contains?: string | undefined;
   amountThreshold?: string | undefined;
   query?: string | undefined;

@@ -1,13 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { sampleMessage, samplePolicy } from "../__fixtures__/inputs.js";
 import { loadGolden } from "../__fixtures__/load.js";
+import type { MailSentinelPolicy, ReceiverTarget } from "../types.js";
 import {
   contentHaystack,
   defaultContentReason,
   evaluatePolicy,
   isTimeInSchedule,
   matchesPolicyEntry,
+  receiverCandidates,
 } from "./engine.js";
+
+const emptyPolicy = (
+  receiverPolicies: MailSentinelPolicy["receiverPolicies"],
+): MailSentinelPolicy => ({
+  version: 1,
+  senderPolicies: [],
+  domainPolicies: [],
+  receiverPolicies,
+  categoryPolicies: [],
+  contentPolicies: [],
+  timePolicies: [],
+  mutePolicies: [],
+});
+
+const bucketMessage = {
+  ...sampleMessage,
+  ccAddresses: ["match@business.com"],
+  deliveredToAddresses: ["match@business.com"],
+  aliasTargets: ["match@business.com"],
+};
 
 describe("policy/engine", () => {
   it("matches the matchesPolicyEntry golden fixture", () => {
@@ -376,19 +398,74 @@ describe("policy/engine", () => {
     const result = evaluatePolicy(
       { ...sampleMessage, toAddresses: [] },
       { category: "financial-relevance" },
-      {
-        version: 1,
-        senderPolicies: [],
-        domainPolicies: [],
-        receiverPolicies: [{ id: "r5", match: "me@business.com", boost: 5 }],
-        categoryPolicies: [],
-        contentPolicies: [],
-        timePolicies: [],
-        mutePolicies: [],
-      },
+      emptyPolicy([{ id: "r5", match: "me@business.com", boost: 5 }]),
       new Date("2026-04-08T12:00:00Z"),
     );
     expect(result.matchedPolicyIds).toEqual([]);
+  });
+
+  describe("receiverCandidates", () => {
+    const message = {
+      ...sampleMessage,
+      toAddresses: ["me@business.com", "cc@example.com"],
+      ccAddresses: ["cc@example.com"],
+      deliveredToAddresses: ["alias@business.com"],
+      aliasTargets: ["catchall@business.com"],
+    };
+
+    it("resolves each target to its bucket", () => {
+      expect(receiverCandidates(message, "cc")).toEqual(["cc@example.com"]);
+      expect(receiverCandidates(message, "delivered_to")).toEqual(["alias@business.com"]);
+      expect(receiverCandidates(message, "alias")).toEqual(["catchall@business.com"]);
+      expect(receiverCandidates(message, "to")).toEqual(["me@business.com", "cc@example.com"]);
+      expect(receiverCandidates(message, undefined)).toEqual(["me@business.com", "cc@example.com"]);
+    });
+
+    it("falls back to an empty list when a targeted bucket is absent", () => {
+      expect(receiverCandidates(sampleMessage, "cc")).toEqual([]);
+      expect(receiverCandidates(sampleMessage, "delivered_to")).toEqual([]);
+      expect(receiverCandidates(sampleMessage, "alias")).toEqual([]);
+    });
+  });
+
+  it.each<[ReceiverTarget, keyof typeof bucketMessage]>([
+    ["cc", "ccAddresses"],
+    ["delivered_to", "deliveredToAddresses"],
+    ["alias", "aliasTargets"],
+  ])("matches a receiver policy targeted at %s", (target) => {
+    const result = evaluatePolicy(
+      bucketMessage,
+      { category: "financial-relevance" },
+      emptyPolicy([{ id: "t1", match: "match@business.com", target, boost: 4 }]),
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toContain("t1");
+    expect(result.scoreModifier).toBe(4);
+  });
+
+  it("does not match a targeted receiver policy against the wrong bucket", () => {
+    const result = evaluatePolicy(
+      // The match address lives only in cc, but the rule targets delivered_to.
+      { ...sampleMessage, ccAddresses: ["match@business.com"] },
+      { category: "financial-relevance" },
+      emptyPolicy([{ id: "t2", match: "match@business.com", target: "delivered_to", boost: 4 }]),
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toEqual([]);
+  });
+
+  it("applies mute > ceiling precedence for a targeted alias mute rule", () => {
+    const result = evaluatePolicy(
+      { ...sampleMessage, aliasTargets: ["newsletters@business.com"] },
+      { category: "financial-relevance" },
+      emptyPolicy([
+        { id: "t3", match: "newsletters@business.com", target: "alias", action: "mute" },
+      ]),
+      new Date("2026-04-08T12:00:00Z"),
+    );
+    expect(result.matchedPolicyIds).toContain("t3");
+    expect(result.muted).toBe(true);
+    expect(result.zoneCeiling).toBe("gray");
   });
 });
 

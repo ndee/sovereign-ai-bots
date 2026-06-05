@@ -246,6 +246,46 @@ describe("commands/policy", () => {
       expect(runtime.policy.receiverPolicies[0]?.boost).toBe(5);
       expect(result.policy.type).toBe("receiver");
     });
+
+    it("adds a receiver policy with a --target and surfaces it via policyList", async () => {
+      const runtime = getFakeRuntime();
+      const result = await policyAdd({
+        instance: "ms-core",
+        json: false,
+        type: "receiver",
+        match: "cc@business.com",
+        target: "cc",
+        minZone: "amber",
+      });
+      expect(runtime.policy.receiverPolicies[0]?.target).toBe("cc");
+      expect(result.policy.target).toBe("cc");
+      const listed = await policyList({ instance: "ms-core" });
+      expect(listed.policies[0]?.target).toBe("cc");
+    });
+
+    it("rejects an invalid --target value", async () => {
+      await expect(
+        policyAdd({
+          instance: "ms-core",
+          json: false,
+          type: "receiver",
+          match: "x@y",
+          target: "bcc",
+        }),
+      ).rejects.toThrow("--target must be one of to|cc|delivered_to|alias");
+    });
+
+    it("rejects --target on a non-receiver policy type", async () => {
+      await expect(
+        policyAdd({
+          instance: "ms-core",
+          json: false,
+          type: "sender",
+          match: "x@y",
+          target: "cc",
+        }),
+      ).rejects.toThrow("--target is only valid for policy type 'receiver'");
+    });
   });
 
   describe("policyRemove", () => {
