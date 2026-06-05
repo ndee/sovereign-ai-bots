@@ -22,6 +22,18 @@ export type FeedbackAction =
   | "digest-only"
   | "mute";
 
+/**
+ * What a feedback action applies to. Resolved explicitly for every feedback
+ * call so the confirmation can name the scope and the user is never surprised
+ * by a hidden one:
+ * - `item`    — this one alert only; records feedbackState + learning, no policy.
+ * - `sender`  — every message from the alert's sender address.
+ * - `domain`  — every message from the alert's sender domain.
+ * - `subject` — any message whose subject contains the derived/given token.
+ * - `content` — any message whose body contains the given token.
+ */
+export type FeedbackScope = "item" | "sender" | "domain" | "subject" | "content";
+
 export interface AmountSignal {
   amount: number;
 }
@@ -369,6 +381,11 @@ export interface CommandOptions {
   query?: string | undefined;
   announce?: boolean | undefined;
   latest?: boolean | undefined;
+  /**
+   * Compute the derived rule for a feedback action without persisting anything
+   * (no state, no policy). Powers the control plane's confirmation preview.
+   */
+  dryRun?: boolean | undefined;
 }
 
 export interface KnownSender {
@@ -414,4 +431,23 @@ export interface DerivedPolicy {
   id: string;
   type: PolicyType;
   entry: PolicyEntryBase;
+}
+
+/**
+ * The exact rule a feedback action resolves to, surfaced in the command result
+ * (and in `--dry-run` previews) so the confirmation can echo precisely what was
+ * — or would be — created. `type: "none"` is the `item` scope: feedback that
+ * touches only the single alert and writes no policy. This is the shared
+ * confirmation contract the control plane renders; #108 (action vocabulary)
+ * plugs its `mute` derivation into the same shape.
+ */
+export interface DerivedFeedbackRule {
+  type: PolicyType | "none";
+  scope: FeedbackScope;
+  match?: string | undefined;
+  pattern?: string | undefined;
+  policyScope?: PolicyScope | undefined;
+  minZone?: Zone | undefined;
+  maxZone?: Zone | undefined;
+  reason: string;
 }

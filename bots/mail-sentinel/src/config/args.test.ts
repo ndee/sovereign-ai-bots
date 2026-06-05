@@ -124,6 +124,7 @@ describe("config/args", () => {
       "alice",
       "--announce",
       "--latest",
+      "--dry-run",
       "--json",
     ];
     const parsed = parseArgs(args);
@@ -135,7 +136,25 @@ describe("config/args", () => {
     expect(parsed.options.contains).toBe("freigegeben");
     expect(parsed.options.announce).toBe(true);
     expect(parsed.options.latest).toBe(true);
+    expect(parsed.options.dryRun).toBe(true);
     expect(parsed.options.json).toBe(true);
+  });
+
+  it("parses --dry-run into options.dryRun for feedback", () => {
+    const parsed = parseArgs([
+      "feedback",
+      "--instance",
+      "ms-core",
+      "--latest",
+      "--action",
+      "reduce",
+      "--scope",
+      "domain",
+      "--dry-run",
+    ]);
+    expect(parsed.command).toBe("feedback");
+    expect(parsed.options.dryRun).toBe(true);
+    expect(parsed.options.scope).toBe("domain");
   });
 
   it("returns undefined command for an empty argv", () => {

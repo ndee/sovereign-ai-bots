@@ -53,6 +53,10 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
       options.latest = true;
       continue;
     }
+    if (token === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
     if (token === undefined || !keyedOptions.has(token)) {
       throw new Error(`Unknown argument: ${token}`);
     }

@@ -1,5 +1,6 @@
 {
-  "always": {
+  "itemAlways": null,
+  "senderAlways": {
     "id": "00000000-0000-0000-0000-000000000000",
     "type": "sender",
     "entry": {
@@ -9,7 +10,7 @@
       "reason": "Derived from feedback for alice@example.com"
     }
   },
-  "reduce": {
+  "senderReduceRed": {
     "id": "00000000-0000-0000-0000-000000000000",
     "type": "sender",
     "entry": {
@@ -19,26 +20,52 @@
       "reason": "Derived from reduce feedback for alice@example.com"
     }
   },
-  "digestOnlyFromAmber": {
+  "domainDigest": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "type": "sender",
+    "type": "domain",
     "entry": {
       "id": "00000000-0000-0000-0000-000000000000",
-      "match": "alice@example.com",
+      "match": "example.com",
       "maxZone": "amber",
-      "reason": "Derived from digest-only feedback for alice@example.com"
+      "reason": "Derived from digest-only feedback for example.com"
     }
   },
-  "digestOnlyFromRed": {
+  "subjectAuto": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "type": "sender",
+    "type": "content",
     "entry": {
       "id": "00000000-0000-0000-0000-000000000000",
-      "match": "alice@example.com",
-      "maxZone": "amber",
-      "reason": "Derived from digest-only feedback for alice@example.com"
+      "pattern": "freigegeben",
+      "scope": "subject",
+      "maxZone": "gray",
+      "reason": "Derived from reduce feedback for \"freigegeben\""
     }
   },
-  "notDerivable": null,
-  "noSender": null
+  "subjectContains": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "type": "content",
+    "entry": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "pattern": "free\\.ride",
+      "scope": "subject",
+      "maxZone": "gray",
+      "reason": "Derived from reduce feedback for \"free.ride\""
+    }
+  },
+  "contentContains": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "type": "content",
+    "entry": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "pattern": "wire transfer",
+      "scope": "body",
+      "maxZone": "amber",
+      "reason": "Derived from digest-only feedback for \"wire transfer\""
+    }
+  },
+  "notDerivableAction": null,
+  "noSender": null,
+  "noDomain": null,
+  "noSubject": null,
+  "contentNoContains": null
 }
