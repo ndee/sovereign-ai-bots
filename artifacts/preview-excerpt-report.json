@@ -1,0 +1,411 @@
+[
+  {
+    "description": "  Alerts and digest items must carry a short, useful preview of what the email\n  said so an operator can judge relevance without opening the mail\n  (sovereign-ai-bots #102, shipped in PR #116). The excerpt is a 2–5 line /\n  ≤320-char quote copied onto the alert at scan time from the LOCAL message\n  snippet only — never a remote fetch — and a \"signal chip\" names the matched\n  reasons in words (top-3, \"+N more\"). Both render into the Matrix message as a\n  quoted block and a \"Signals:\" line, and both omit cleanly when absent.\n\n  These scenarios drive real business emails through the live mailbox and assert\n  the three acceptance criteria end-to-end against the node:\n    - Every RED alert carries a short useful preview when available.\n    - Digest items include enough context (excerpt + signal chip) to judge\n      importance without opening the mail.\n    - The preview respects privacy / local-first: it is derived solely from the\n      locally stored snippet, capped, and contains no external content.",
+    "elements": [
+      {
+        "description": "",
+        "id": "mail-sentinel-alert-&-digest-preview-excerpts-(sovereign-ai-bots-#102);a-red-alert-carries-a-capped-preview-excerpt-and-a-signal-chip",
+        "keyword": "Scenario",
+        "line": 23,
+        "name": "A RED alert carries a capped preview excerpt and a signal chip",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 1450922963
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 19,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 44422226624
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 20,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 355850646
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 30,
+            "name": "I send the \"invoice-overdue\" canonical fixture email",
+            "match": {
+              "location": "steps/fixtures.steps.ts:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 6056027325
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 31,
+            "name": "I wait up to 5 minutes for the \"invoice-overdue\" email to be recorded",
+            "match": {
+              "location": "steps/alert.steps.ts:67"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 136959072213
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 32,
+            "name": "the \"invoice-overdue\" fixture should be in the \"RED\" zone",
+            "match": {
+              "location": "steps/fixtures.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 448693
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 33,
+            "name": "the \"invoice-overdue\" fixture should be delivered as a Matrix alert",
+            "match": {
+              "location": "steps/fixtures.steps.ts:122"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 376197
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 34,
+            "name": "the \"invoice-overdue\" alert should carry a preview excerpt",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:63"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 299330087
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 35,
+            "name": "the \"invoice-overdue\" alert excerpt should be capped to the #102 limits",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:77"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 240013108
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 36,
+            "name": "the \"invoice-overdue\" alert excerpt should be derived from the local snippet",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 230518391
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 37,
+            "name": "the \"invoice-overdue\" alert should carry a signal chip from its reasons",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:128"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 228052028
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 38,
+            "name": "the Matrix alert for \"invoice-overdue\" should render a quoted preview excerpt",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:172"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 348610
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 39,
+            "name": "the Matrix alert for \"invoice-overdue\" should render a \"Signals:\" chip",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:184"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 398836
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@preview-excerpt-102",
+            "line": 22
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-alert-&-digest-preview-excerpts-(sovereign-ai-bots-#102);digest-items-carry-excerpt-and-signal-chip-context-judgeable-without-opening-the-mail",
+        "keyword": "Scenario",
+        "line": 42,
+        "name": "Digest items carry excerpt and signal-chip context judgeable without opening the mail",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 532420347
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 19,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 33861675742
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 20,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 110886
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 53,
+            "name": "I send the \"payment-receipt\" canonical fixture email",
+            "match": {
+              "location": "steps/fixtures.steps.ts:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5878087633
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 54,
+            "name": "I send the \"subscription-renewal\" canonical fixture email",
+            "match": {
+              "location": "steps/fixtures.steps.ts:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4235989035
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 55,
+            "name": "I send the \"nonurgent-invoice\" canonical fixture email",
+            "match": {
+              "location": "steps/fixtures.steps.ts:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4109684129
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 56,
+            "name": "I wait up to 5 minutes for the \"payment-receipt\" email to be recorded",
+            "match": {
+              "location": "steps/alert.steps.ts:67"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 77253474728
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 57,
+            "name": "I wait up to 5 minutes for the \"nonurgent-invoice\" email to be recorded",
+            "match": {
+              "location": "steps/alert.steps.ts:67"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 305416141449
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 58,
+            "name": "I wait up to 2 minutes for the pending amber digest to hold at least 1 item",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:217"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 321478078
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 59,
+            "name": "every pending amber digest item should carry a preview excerpt and a signal chip",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:236"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 631341913
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 60,
+            "name": "I force the pending amber digest to flush",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:286"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 526307215
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 61,
+            "name": "I wait up to 4 minutes for the AMBER digest to be delivered in Matrix",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:325"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 41691933550
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 62,
+            "name": "the Matrix digest should render a quoted preview excerpt",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:349"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 414604
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 63,
+            "name": "the Matrix digest should render a \"Signals:\" chip",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:359"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 162279
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 64,
+            "name": "the Matrix digest item should be judgeable without opening the mail",
+            "match": {
+              "location": "steps/preview-excerpt.steps.ts:375"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 259019
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 254787856
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@preview-excerpt-102",
+            "line": 41
+          },
+          {
+            "name": "@digest-flush-cleanup",
+            "line": 41
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "mail-sentinel-alert-&-digest-preview-excerpts-(sovereign-ai-bots-#102)",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "Mail Sentinel alert & digest preview excerpts (sovereign-ai-bots #102)",
+    "tags": [],
+    "uri": "features/alert-preview-excerpt.feature"
+  }
+]

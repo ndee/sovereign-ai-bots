@@ -1,0 +1,106 @@
+E2E proof — sovereign-ai-bots #102
+Mail Sentinel: short, local-derived preview excerpt + signal-chip evidence on
+alerts and digest items (shipped in PR #116).
+
+Node:        root@204.168.143.168
+Homeserver:  https://brave-freedom-badger-ad52.sovereign-ai-node.com
+Alert room:  !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com (display name "Alerts")
+bots ref:    5ff7adb (merge of PR #125; PR #116 / commit 048b51a "#102 excerpt" is reachable)
+Deployed:    confirmed live in the running mail-sentinel.js bundle
+             (buildExcerpt / formatSignalChip / "Signals:" / <blockquote> all present)
+Run id:      e2e-1780686705115
+Result:      2/2 scenarios passed, 26/26 steps passed
+Suite:       sovereign-ai-node-pro/e2e, feature features/alert-preview-excerpt.feature
+             (tag @preview-excerpt-102)
+
+================================================================================
+ACCEPTANCE CRITERIA (issue #102)
+================================================================================
+
+[PASS] Every alert has a short useful preview when available.
+       Scenario 1 (RED alert "invoice-overdue"):
+         - state.alerts[].excerpt is present (320 chars).
+         - excerpt is capped to the #102 limits: <= 320 chars / <= 5 lines.
+         - excerpt is a prefix of the LOCAL state.messages[messageKey].snippet
+           (privacy / local-first: derived solely from the local snippet, no
+           remote fetch — see "PRIVACY" below).
+         - the alert carries reasons that drive the signal chip (3 reasons).
+         - the operator-visible Matrix alert renders the quoted excerpt ("> …")
+           and the "Signals:" chip.
+       Live RED alert tile (artifacts/preview-excerpt-red-alert-tile.png):
+
+         🔴 RED · Financial Relevance
+         [af1002] Final demand: invoice INV-2048 ($489.00) overdue
+         From: Northgrid Billing
+         Why it matters: Payment failure may trigger automatic service suspension today.
+         > Hello, This is the third and final notice for invoice INV-2048.
+         > Amount due: $489.00 … Final payment deadline: April 18, 2026 (today) …
+         > No further reminders will be sent bef…
+         Signals: subject mentions an invoice, offer, contract, payment, or
+                  subscription renewal · body mentions urgency, deadlines,
+                  escalation, or complaints · body contains payment- or
+                  subscription-renewal wording
+         Confidence: high (98%)
+
+[PASS] Digest items include enough context to judge importance.
+       Scenario 2 (AMBER digest):
+         - every pending amber digest item the node holds carries a preview
+           excerpt AND reasons for a signal chip (asserted item-by-item over
+           state.digest.pendingAmber — zone-agnostic, so LLM zone drift on a
+           single borderline fixture does not flake the run).
+         - a forced 12h digest flush (rewind state.digest.lastDigestAt, restored
+           by the @digest-flush-cleanup hook) posts a real AMBER DIGEST tile.
+         - the rendered digest body is judgeable without opening the mail: each
+           item carries a numbered item line, a "Why it matters:" rationale, a
+           quoted excerpt, and a "Signals:" chip.
+       Live AMBER DIGEST tile (artifacts/preview-excerpt-digest-tile.png):
+
+         🟠 AMBER DIGEST · 2 items
+         Window: last 12h
+         1. [b75cb4] Receipt for your payment to Northgrid
+            From: PayFlow · Financial Relevance · high (100%)
+            Why it matters: Payment receipt confirms transaction completion …
+            > Hello, This is a receipt for your recent payment. Merchant:
+            > Northgrid Amount: $489.00 Date: April 12, 2026 Reference: PF-882104 …
+            Signals: subject mentions an invoice, offer, contract, payment, …
+         2. [d80cd5] New invoice for April workspace services
+            From: Workspace Tools Billing · Financial Relevance · high (95%)
+            Why it matters: Invoice charges workspace service fees …
+            > Hello, A new invoice is available for your April workspace services.
+            > Invoice number: WS-0412 Amount: $72.00 Due date: April 26, 2026 …
+            Signals: subject mentions an invoice … · body contains payment- or
+                     subscription-renewal wording
+
+[PASS] Preview respects privacy and local-first constraints.
+       Asserted in both scenarios: the excerpt (minus any trailing ellipsis) is
+       a prefix of compactText(state.messages[messageKey].snippet) — the local
+       preview text. The excerpt is therefore derived solely from local data,
+       capped, and contains no externally fetched content. The runtime exposes
+       no remote-fetch path at render; buildExcerpt operates on the local
+       snippet only.
+
+================================================================================
+STEP-LEVEL RESULTS (cucumber-run.log)
+================================================================================
+
+Scenario: A RED alert carries a capped preview excerpt and a signal chip — PASS
+  ✔ the "invoice-overdue" fixture should be in the "RED" zone
+  ✔ the "invoice-overdue" fixture should be delivered as a Matrix alert
+  ✔ the "invoice-overdue" alert should carry a preview excerpt
+  ✔ the "invoice-overdue" alert excerpt should be capped to the #102 limits
+  ✔ the "invoice-overdue" alert excerpt should be derived from the local snippet
+  ✔ the "invoice-overdue" alert should carry a signal chip from its reasons
+  ✔ the Matrix alert for "invoice-overdue" should render a quoted preview excerpt
+  ✔ the Matrix alert for "invoice-overdue" should render a "Signals:" chip
+
+Scenario: Digest items carry excerpt and signal-chip context judgeable
+          without opening the mail — PASS
+  ✔ every pending amber digest item should carry a preview excerpt and a signal chip
+  ✔ I force the pending amber digest to flush
+  ✔ I wait up to 4 minutes for the AMBER digest to be delivered in Matrix
+  ✔ the Matrix digest should render a quoted preview excerpt
+  ✔ the Matrix digest should render a "Signals:" chip
+  ✔ the Matrix digest item should be judgeable without opening the mail
+
+2 scenarios (2 passed)
+26 steps (26 passed)

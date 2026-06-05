@@ -1,0 +1,44 @@
+[e2e] Operator logged into Matrix and joined alert room
+[e2e] Mail Sentinel state reset; removed 0 orphan e2e policies
+[e2e] Bot Matrix token is valid
+[e2e] Run ID: e2e-1780686705115
+[e2e] Alert room: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
+[e2e] Scan timer overridden to 1min
+..[e2e] Mail Sentinel startup: timer active, policy profile loaded (1 policies)
+.[e2e] Sent canonical fixture "invoice-overdue" with run ID e2e-1780686705115
+.[e2e] Waiting up to 5min for "invoice-overdue" alert (pattern="invoice-overdue-", baseline=0)...
+[e2e] Found "invoice-overdue" alert id=0464b2e4-a396-49d0-bc17-6496b88bc616 zone=red category=financial-relevance
+...[e2e] "invoice-overdue" alert excerpt (320 chars): "Hello, This is the third and final notice for invoice INV-2048. Amount due: $489…"
+.[e2e] "invoice-overdue" excerpt within caps: 320/320 chars, 1/5 lines
+.[e2e] "invoice-overdue" excerpt is a local-snippet prefix (privacy/local-first confirmed)
+.[e2e] "invoice-overdue" alert signal chip: "subject mentions an invoice, offer, contract, payment, or subscription renewal · body mentions urgency, deadlines, escalation, or complaints · body contains payment- or subscription-renewal wording"
+.[e2e] Matrix alert for "invoice-overdue" renders a quoted excerpt line
+.[e2e] Matrix alert for "invoice-overdue" renders a "Signals:" chip
+....[e2e] Sent canonical fixture "payment-receipt" with run ID e2e-1780686705115
+.[e2e] Sent canonical fixture "subscription-renewal" with run ID e2e-1780686705115
+.[e2e] Sent canonical fixture "nonurgent-invoice" with run ID e2e-1780686705115
+.[e2e] Waiting up to 5min for "payment-receipt" alert (pattern="payment-receipt-", baseline=0)...
+[e2e] Found "payment-receipt" alert id=b75cb416-8b61-474e-a8d2-dbc044805bf1 zone=amber category=financial-relevance
+.[e2e] Waiting up to 5min for "nonurgent-invoice" alert (pattern="nonurgent-invoice-", baseline=1)...
+[e2e] Timeout reached without finding "nonurgent-invoice" alert
+.[e2e] Waiting up to 2min for >= 1 pending amber digest item(s)...
+[e2e] Pending amber digest holds 2 item(s) for this run
+.[e2e] digest item "Receipt for your payment to Northgrid — payme" carries excerpt (169 chars) + 1 reason(s)
+[e2e] digest item "New invoice for April workspace services — no" carries excerpt (216 chars) + 2 reason(s)
+[e2e] All 2 pending amber digest item(s) carry excerpt + signal chip
+.[e2e] Rewound digest.lastDigestAt to force a flush of 2 pending amber item(s) on the next scan
+.[e2e] Waiting up to 4min for an AMBER DIGEST tile in Matrix...
+[e2e] AMBER DIGEST tile delivered: "🟠 AMBER DIGEST · 2 items
+Window: last 12h
+
+1. [b75cb4] Receipt for your payment…"
+.[e2e] AMBER digest renders a quoted excerpt line
+.[e2e] AMBER digest renders a "Signals:" chip
+.[e2e] AMBER digest item is judgeable without opening the mail (item line + why + excerpt + signals present)
+.[e2e] Restored digest.lastDigestAt after forced flush
+.[e2e] Scan timer restored
+
+
+2 scenarios (2 passed)
+26 steps (26 passed)
+11m51.490s (executing steps: 11m04.957s)
