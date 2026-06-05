@@ -1,79 +1,74 @@
+================================================================================
 sovereign-ai-bots #99 — Mail Sentinel body/snippet content policy rules
-E2E re-run with BROWSER-CAPTURED (Element.io) artifacts
-========================================================================
+E2E RE-RUN + Matrix-bot rule-creation check
+Date: 2026-06-05
+Node: brave-freedom-badger-ad52.sovereign-ai-node.com (bots ref 74d18d7 / PR#114 merged, node 2.2.2)
+================================================================================
 
-Node           : root@204.168.143.168
-Public host    : brave-freedom-badger-ad52.sovereign-ai-node.com
-Homeserver     : https://brave-freedom-badger-ad52.sovereign-ai-node.com
-Alert room     : !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
-Bots ref       : 74d18d7 (bots main HEAD, PR#114 merged)
-Bots commit    : 74d18d7fb62afa5837b8600164e74703283ebe28
-Node version   : 2.2.2 (commit 12b20738)
-Run ID         : e2e-1780628620351
-Result         : 5 scenarios PASSED, 32 steps PASSED
-Captured from  : app.element.io (Element web client), operator account, live homeserver
+PART A — E2E SUITE (CLI-driven rule creation): PASS
+--------------------------------------------------------------------------------
+5 scenarios (5 passed)
+32 steps (32 passed)
+10m34s, executed against the live node.
 
-------------------------------------------------------------------------
-BOUNDARY EVIDENCE (from zone history during the run)
-------------------------------------------------------------------------
-content-body         body  rule, body-only marker          -> zone=red   (e2e:content-policy body)
-content-snippet-hit  snippet rule, marker < char 500       -> zone=red   (e2e:content-policy snippet)
-content-snippet-miss snippet rule, marker > char 500       -> zone=amber (model's own call) — NOT escalated, no RED alert
-content-body-deep    body  rule, SAME deep marker (>500)    -> zone=red   (e2e:content-policy body)
+  body rule        -> "Routine weekly status summary"  classified RED
+  snippet hit      -> "Daily preview reference note"    classified RED
+  snippet miss     -> "Weekly archival reference note"  stayed AMBER baseline,
+                       NOT escalated, no RED alert (marker past 500-char window)
+  body deep        -> "Monthly archival reference note" classified RED
+  create + show    -> body & snippet content rules round-trip into `policy list`
 
-  Crux: content-snippet-miss and content-body-deep use the same body offset
-  (marker past char 500). Only the scope differs. snippet cannot see past the
-  500-char preview window; body sees the full local text. This is the
-  text.slice(0,500) snippet boundary, proven on a live node.
+Same body, same offset: snippet rule cannot see past 500 chars, body rule can.
+Rules are created in this suite via the CLI:
+  mail-sentinel policy add --type content --contains <text> --scope body|snippet \
+    --min-zone red --json
+This path works fully.
 
-policy round-trip (show policies):
-  content rule scope=body    pattern="showbody-e2e-1780628620351"    -> listed
-  content rule scope=snippet pattern="showsnippet-e2e-1780628620351" -> listed
-  both removed by the @content-policy-cleanup hook (locally removable)
+PART B — RULE CREATION VIA THE MATRIX BOT: NOT SUPPORTED (BLOCKER)
+--------------------------------------------------------------------------------
+New requirement: screenshots must show the #99 content rule being CREATED via the
+Matrix bot in Element.io.
 
-------------------------------------------------------------------------
-REAL Element.io alert-room RED alerts (operator view, content-policy escalations)
-------------------------------------------------------------------------
-The fixtures carry deliberately low-signal subjects ("Routine weekly status
-summary", etc.) that the model classifies as informational — they reach RED
-ONLY because a body/snippet content policy matched the local text. Captured
-live from the Mail Sentinel alert room in Element:
+Result: the Mail Sentinel Matrix bot CANNOT create body/snippet content rules.
 
-----------------------------------------
-🔴 RED · Risk / Escalation
+Live verification (operator -> alert room, app.element.io):
+  Operator: "Please create a content policy: if a message body contains
+             \"deadline-override-2026\", escalate it to RED."
 
-Monthly archival reference note
+  Bot reply (verbatim, @mail-sentinel):
+    "Content policies matching message body text are not supported. The policy
+     system only accepts:
+       - `type`: `sender` or `domain`
+       - `match`: the email address or domain pattern
+       - `min-zone`: `gray`, `amber`, or `red`
+     Body content matching cannot be configured via policies. The default routing
+     evaluates message content automatically during scans.
+     If you know the sender or domain that sends messages containing
+     \"deadline-override-2026\", I can create a sender/domain policy to force those
+     to RED zone. Otherwise, the content-based escalation must rely on the default
+     routing logic."
 
-From: Archival Notes
-Why it matters: Routine informational message requires no action
-Confidence: medium (70%)
+Reproduced with two phrasings (natural-language and explicit "scope body");
+both refused. No policy was created (policy list unchanged: 1 pre-existing sender
+policy).
 
-Reply in thread with:
-very important · not important · remind later · always treat like this · less of this
+ROOT CAUSE (in sovereign-ai-bots, not the node-pro e2e suite):
+  The Matrix bot agent's tool surface only exposes a sender/domain form of
+  `policy add`. The allowedCommands whitelist in
+    bots/mail-sentinel/sovereign-bot.json
+  (and the generated workspace/TOOLS.md the agent reads) lists only:
+    policy add --type <type> --match <pattern> --min-zone <zone> --json
+  It does NOT expose --scope (body|snippet|subject), --contains, or --max-zone.
+  So the agent has no way to create the #99 content-scoped rules and correctly
+  reports them as unsupported. This is unchanged on bots origin/main HEAD
+  (4204821) — no open PR adds scoped content-policy creation to the Matrix
+  surface.
 
-----------------------------------------
-🔴 RED · Risk / Escalation
+FIX NEEDED (bots side) to satisfy this requirement:
+  Extend the mail-sentinel allowedCommands whitelist + TOOLS.md (and AGENTS.md
+  guidance) to expose content-scoped policy creation via Matrix, e.g.:
+    policy add --type content --contains <text> --scope <scope> --min-zone <zone> --json
+  Once exposed, the operator can create a body/snippet rule by DM and the bot can
+  confirm it, and this screenshot requirement becomes capturable.
 
-Daily preview reference note
-
-From: Preview Notes
-Why it matters: This is informational only with no action required or deadline.
-Confidence: high (92%)
-
-Reply in thread with:
-very important · not important · remind later · always treat like this · less of this
-
-----------------------------------------
-🔴 RED · Risk / Escalation
-
-Routine weekly status summary
-
-From: Status Monitor
-Why it matters: Routine status update with explicit confirmation that no action is required and systems remain nominal.
-Confidence: high (95%)
-
-Reply in thread with:
-very important · not important · remind later · always treat like this · less of this
-
-
-(Captured 2026-06-05T03:18:14Z UTC)
+================================================================================
