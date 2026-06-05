@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { loadGolden } from "../__fixtures__/load.js";
 import {
+  collectAddresses,
   detectDeadlineSignal,
   normalizeHeaderMap,
   parseAddressFromList,
   parseHighestAmount,
   parseMessage,
   parseReceiverAddresses,
+  parseReceiverBuckets,
 } from "./parse.js";
 
 describe("imap/parse", () => {
@@ -189,6 +191,82 @@ describe("imap/parse", () => {
 
     it("ignores empty strings and invalid entries", () => {
       expect(parseReceiverAddresses("", [], { to: "" })).toEqual([]);
+    });
+  });
+
+  describe("collectAddresses", () => {
+    it("merges and deduplicates across multiple sources", () => {
+      expect(collectAddresses(["alice@a.com"], "bob@b.com, alice@a.com", undefined, 42)).toEqual([
+        "alice@a.com",
+        "bob@b.com",
+      ]);
+    });
+
+    it("returns an empty array when no source yields an address", () => {
+      expect(collectAddresses()).toEqual([]);
+    });
+  });
+
+  describe("parseReceiverBuckets", () => {
+    it("splits recipients into per-field buckets", () => {
+      const buckets = parseReceiverBuckets(["me@business.com"], ["cc@example.com"], {
+        cc: "extra-cc@example.com",
+        "delivered-to": "alias@business.com",
+        "x-original-to": "catchall@business.com",
+        "envelope-to": "envelope@business.com",
+        "x-forwarded-to": "forwarded@business.com",
+      });
+      expect(buckets.toAddresses).toContain("me@business.com");
+      expect(buckets.toAddresses).toContain("cc@example.com");
+      expect(buckets.ccAddresses).toEqual(["cc@example.com", "extra-cc@example.com"]);
+      expect(buckets.deliveredToAddresses).toEqual(["alias@business.com"]);
+      expect(buckets.aliasTargets).toEqual([
+        "catchall@business.com",
+        "envelope@business.com",
+        "forwarded@business.com",
+      ]);
+    });
+
+    it("returns empty buckets when no recipient data is present", () => {
+      expect(parseReceiverBuckets(undefined, undefined, {})).toEqual({
+        toAddresses: [],
+        ccAddresses: [],
+        deliveredToAddresses: [],
+        aliasTargets: [],
+      });
+    });
+  });
+
+  describe("parseMessage recipient buckets", () => {
+    it("populates cc, delivered-to, and alias buckets from fields and headers", () => {
+      const parsed = parseMessage(
+        { uid: 20 },
+        {
+          message: {
+            uid: 20,
+            to: ["Me <me@business.com>"],
+            cc: ["CC <cc@example.com>"],
+            text: "hi",
+            headers: [
+              { key: "Delivered-To", value: "alias@business.com" },
+              { key: "X-Original-To", value: "catchall@business.com" },
+            ],
+          },
+        },
+      );
+      expect(parsed.ccAddresses).toEqual(["cc@example.com"]);
+      expect(parsed.deliveredToAddresses).toEqual(["alias@business.com"]);
+      expect(parsed.aliasTargets).toEqual(["catchall@business.com"]);
+    });
+
+    it("omits recipient buckets entirely when their fields are empty", () => {
+      const parsed = parseMessage(
+        { uid: 21 },
+        { message: { uid: 21, to: ["me@business.com"], text: "hi" } },
+      );
+      expect(parsed.ccAddresses).toBeUndefined();
+      expect(parsed.deliveredToAddresses).toBeUndefined();
+      expect(parsed.aliasTargets).toBeUndefined();
     });
   });
 });

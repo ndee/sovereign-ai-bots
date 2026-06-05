@@ -17,6 +17,7 @@ import type {
   PolicyEntryBase,
   PolicyScope,
   PolicyType,
+  ReceiverTarget,
 } from "../types.js";
 import { compactText, escapeRegExp } from "../util/normalize.js";
 
@@ -24,6 +25,11 @@ const POLICY_SCOPES: readonly PolicyScope[] = ["subject", "body", "snippet", "an
 
 const isPolicyScope = (value: unknown): value is PolicyScope =>
   typeof value === "string" && (POLICY_SCOPES as readonly string[]).includes(value);
+
+const RECEIVER_TARGETS: readonly ReceiverTarget[] = ["to", "cc", "delivered_to", "alias"];
+
+const isReceiverTarget = (value: unknown): value is ReceiverTarget =>
+  typeof value === "string" && (RECEIVER_TARGETS as readonly string[]).includes(value);
 
 export interface PolicyListCommandResult {
   instanceId: string;
@@ -84,6 +90,14 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
   if (options.scope !== undefined && !isPolicyScope(options.scope)) {
     throw new Error("Option --scope must be one of subject|body|snippet|any");
   }
+  if (options.target !== undefined) {
+    if (options.type !== "receiver") {
+      throw new Error("Option --target is only valid for policy type 'receiver'");
+    }
+    if (!isReceiverTarget(options.target)) {
+      throw new Error("Option --target must be one of to|cc|delivered_to|alias");
+    }
+  }
   // Explicit --pattern wins; otherwise --contains is escaped into a literal-match
   // regex so users never hand-write regex. Literal --contains rules default to the
   // subject scope (the issue's "subject contains …" use cases); raw --pattern rules
@@ -104,6 +118,7 @@ export const policyAdd = async (options: CommandOptions): Promise<PolicyAddComma
     ...(typeof options.match === "string" ? { match: options.match } : {}),
     ...(resolvedPattern === undefined ? {} : { pattern: resolvedPattern }),
     ...(resolvedScope === undefined ? {} : { scope: resolvedScope }),
+    ...(isReceiverTarget(options.target) ? { target: options.target } : {}),
     ...(typeof options.category === "string" ? { category: options.category } : {}),
     ...(typeof options.schedule === "string" ? { schedule: options.schedule } : {}),
     ...(typeof options.minZone === "string"

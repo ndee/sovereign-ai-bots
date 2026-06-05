@@ -114,6 +114,8 @@ describe("config/args", () => {
       "invoice",
       "--scope",
       "subject",
+      "--target",
+      "cc",
       "--contains",
       "freigegeben",
       "--amount-threshold",
@@ -129,6 +131,7 @@ describe("config/args", () => {
     expect(parsed.options.subcommand).toBe("add");
     expect(parsed.options.instance).toBe("ms");
     expect(parsed.options.scope).toBe("subject");
+    expect(parsed.options.target).toBe("cc");
     expect(parsed.options.contains).toBe("freigegeben");
     expect(parsed.options.announce).toBe(true);
     expect(parsed.options.latest).toBe(true);
