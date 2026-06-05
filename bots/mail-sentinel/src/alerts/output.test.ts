@@ -179,7 +179,7 @@ describe("alerts/output", () => {
     ).toBe(loadGolden("formatPolicyResult.mixed"));
   });
 
-  it("renders content-policy scope and pattern in the listing", () => {
+  it("renders content-policy scope and pattern under the Content section", () => {
     const rendered = formatPolicyResult({
       policies: [
         { id: "c-sub", type: "content", pattern: "DOWN", scope: "subject" },
@@ -189,12 +189,55 @@ describe("alerts/output", () => {
         { id: "c-bare", type: "content", pattern: "overdue" },
       ],
     });
-    expect(rendered).toContain("- [c-sub] content subject:/DOWN/");
-    expect(rendered).toContain("- [c-body] content body:/approved/");
-    expect(rendered).toContain("- [c-snip] content snippet:/receipt/");
-    expect(rendered).toContain("- [c-any] content any:/invoice/");
+    // The rule type is now the section header, so the line no longer repeats it.
+    expect(rendered).toContain("Content (5):");
+    expect(rendered).toContain("- [c-sub] subject:/DOWN/");
+    expect(rendered).toContain("- [c-body] body:/approved/");
+    expect(rendered).toContain("- [c-snip] snippet:/receipt/");
+    expect(rendered).toContain("- [c-any] any:/invoice/");
     // A content entry without an explicit scope renders as "any".
-    expect(rendered).toContain("- [c-bare] content any:/overdue/");
+    expect(rendered).toContain("- [c-bare] any:/overdue/");
+  });
+
+  it("uses singular wording for a single rule and a single effective route", () => {
+    const rendered = formatPolicyResult({
+      policies: [{ id: "s1", type: "sender", match: "a@b", minZone: "amber" }],
+    });
+    expect(rendered.startsWith("Mail Sentinel policies (1 rule, 1 effective route):")).toBe(true);
+  });
+
+  it("collapses exact-duplicate rules and tags each line with its effect", () => {
+    const rendered = formatPolicyResult({
+      policies: [
+        { id: "s1", type: "sender", match: "boss@corp.com", minZone: "amber" },
+        { id: "s2", type: "sender", match: "boss@corp.com", minZone: "amber" },
+        { id: "c1", type: "content", pattern: "invoice", scope: "subject", boost: 2 },
+      ],
+    });
+    expect(rendered).toContain("- [s1,s2] boss@corp.com (x2, collapsed)  floor=amber");
+    expect(rendered).toContain("- [c1] subject:/invoice/  boost +2");
+  });
+
+  it("resolves effective routing and surfaces contradictions", () => {
+    const rendered = formatPolicyResult({
+      policies: [
+        { id: "m1", type: "mute", match: "*.spam.example" },
+        { id: "d1", type: "domain", match: "news.example", maxZone: "gray" },
+        { id: "x1", type: "sender", match: "vip@corp.com", minZone: "red" },
+        { id: "x2", type: "sender", match: "vip@corp.com", maxZone: "amber" },
+      ],
+    });
+    expect(rendered).toContain("3 effective routes");
+    expect(rendered).toContain("Effective routing (mute > ceiling > floor > boost):");
+    expect(rendered).toContain("  *.spam.example -> MUTED");
+    expect(rendered).toContain("  news.example -> ceiling gray");
+    // The same target with both a floor and a ceiling stays two list lines AND
+    // resolves to a combined effective route, so the contradiction is explained.
+    expect(rendered).toContain("  vip@corp.com -> floor red ceiling amber");
+    expect(rendered).toContain("- [x1] vip@corp.com  floor=red");
+    expect(rendered).toContain("- [x2] vip@corp.com  ceiling=amber");
+    // A mute-type rule shows MUTED on its own line under the Mute section.
+    expect(rendered).toContain("- [m1] *.spam.example  MUTED");
   });
 
   it("matches the formatPolicyActionResult golden fixtures", () => {
