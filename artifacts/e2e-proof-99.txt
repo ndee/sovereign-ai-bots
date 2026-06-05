@@ -1,112 +1,79 @@
-================================================================================
- E2E PROOF — Mail Sentinel body/snippet content policy rules (sovereign-ai-bots #99)
-================================================================================
- Live end-to-end run against a sovereign-ai-node carrying the merged #99 code
- (bots ref 74d18d7 = PR#113 + PR#114). Each scenario drives a real email through
- the live mailbox, lets the 1-minute scan classify it locally, and asserts the
- content rule's effect on the local zone-history classification.
+sovereign-ai-bots #99 — Mail Sentinel body/snippet content policy rules
+E2E re-run with BROWSER-CAPTURED (Element.io) artifacts
+========================================================================
 
- Result: 5 scenarios, 32 steps — ALL PASSED.   Run ID: e2e-1780614899404
+Node           : root@204.168.143.168
+Public host    : brave-freedom-badger-ad52.sovereign-ai-node.com
+Homeserver     : https://brave-freedom-badger-ad52.sovereign-ai-node.com
+Alert room     : !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
+Bots ref       : 74d18d7 (bots main HEAD, PR#114 merged)
+Bots commit    : 74d18d7fb62afa5837b8600164e74703283ebe28
+Node version   : 2.2.2 (commit 12b20738)
+Run ID         : e2e-1780628620351
+Result         : 5 scenarios PASSED, 32 steps PASSED
+Captured from  : app.element.io (Element web client), operator account, live homeserver
 
---------------------------------------------------------------------------------
- BOUNDARY PROOF (the crux of #99: snippet = first 500 chars of the LOCAL preview)
---------------------------------------------------------------------------------
- message.snippet = text.slice(0, 500)   [bots/mail-sentinel/src/imap/parse.ts]
- haystack per scope: subject->subject, body->text, snippet->snippet, any->subject+text
-                                        [bots/mail-sentinel/src/policy/engine.ts]
+------------------------------------------------------------------------
+BOUNDARY EVIDENCE (from zone history during the run)
+------------------------------------------------------------------------
+content-body         body  rule, body-only marker          -> zone=red   (e2e:content-policy body)
+content-snippet-hit  snippet rule, marker < char 500       -> zone=red   (e2e:content-policy snippet)
+content-snippet-miss snippet rule, marker > char 500       -> zone=amber (model's own call) — NOT escalated, no RED alert
+content-body-deep    body  rule, SAME deep marker (>500)    -> zone=red   (e2e:content-policy body)
 
- Fixture                marker offset   rule scope   forced   observed zone   verdict
- ---------------------  -------------   ----------   ------   -------------   -------
- content-body           ~char 81 (body) body         RED      red            rule matched body text
- content-snippet-hit    ~char 36 (<500)  snippet      RED      red            rule matched local preview
- content-snippet-miss   ~char 814 (>500) snippet      RED      amber          rule INERT (past 500-char window)
- content-body-deep      ~char 814 (>500) body         RED      red            body sees full local text
+  Crux: content-snippet-miss and content-body-deep use the same body offset
+  (marker past char 500). Only the scope differs. snippet cannot see past the
+  500-char preview window; body sees the full local text. This is the
+  text.slice(0,500) snippet boundary, proven on a live node.
 
- content-snippet-miss + content-body-deep share the SAME body offset (marker past
- char 500). The ONLY difference is the scope: a snippet rule cannot see the marker
- (stays amber, no RED alert), a body rule can (escalates to RED). That pair is the
- 500-char snippet boundary, proven live.
+policy round-trip (show policies):
+  content rule scope=body    pattern="showbody-e2e-1780628620351"    -> listed
+  content rule scope=snippet pattern="showsnippet-e2e-1780628620351" -> listed
+  both removed by the @content-policy-cleanup hook (locally removable)
 
---------------------------------------------------------------------------------
- ZONE-HISTORY EVIDENCE (newest classification per message, from live node state)
---------------------------------------------------------------------------------
- [e2e] Found zone history for "content-body" messageKey=msg:<e2e-1780614899404-content-body@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
- .[e2e] "content-body" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
- [e2e] Found zone history for "content-snippet-hit" messageKey=msg:<e2e-1780614899404-content-snippet-hit@e2e.sovereign-ai> zone=red reason="e2e:content-policy snippet e2e-1780614899404"
- .[e2e] "content-snippet-hit" zone history newest=red reason="e2e:content-policy snippet e2e-1780614899404"
- [e2e] Found zone history for "content-snippet-miss" messageKey=msg:<e2e-1780614899404-content-snippet-miss@e2e.sovereign-ai> zone=amber reason="Routine informational note requires no action and contains no deadlines or monetary amounts."
- .[e2e] "content-snippet-miss" stayed at baseline zone=amber (not red), reason="Routine informational note requires no action and contains no deadlines or monetary amounts." — snippet rule correctly inert past 500-char window
- .[e2e] No RED alert recorded for "content-snippet-miss" — snippet rule did not escalate
- [e2e] Found zone history for "content-body-deep" messageKey=msg:<e2e-1780614899404-content-body-deep@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
- .[e2e] "content-body-deep" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
+------------------------------------------------------------------------
+REAL Element.io alert-room RED alerts (operator view, content-policy escalations)
+------------------------------------------------------------------------
+The fixtures carry deliberately low-signal subjects ("Routine weekly status
+summary", etc.) that the model classifies as informational — they reach RED
+ONLY because a body/snippet content policy matched the local text. Captured
+live from the Mail Sentinel alert room in Element:
 
---------------------------------------------------------------------------------
- CREATE / SHOW / REMOVE — rules are local & inspectable
---------------------------------------------------------------------------------
- # Live 'show policies' round-trip demo — body & snippet scopes (bots #99)
- # Node: <test-node> (slug rotates per install; reached over SSH tunnel)
- # Mail Sentinel CLI: bin/mail-sentinel.js  (bots ref 74d18d7 = PR#113+#114)
- 
- $ policy add --type content --scope body --contains payment-receipt-proofdemo-232514 --max-zone gray
- {
-   "instanceId": "mail-sentinel-core",
-   "changed": true,
-   "policy": {
-     "type": "content",
-     "id": "f24260e1-0b92-461f-9435-590189ba4122",
-     "pattern": "payment-receipt-proofdemo-232514",
-     "scope": "body",
-     "maxZone": "gray",
-     "reason": "e2e:proof-99 body"
-   }
- }
- 
- $ policy add --type content --scope snippet --contains server-termination-proofdemo-232514 --min-zone red
- {
-   "instanceId": "mail-sentinel-core",
-   "changed": true,
-   "policy": {
-     "type": "content",
-     "id": "0dcadc06-c28c-452c-bd57-707ea67b5844",
-     "pattern": "server-termination-proofdemo-232514",
-     "scope": "snippet",
-     "minZone": "red",
-     "reason": "e2e:proof-99 snippet"
-   }
- }
- 
- $ policy list   # show policies — both scopes round-trip and are inspectable
- [
-   {
-     "type": "content",
-     "id": "f24260e1-0b92-461f-9435-590189ba4122",
-     "pattern": "payment-receipt-proofdemo-232514",
-     "scope": "body",
-     "maxZone": "gray",
-     "reason": "e2e:proof-99 body"
-   },
-   {
-     "type": "content",
-     "id": "0dcadc06-c28c-452c-bd57-707ea67b5844",
-     "pattern": "server-termination-proofdemo-232514",
-     "scope": "snippet",
-     "minZone": "red",
-     "reason": "e2e:proof-99 snippet"
-   }
- ]
- 
- $ policy remove --id <each>   # rules are locally removable
- {
-   "ok": false,
-   "error": {
-     "message": "Unknown argument: 0dcadc06-c28c-452c-bd57-707ea67b5844"
-   }
- }
- 
+----------------------------------------
+🔴 RED · Risk / Escalation
 
- (the demo's final remove erred only on a shell-quoting artifact in the capture
-  script; both demo rules were subsequently removed and the node verified clean —
-  remaining e2e/proof policies: 0. In the suite itself, the @content-policy-cleanup
-  After hook removes every rule it adds; see the run log "Removed temporary
-  content policy <id>" lines.)
-================================================================================
+Monthly archival reference note
+
+From: Archival Notes
+Why it matters: Routine informational message requires no action
+Confidence: medium (70%)
+
+Reply in thread with:
+very important · not important · remind later · always treat like this · less of this
+
+----------------------------------------
+🔴 RED · Risk / Escalation
+
+Daily preview reference note
+
+From: Preview Notes
+Why it matters: This is informational only with no action required or deadline.
+Confidence: high (92%)
+
+Reply in thread with:
+very important · not important · remind later · always treat like this · less of this
+
+----------------------------------------
+🔴 RED · Risk / Escalation
+
+Routine weekly status summary
+
+From: Status Monitor
+Why it matters: Routine status update with explicit confirmation that no action is required and systems remain nominal.
+Confidence: high (95%)
+
+Reply in thread with:
+very important · not important · remind later · always treat like this · less of this
+
+
+(Captured 2026-06-05T03:18:14Z UTC)
