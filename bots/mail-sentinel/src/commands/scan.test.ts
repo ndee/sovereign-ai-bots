@@ -103,6 +103,45 @@ describe("commands/scan", () => {
     expect(runtime.state.alerts).toHaveLength(1);
   });
 
+  it("de-escalates a newsletter the LLM would have red-alerted (bulk ceiling)", async () => {
+    const runtime = setupRuntimeForScan();
+    // Same urgent, invoice-like content the LLM flags red — but carrying strong
+    // bulk signals (list-unsubscribe + bulk infra + campaign language + many
+    // links + automated sender). The bulk ceiling must hold it out of red.
+    runtime.searchMail = async () => ({
+      messages: [
+        {
+          uid: 11,
+          size: 1000,
+          messageId: "<promo@ex>",
+          from: ["Vendor <billing@promo.example>"],
+          subject: "Invoice: your subscription renewal is due",
+        },
+      ],
+    });
+    // Two bulk signals (list-unsubscribe header + high link density) → confidence
+    // 0.5, below grayConfidence → amber ceiling. A neutral sender and no campaign
+    // wording keep it at exactly two signals so the cap lands on amber, not gray.
+    runtime.readMail = async () => ({
+      message: {
+        uid: 11,
+        messageId: "<promo@ex>",
+        from: ["Vendor <billing@promo.example>"],
+        subject: "Invoice: your subscription renewal is due",
+        text: `Pay $500 now for invoice. ${Array.from(
+          { length: 10 },
+          (_, index) => `https://promo.example/p${String(index)}`,
+        ).join(" ")}`,
+        headers: [{ key: "List-Unsubscribe", value: "<https://promo.example/unsub>" }],
+      },
+    });
+    const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+    const result = await scan({ instance: "ms-core" });
+    expect(result.redAlertsSent).toBe(0);
+    expect(result.amberQueued).toBe(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("copies a capped excerpt from the local snippet onto the alert at scan time", async () => {
     const runtime = setupRuntimeForScan();
     await scan({ instance: "ms-core" });

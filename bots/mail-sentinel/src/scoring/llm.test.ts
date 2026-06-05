@@ -562,6 +562,109 @@ describe("scoring/llm", () => {
     });
     expect(result.zone).toBe("amber");
   });
+
+  const redLlm = (): LlmResult => ({
+    decisionRequired: true,
+    financialRelevance: true,
+    riskEscalation: false,
+    confidence: 90,
+    urgency: "high",
+    reason: "clear invoice",
+    deadlineDetected: true,
+    amountDetected: true,
+    suggestedZone: "red",
+  });
+
+  const bulkRedScored = {
+    score: 6,
+    categoryScores: {
+      "decision-required": 0,
+      "financial-relevance": 6,
+      "risk-escalation": 0,
+    },
+    category: "financial-relevance" as const,
+  };
+
+  it("caps an urgent bulk mail at amber and names the signals", () => {
+    const result = determineZone({
+      scored: bulkRedScored,
+      policyResult: neutralPolicy,
+      llmResult: redLlm(),
+      rules: sampleRules,
+      bulk: {
+        isBulk: true,
+        confidence: 0.5,
+        signals: ["list-unsubscribe header", "high link density (10 links)"],
+        ceiling: "amber",
+      },
+    });
+    expect(result.zone).toBe("amber");
+    expect(result.reasons).toContain(
+      "Held at amber: looks like a newsletter — list-unsubscribe header, high link density (10 links)",
+    );
+  });
+
+  it("lets an explicit user floor override the bulk ceiling (floor wins)", () => {
+    const result = determineZone({
+      scored: bulkRedScored,
+      policyResult: { ...neutralPolicy, zoneFloor: "red" },
+      llmResult: redLlm(),
+      rules: sampleRules,
+      bulk: {
+        isBulk: true,
+        confidence: 1,
+        signals: ["list-unsubscribe header", "newsletter / campaign language"],
+        ceiling: "gray",
+      },
+    });
+    expect(result.zone).toBe("red");
+    expect(result.reasons).toContain("user policy floor overrides bulk suppression");
+  });
+
+  it("pulls an amber candidate down to gray under a gray bulk ceiling", () => {
+    const result = determineZone({
+      scored: {
+        score: 5,
+        categoryScores: {
+          "decision-required": 0,
+          "financial-relevance": 5,
+          "risk-escalation": 0,
+        },
+        category: "financial-relevance",
+      },
+      policyResult: neutralPolicy,
+      llmResult: null,
+      rules: sampleRules,
+      bulk: {
+        isBulk: true,
+        confidence: 1,
+        signals: ["bulk-mail infrastructure headers", "newsletter / campaign language"],
+        ceiling: "gray",
+      },
+    });
+    expect(result.zone).toBe("gray");
+    expect(result.reasons).toContain(
+      "Held at gray: looks like a newsletter — bulk-mail infrastructure headers, newsletter / campaign language",
+    );
+  });
+
+  it("leaves the zone untouched when detection found no bulk", () => {
+    const result = determineZone({
+      scored: bulkRedScored,
+      policyResult: neutralPolicy,
+      llmResult: redLlm(),
+      rules: sampleRules,
+      bulk: {
+        isBulk: false,
+        confidence: 0.25,
+        signals: ["list-unsubscribe header"],
+        ceiling: null,
+      },
+    });
+    expect(result.zone).toBe("red");
+    expect(result.reasons).not.toContain("user policy floor overrides bulk suppression");
+    expect(result.reasons.some((reason) => reason.startsWith("Held at"))).toBe(false);
+  });
 });
 
 describe("buildUserFacingWhy", () => {

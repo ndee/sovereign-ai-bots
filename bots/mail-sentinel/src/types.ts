@@ -264,6 +264,23 @@ export interface RuleMatch {
   categories: string[];
 }
 
+/**
+ * Tunables for the bulk/newsletter suppression layer. The detector caps a
+ * message's zone (never RED) *before* the user policy floor is applied, so an
+ * explicit user floor always wins. Defaults are conservative (require ≥2
+ * distinct signals) to protect transactional mail riding bulk infrastructure.
+ */
+export interface BulkConfig {
+  /** Master switch; when false the detector is a no-op. */
+  enabled: boolean;
+  /** Minimum distinct bulk signals before a message is treated as bulk. */
+  minSignals: number;
+  /** Outbound-link count that counts as a "high link density" signal. */
+  minLinks: number;
+  /** Confidence at/above which the cap tightens from amber to gray. */
+  grayConfidence: number;
+}
+
 export interface RulesDocument {
   version: number;
   thresholds: {
@@ -280,6 +297,7 @@ export interface RulesDocument {
   defaultReminderDelay?: string | undefined;
   senderWeights: Record<string, number>;
   domainWeights: Record<string, number>;
+  bulk: BulkConfig;
   rules: RuleEntry[];
 }
 
