@@ -26,6 +26,20 @@ describe("config/args", () => {
     ).toEqual(loadGolden("parseArgs.feedback"));
   });
 
+  it("parses a feedback --ref value", () => {
+    const { command, options } = parseArgs([
+      "feedback",
+      "--instance",
+      "ms-core",
+      "--ref",
+      "a1b2c3",
+      "--action",
+      "not-important",
+    ]);
+    expect(command).toBe("feedback");
+    expect(options.ref).toBe("a1b2c3");
+  });
+
   it("matches the parseArgs policyAdd golden fixture", () => {
     expect(
       parseArgs([

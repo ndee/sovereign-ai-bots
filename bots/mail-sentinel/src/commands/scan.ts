@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { buildDigestMessage, buildRedAlertMessage, mapAlertToSummary } from "../alerts/format.js";
+import {
+  buildDigestMessage,
+  buildRedAlertMessage,
+  DIGEST_VISIBLE_LIMIT,
+  mapAlertToSummary,
+} from "../alerts/format.js";
+import { mintShortRef } from "../alerts/short-ref.js";
 import type { MailSentinelRuntime } from "../config/runtime.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../constants.js";
@@ -45,6 +51,12 @@ export const flushDigestIfDue = async (
   await runtime.sendMatrixRoomMessage(buildDigestMessage(pendingAlerts, runtime.digestInterval));
   state.digest.lastDigestAt = scanAt;
   state.digest.pendingAmber = [];
+  // Persist the order the user actually saw (the visible slice the digest
+  // renders) so positional feedback resolves against this digest, not a
+  // later re-render with shifted numbering.
+  state.digest.lastDigestAlertIds = pendingAlerts
+    .slice(0, DIGEST_VISIBLE_LIMIT)
+    .map((alert) => alert.alertId);
   for (const alert of pendingAlerts) {
     alert.digestSentAt = scanAt;
   }
@@ -231,8 +243,17 @@ export const scan = async (
           continue;
         }
 
+        const alertId = randomUUID();
         const alert: StoredAlert = {
-          alertId: randomUUID(),
+          alertId,
+          // Mint a stable short handle, lengthening past the default only if a
+          // shorter prefix would collide with an existing live alert's ref.
+          shortRef: mintShortRef(
+            alertId,
+            state.alerts
+              .map((existing) => existing.shortRef)
+              .filter((ref): ref is string => typeof ref === "string"),
+          ),
           messageKey: parsed.key,
           uid: parsed.uid,
           ...(parsed.messageId === undefined ? {} : { messageId: parsed.messageId }),

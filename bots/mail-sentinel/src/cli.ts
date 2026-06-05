@@ -11,7 +11,7 @@ import {
   printOutput,
 } from "./alerts/output.js";
 import { digest } from "./commands/digest.js";
-import { applyFeedback } from "./commands/feedback.js";
+import { applyFeedback, isAmbiguousFeedback } from "./commands/feedback.js";
 import { listAlerts } from "./commands/list-alerts.js";
 import { policyAdd, policyImportantSender, policyList, policyRemove } from "./commands/policy.js";
 import { scan } from "./commands/scan.js";
@@ -41,10 +41,21 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
         "Expected --action <important|not-important|less-often|remind-later|always-like-this|reduce|digest-only>",
       );
     }
-    if ((options.latest === true) === (typeof options.alertId === "string")) {
-      throw new Error("Use either --latest or --alert-id");
+    const selectorCount = [
+      typeof options.alertId === "string",
+      options.latest === true,
+      typeof options.ref === "string",
+    ].filter(Boolean).length;
+    if (selectorCount !== 1) {
+      throw new Error("Use exactly one of --alert-id, --latest, or --ref");
     }
-    printOutput(await applyFeedback(options), options, formatFeedbackResult);
+    const result = await applyFeedback(options);
+    printOutput(result, options, formatFeedbackResult);
+    // Ambiguous feedback applied no change — signal failure so callers (the
+    // Matrix bridge, the agent loop) re-prompt rather than treat it as success.
+    if (isAmbiguousFeedback(result)) {
+      process.exitCode = 1;
+    }
     return;
   }
   if (command === "list-alerts") {

@@ -30,20 +30,55 @@ export const formatScanResult = (result: Partial<ScanResult>): string => {
   return lines.join("\n");
 };
 
-export interface FeedbackResult {
-  note: string;
-  alertId: string;
-  nextReminderAt?: string;
-  policyId?: string;
+export interface FeedbackResultCandidate {
+  shortRef: string;
+  subject: string;
+  from: string;
 }
 
+export interface FeedbackResult {
+  note?: string;
+  alertId?: string;
+  shortRef?: string;
+  subject?: string;
+  from?: string;
+  nextReminderAt?: string;
+  policyId?: string;
+  status?: "ambiguous";
+  ref?: string;
+  candidates?: readonly FeedbackResultCandidate[];
+}
+
+// Name the exact item a confirmation applies to: "[shortRef] 'subject' from
+// sender". Falls back to the bare alertId when the enriched fields are absent,
+// so output is never empty.
+const describeTarget = (result: FeedbackResult): string => {
+  if (typeof result.shortRef === "string" && typeof result.subject === "string") {
+    const sender = typeof result.from === "string" ? ` from ${result.from}` : "";
+    return `[${result.shortRef}] '${result.subject}'${sender}`;
+  }
+  return `Alert ${String(result.alertId)}`;
+};
+
 export const formatFeedbackResult = (result: FeedbackResult): string => {
+  // Ambiguous: lead with the status word, then list the candidates with their
+  // short refs so the user can reply with an unambiguous one. No change applied.
+  if (result.status === "ambiguous") {
+    const candidates = result.candidates ?? [];
+    return [
+      `Ambiguous: '${result.ref ?? ""}' matches ${String(candidates.length)} items. Reply with one of:`,
+      ...candidates.map(
+        (candidate) => `- [${candidate.shortRef}] '${candidate.subject}' from ${candidate.from}`,
+      ),
+    ].join("\n");
+  }
+  const target = describeTarget(result);
   if (result.policyId !== undefined) {
-    return `${result.note} Alert ${result.alertId}. Policy ${result.policyId} created.`;
+    return `${result.note} Applied to: ${target}. Policy ${result.policyId} created.`;
   }
   return result.nextReminderAt === undefined
-    ? `${result.note} Alert ${result.alertId}.`
-    : `${result.note} Alert ${result.alertId} will be revisited at ${result.nextReminderAt}.`;
+    ? `${result.note} Applied to: ${target}.`
+    : `${result.note} Applied to: ${target}. Will be revisited at ${result.nextReminderAt}.`;
 };
 
 export interface ListAlertsResult {

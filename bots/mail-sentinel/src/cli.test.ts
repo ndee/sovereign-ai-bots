@@ -73,10 +73,10 @@ describe("cli", () => {
     );
   });
 
-  it("rejects feedback with neither --latest nor --alert-id", async () => {
+  it("rejects feedback with no selector (neither --latest, --alert-id, nor --ref)", async () => {
     await expect(
       runCli(["feedback", "--instance", "ms-core", "--action", "important"]),
-    ).rejects.toThrow("Use either --latest or --alert-id");
+    ).rejects.toThrow("Use exactly one of --alert-id, --latest, or --ref");
   });
 
   it("rejects feedback with both --latest and --alert-id", async () => {
@@ -91,7 +91,23 @@ describe("cli", () => {
         "--action",
         "important",
       ]),
-    ).rejects.toThrow("Use either --latest or --alert-id");
+    ).rejects.toThrow("Use exactly one of --alert-id, --latest, or --ref");
+  });
+
+  it("rejects feedback with both --ref and --alert-id", async () => {
+    await expect(
+      runCli([
+        "feedback",
+        "--instance",
+        "ms-core",
+        "--ref",
+        "abc",
+        "--alert-id",
+        "x",
+        "--action",
+        "important",
+      ]),
+    ).rejects.toThrow("Use exactly one of --alert-id, --latest, or --ref");
   });
 
   it("dispatches feedback when --latest is set and an alert exists", async () => {
@@ -110,6 +126,58 @@ describe("cli", () => {
     });
     await runCli(["feedback", "--instance", "ms-core", "--latest", "--action", "important"]);
     expect(stdoutSpy).toHaveBeenCalled();
+  });
+
+  it("dispatches feedback via --ref and confirms the matched item", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push({
+      alertId: "aaaaaaaa-0000-0000-0000-000000000000",
+      shortRef: "aaaaaa",
+      zone: "red",
+      category: "financial-relevance",
+      subject: "Invoice overdue",
+      from: "Alice <alice@example.com>",
+      fromAddress: "alice@example.com",
+      why: "w",
+      sentAt: "2026-04-08T09:00:00Z",
+      feedbackState: "pending",
+      matchedRuleIds: [],
+    });
+    await runCli(["feedback", "--instance", "ms-core", "--ref", "aaaaaa", "--action", "important"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("[aaaaaa] 'Invoice overdue'");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("sets a non-zero exit code when --ref feedback is ambiguous and applies no change", async () => {
+    const runtime = getFakeRuntime();
+    const base = {
+      zone: "amber" as const,
+      category: "financial-relevance" as const,
+      from: "Alice <alice@example.com>",
+      fromAddress: "alice@example.com",
+      why: "w",
+      sentAt: "2026-04-08T09:00:00Z",
+      feedbackState: "pending" as const,
+      matchedRuleIds: [],
+    };
+    runtime.state.alerts.push(
+      {
+        ...base,
+        alertId: "aa000000-0000-0000-0000-000000000000",
+        shortRef: "aa0000",
+        subject: "One",
+      },
+      {
+        ...base,
+        alertId: "aa111111-0000-0000-0000-000000000000",
+        shortRef: "aa1111",
+        subject: "Two",
+      },
+    );
+    await runCli(["feedback", "--instance", "ms-core", "--ref", "aa", "--action", "important"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("Ambiguous: 'aa' matches 2 items");
+    expect(process.exitCode).toBe(1);
+    expect(runtime.state.alerts.every((a) => a.feedbackState === "pending")).toBe(true);
   });
 
   it("rejects list-alerts without a valid --view", async () => {
