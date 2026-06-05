@@ -79,6 +79,14 @@ export interface StoredAlert {
   domain?: string | undefined;
   toAddresses?: string[] | undefined;
   why: string;
+  /**
+   * Short, capped, message-evidence excerpt copied onto the alert at scan time
+   * (not looked up at render). Derived solely from the local message snippet —
+   * never a remote fetch — so the alert is self-contained and survives
+   * `pruneState`. Optional: pre-existing persisted alerts (and alerts whose
+   * message had no snippet) simply render without an excerpt block.
+   */
+  excerpt?: string | undefined;
   sentAt: string;
   score?: number | undefined;
   adjustedScore?: number | undefined;

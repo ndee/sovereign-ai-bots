@@ -103,6 +103,34 @@ describe("commands/scan", () => {
     expect(runtime.state.alerts).toHaveLength(1);
   });
 
+  it("copies a capped excerpt from the local snippet onto the alert at scan time", async () => {
+    const runtime = setupRuntimeForScan();
+    await scan({ instance: "ms-core" });
+    const alert = runtime.state.alerts.at(-1);
+    // Excerpt is derived from the local message snippet (the body text), never
+    // a remote fetch — the only data source the runtime exposes is readMail.
+    expect(alert?.excerpt).toBe("Please pay $500 for invoice.");
+    expect(alert?.excerpt).toBe(runtime.state.messages["msg:<m1@ex>"]?.snippet);
+  });
+
+  it("omits the excerpt when the message body has no usable snippet", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.readMail = async () => ({
+      message: {
+        uid: 10,
+        messageId: "<m1@ex>",
+        from: ["Alice <alice@example.com>"],
+        subject: "Invoice #1",
+        text: "   ",
+        headers: [],
+      },
+    });
+    await scan({ instance: "ms-core" });
+    const alert = runtime.state.alerts.at(-1);
+    expect(alert).toBeDefined();
+    expect(alert?.excerpt).toBeUndefined();
+  });
+
   it("queues amber alerts instead of sending Matrix messages", async () => {
     const runtime = setupRuntimeForScan();
     runtime.classifyCandidate = async () =>

@@ -1,6 +1,7 @@
 import { CATEGORY_LABELS } from "../constants.js";
 import type { AlertSummary, StoredAlert } from "../types.js";
 import { formatConfidenceLabel } from "../util/time.js";
+import { formatSignalChip } from "./evidence.js";
 import { deriveShortRef } from "./short-ref.js";
 
 type AlertKind = AlertSummary["kind"];
@@ -116,6 +117,17 @@ const escapeHtml = (value: string): string =>
 const renderCodeOptions = (options: readonly string[]): string =>
   options.map((option) => `<code>${escapeHtml(option)}</code>`).join(" · ");
 
+// Render the message-evidence excerpt as a quote so it reads as "the email
+// said". Plain text prefixes each line with `> `; HTML wraps the escaped,
+// `<br>`-joined lines in a <blockquote>. The excerpt is already capped/escaped
+// safe at the source (`buildExcerpt`), but we still HTML-escape on render so
+// untrusted message content can never inject markup.
+const renderExcerptLines = (excerpt: string): string[] =>
+  excerpt.split("\n").map((line) => `> ${line}`);
+
+const renderExcerptHtml = (excerpt: string): string =>
+  `<blockquote>${excerpt.split("\n").map(escapeHtml).join("<br>")}</blockquote>`;
+
 export const formatAlertLine = (
   alert: Pick<StoredAlert, "alertId" | "shortRef" | "zone" | "category" | "from" | "subject">,
 ): string =>
@@ -152,6 +164,11 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
   // Bracketed so the handle reads as a typeable reference, not prose. Users
   // reply "feedback <ref> not important" to target this exact alert.
   const ref = `[${alertShortRef(alert)}]`;
+  // Evidence block: a quoted excerpt of what the mail said, plus a signal chip
+  // naming the matched reasons in words. Both omitted cleanly when absent so
+  // the rest of the alert is unchanged (#102).
+  const excerpt = alert.excerpt;
+  const signals = formatSignalChip(alert.reasons);
 
   const bodyLines = [
     `${emoji} ${zone} · ${category}${reminderSuffix}`,
@@ -160,20 +177,47 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
     "",
     `From: ${sender}`,
     `Why it matters: ${alert.why}`,
+    ...(excerpt === undefined ? [] : ["", ...renderExcerptLines(excerpt)]),
+    ...(signals === undefined ? [] : [`Signals: ${signals}`]),
     `Confidence: ${confidence}`,
     "",
     "Reply in thread with:",
     ALERT_FEEDBACK_OPTIONS.join(" · "),
   ];
 
+  // A <blockquote> is a block element and cannot live inside the meta <p>. With
+  // an excerpt we close the <p> after "Why it matters", drop in the blockquote,
+  // then resume the meta block (signals + confidence) in a fresh <p>. With no
+  // excerpt the original single-<p> meta block (From/Why/[signals]/Confidence)
+  // is preserved byte-for-byte so existing alerts render unchanged.
+  const signalsHtmlLine =
+    signals === undefined ? [] : [`<strong>Signals:</strong> ${escapeHtml(signals)}<br>`];
+  const metaHtml =
+    excerpt === undefined
+      ? [
+          "<p>",
+          `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
+          `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}<br>`,
+          ...signalsHtmlLine,
+          `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+          "</p>",
+        ]
+      : [
+          "<p>",
+          `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
+          `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}`,
+          "</p>",
+          renderExcerptHtml(excerpt),
+          "<p>",
+          ...signalsHtmlLine,
+          `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+          "</p>",
+        ];
+
   const formattedBody = [
     `<p>${emoji} <strong>${escapeHtml(`${zone} · ${category}${reminderSuffix}`)}</strong></p>`,
     `<p><code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong></p>`,
-    "<p>",
-    `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
-    `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}<br>`,
-    `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
-    "</p>",
+    ...metaHtml,
     "<p>",
     "Reply in thread with:<br>",
     renderCodeOptions(ALERT_FEEDBACK_OPTIONS),
@@ -208,6 +252,10 @@ export const buildDigestMessage = (
     // The position is digest-scoped (it shifts between digests); the bracketed
     // ref is stable, so both are shown and either targets this item.
     const ref = `[${alertShortRef(alert)}]`;
+    // Per-item evidence so the digest is judgeable without opening the mail:
+    // quoted excerpt + signal chip, each omitted cleanly when absent (#102).
+    const excerpt = alert.excerpt;
+    const signals = formatSignalChip(alert.reasons);
 
     bodyLines.push(
       "",
@@ -215,15 +263,33 @@ export const buildDigestMessage = (
       `From: ${sender}`,
       confidence,
       `Why it matters: ${alert.why}`,
+      ...(excerpt === undefined ? [] : renderExcerptLines(excerpt)),
+      ...(signals === undefined ? [] : [`Signals: ${signals}`]),
     );
+    // A <blockquote> is a block element and cannot sit inside the item <p>, so
+    // when an excerpt is present we close the <p> after "Why it matters", emit
+    // the blockquote, then carry the signal chip in its own trailing <p>. With
+    // no excerpt the chip just appends inside the item <p> (after a <br>).
     htmlParts.push(
       "<p>",
       `<strong>${position}.</strong> <code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong><br>`,
       `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
       `${escapeHtml(confidence)}<br>`,
-      `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}`,
-      "</p>",
+      `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}${
+        excerpt === undefined && signals !== undefined ? "<br>" : ""
+      }`,
     );
+    if (excerpt === undefined) {
+      if (signals !== undefined) {
+        htmlParts.push(`<strong>Signals:</strong> ${escapeHtml(signals)}`);
+      }
+      htmlParts.push("</p>");
+    } else {
+      htmlParts.push("</p>", renderExcerptHtml(excerpt));
+      if (signals !== undefined) {
+        htmlParts.push("<p>", `<strong>Signals:</strong> ${escapeHtml(signals)}`, "</p>");
+      }
+    }
   });
 
   if (alerts.length > DIGEST_VISIBLE_LIMIT) {

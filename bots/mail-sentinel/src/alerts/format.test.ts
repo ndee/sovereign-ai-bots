@@ -286,6 +286,99 @@ describe("alerts/format", () => {
     expect(formatSenderDisplay("not-an-address")).toBe("not-an-address");
   });
 
+  const evidenceAlert: StoredAlert = {
+    ...sampleAlert,
+    excerpt: "Please pay the attached invoice by Friday.\nTotal due: $500.",
+    reasons: ["subject mentions an invoice", "mentions a dollar amount", "deadline detected"],
+  };
+
+  it("matches the buildRedAlertMessage with-evidence golden fixture", () => {
+    expect(buildRedAlertMessage(evidenceAlert, "new-alert")).toEqual(
+      loadGolden("buildRedAlertMessage.withEvidence"),
+    );
+  });
+
+  it("matches the buildDigestMessage with-evidence golden fixture", () => {
+    expect(buildDigestMessage([{ ...evidenceAlert, zone: "amber" }], "12h")).toEqual(
+      loadGolden("buildDigestMessage.withEvidence"),
+    );
+  });
+
+  it("renders the excerpt as a quote and the signals chip in the red alert", () => {
+    const msg = buildRedAlertMessage(evidenceAlert, "new-alert");
+    expect(msg.body).toContain("> Please pay the attached invoice by Friday.");
+    expect(msg.body).toContain("> Total due: $500.");
+    expect(msg.body).toContain(
+      "Signals: subject mentions an invoice · mentions a dollar amount · deadline detected",
+    );
+    expect(msg.formattedBody).toContain(
+      "<blockquote>Please pay the attached invoice by Friday.<br>Total due: $500.</blockquote>",
+    );
+    expect(msg.formattedBody).toContain("<strong>Signals:</strong>");
+  });
+
+  it("renders the excerpt and signals per digest item", () => {
+    const msg = buildDigestMessage([{ ...evidenceAlert, zone: "amber" }], "12h");
+    expect(msg.body).toContain("> Please pay the attached invoice by Friday.");
+    expect(msg.body).toContain("Signals: subject mentions an invoice");
+    expect(msg.formattedBody).toContain("<blockquote>");
+    expect(msg.formattedBody).toContain("<strong>Signals:</strong>");
+  });
+
+  it("omits the excerpt block and signals chip cleanly when both are absent", () => {
+    const msg = buildRedAlertMessage(sampleAlert, "new-alert");
+    expect(msg.body).not.toContain(">");
+    expect(msg.body).not.toContain("Signals:");
+    expect(msg.formattedBody).not.toContain("<blockquote>");
+    expect(msg.formattedBody).not.toContain("Signals:");
+  });
+
+  it("renders signals without an excerpt in both alert and digest", () => {
+    const signalsOnly: StoredAlert = { ...sampleAlert, reasons: ["deadline detected"] };
+    const alertMsg = buildRedAlertMessage(signalsOnly, "new-alert");
+    expect(alertMsg.body).toContain("Signals: deadline detected");
+    expect(alertMsg.body).not.toContain(">");
+    expect(alertMsg.formattedBody).toContain("<strong>Signals:</strong> deadline detected<br>");
+    expect(alertMsg.formattedBody).not.toContain("<blockquote>");
+
+    const digestMsg = buildDigestMessage([{ ...signalsOnly, zone: "amber" }], "12h");
+    expect(digestMsg.body).toContain("Signals: deadline detected");
+    expect(digestMsg.body).not.toContain(">");
+    expect(digestMsg.formattedBody).toContain("<strong>Signals:</strong> deadline detected");
+    expect(digestMsg.formattedBody).not.toContain("<blockquote>");
+  });
+
+  it("renders an excerpt without signals in both alert and digest", () => {
+    const excerptOnly: StoredAlert = { ...sampleAlert, excerpt: "One line of evidence." };
+    const alertMsg = buildRedAlertMessage(excerptOnly, "new-alert");
+    expect(alertMsg.body).toContain("> One line of evidence.");
+    expect(alertMsg.body).not.toContain("Signals:");
+    expect(alertMsg.formattedBody).toContain("<blockquote>One line of evidence.</blockquote>");
+    expect(alertMsg.formattedBody).not.toContain("Signals:");
+
+    const digestMsg = buildDigestMessage([{ ...excerptOnly, zone: "amber" }], "12h");
+    expect(digestMsg.body).toContain("> One line of evidence.");
+    expect(digestMsg.body).not.toContain("Signals:");
+    expect(digestMsg.formattedBody).toContain("<blockquote>One line of evidence.</blockquote>");
+    expect(digestMsg.formattedBody).not.toContain("Signals:");
+  });
+
+  it("HTML-escapes untrusted excerpt and signal content so markup cannot be injected", () => {
+    const malicious: StoredAlert = {
+      ...sampleAlert,
+      excerpt: "<script>alert(1)</script> & co\nsecond <b>line</b>",
+      reasons: ["<img src=x onerror=1>"],
+    };
+    const msg = buildRedAlertMessage(malicious, "new-alert");
+    expect(msg.formattedBody).toContain(
+      "<blockquote>&lt;script&gt;alert(1)&lt;/script&gt; &amp; co<br>second &lt;b&gt;line&lt;/b&gt;</blockquote>",
+    );
+    expect(msg.formattedBody).not.toContain("<script>");
+    expect(msg.formattedBody).toContain("&lt;img src=x onerror=1&gt;");
+    // Plain body keeps raw characters (it is plain text).
+    expect(msg.body).toContain("> <script>alert(1)</script> & co");
+  });
+
   it("matches the buildDigestMessage many-alerts golden fixture", () => {
     const message = buildDigestMessage(
       Array.from({ length: 12 }, (_, i) => ({
