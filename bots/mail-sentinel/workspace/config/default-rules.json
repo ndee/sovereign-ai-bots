@@ -14,6 +14,12 @@
   "defaultReminderDelay": "4h",
   "senderWeights": {},
   "domainWeights": {},
+  "bulk": {
+    "enabled": true,
+    "minSignals": 2,
+    "minLinks": 8,
+    "grayConfidence": 0.7
+  },
   "rules": [
     {
       "id": "decision-approval-subject",

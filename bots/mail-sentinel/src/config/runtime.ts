@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 
 import {
   DEFAULT_AGENT_ID,
+  DEFAULT_BULK_ENABLED,
+  DEFAULT_BULK_GRAY_CONFIDENCE,
+  DEFAULT_BULK_MIN_LINKS,
+  DEFAULT_BULK_MIN_SIGNALS,
   DEFAULT_CONFIG_PATH,
   DEFAULT_DIGEST_INTERVAL,
   DEFAULT_IMAP_INSTANCE_ID,
@@ -197,6 +201,7 @@ export class MailSentinelRuntime {
     const rulesRecord = rules as Record<string, unknown>;
     const thresholds = (rulesRecord.thresholds ?? {}) as Record<string, unknown>;
     const zoneThresholds = (rulesRecord.zoneThresholds ?? {}) as Record<string, unknown>;
+    const bulk = (rulesRecord.bulk ?? {}) as Record<string, unknown>;
     return {
       version: Number(rulesRecord.version ?? 2),
       thresholds: {
@@ -216,6 +221,12 @@ export class MailSentinelRuntime {
           : undefined,
       senderWeights: (rulesRecord.senderWeights as Record<string, number>) ?? {},
       domainWeights: (rulesRecord.domainWeights as Record<string, number>) ?? {},
+      bulk: {
+        enabled: typeof bulk.enabled === "boolean" ? bulk.enabled : DEFAULT_BULK_ENABLED,
+        minSignals: Number(bulk.minSignals ?? DEFAULT_BULK_MIN_SIGNALS),
+        minLinks: Number(bulk.minLinks ?? DEFAULT_BULK_MIN_LINKS),
+        grayConfidence: Number(bulk.grayConfidence ?? DEFAULT_BULK_GRAY_CONFIDENCE),
+      },
       rules: Array.isArray(rulesRecord.rules) ? rulesRecord.rules : [],
     };
   }

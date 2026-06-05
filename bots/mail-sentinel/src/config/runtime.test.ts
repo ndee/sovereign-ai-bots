@@ -266,6 +266,28 @@ describe("config/runtime", () => {
       expect(rules.defaultReminderDelay).toBeUndefined();
       expect(rules.senderWeights).toEqual({});
       expect(rules.rules).toEqual([]);
+      expect(rules.bulk).toEqual({
+        enabled: true,
+        minSignals: 2,
+        minLinks: 8,
+        grayConfidence: 0.7,
+      });
+    });
+
+    it("honours an explicit bulk config block", async () => {
+      const runtime = await loadRuntime();
+      readFile.mockResolvedValueOnce(
+        JSON.stringify({
+          bulk: { enabled: false, minSignals: 3, minLinks: 12, grayConfidence: 0.9 },
+        }),
+      );
+      const rules = await runtime.readRules();
+      expect(rules.bulk).toEqual({
+        enabled: false,
+        minSignals: 3,
+        minLinks: 12,
+        grayConfidence: 0.9,
+      });
     });
 
     it("throws when the rules file is missing or invalid", async () => {

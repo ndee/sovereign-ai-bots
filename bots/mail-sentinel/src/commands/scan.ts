@@ -12,6 +12,7 @@ import { resolveToolRuntime } from "../config/runtime.js";
 import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../constants.js";
 import { parseMessage } from "../imap/parse.js";
 import { evaluatePolicy } from "../policy/engine.js";
+import { detectBulkSignals } from "../scoring/bulk.js";
 import { scoreMessage } from "../scoring/heuristics.js";
 import { buildLlmCandidate, buildUserFacingWhy, determineZone } from "../scoring/llm.js";
 import { withLockedState } from "../state/io.js";
@@ -232,6 +233,7 @@ export const scan = async (
           policyResult,
           llmResult,
           rules,
+          bulk: detectBulkSignals(parsed, rules.bulk),
         });
         // determineZone always populates at least one reason.
         state.zoneHistory.push({
