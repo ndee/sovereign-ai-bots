@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sampleAlert } from "../__fixtures__/inputs.js";
 import { loadGolden } from "../__fixtures__/load.js";
+import type { ExplainCommandResult } from "../commands/explain.js";
 import {
   formatDigestResult,
+  formatExplainResult,
   formatFeedbackResult,
   formatListAlertsResult,
   formatPolicyActionResult,
@@ -277,5 +279,206 @@ describe("alerts/output", () => {
       printOutput({ a: 1 }, { json: false }, () => "text output");
       expect(writeSpy).toHaveBeenCalledWith("text output\n");
     });
+  });
+});
+
+describe("alerts/output formatExplainResult", () => {
+  const fullExplanation = (
+    overrides: Partial<ExplainCommandResult> = {},
+  ): ExplainCommandResult => ({
+    instanceId: "ms-core",
+    alertId: "11111111-1111-1111-1111-111111111111",
+    shortRef: "111111",
+    subject: "Invoice overdue",
+    from: "Billing <billing@example.com>",
+    policy: {
+      signals: ["amount detected", "deadline detected"],
+      matchedRuleIds: ["rule-amount", "rule-deadline"],
+      policyModifiers: ["sender billing@example.com boosted"],
+      score: 5,
+      adjustedScore: 7,
+      categoryScores: { "financial-relevance": 5 },
+    },
+    semantic: {
+      available: true,
+      result: {
+        decisionRequired: true,
+        financialRelevance: true,
+        riskEscalation: false,
+        confidence: 82,
+        urgency: "high",
+        reason: "Payment failure may lock the account within 48 hours.",
+        deadlineDetected: true,
+        amountDetected: true,
+        suggestedZone: "red",
+      },
+    },
+    decision: {
+      zone: "red",
+      category: "financial-relevance",
+      confidence: 82,
+      why: "Payment failure may lock the account within 48 hours.",
+    },
+    ...overrides,
+  });
+
+  it("renders the three sections separately, reusing the signal chip", () => {
+    const text = formatExplainResult(fullExplanation());
+    expect(text).toBe(
+      [
+        "Explanation for [111111] 'Invoice overdue' from Billing <billing@example.com>",
+        "",
+        "Policy & heuristics:",
+        "  - Signals: amount detected · deadline detected",
+        "  - Matched rules: rule-amount, rule-deadline",
+        "  - Policy: sender billing@example.com boosted",
+        "  - Score: base 5 → adjusted 7",
+        "",
+        "Semantic review:",
+        "  - Verdict: Payment failure may lock the account within 48 hours.",
+        "  - Classified: decision-required, financial-relevance",
+        "  - Urgency: high",
+        "  - Suggested zone: red",
+        "  - Confidence: high (82%)",
+        "  - Extracted signals: deadline=true, amount=true",
+        "",
+        "Zone decision:",
+        "  - Zone: RED",
+        "  - Category: financial-relevance",
+        "  - Confidence: high (82%)",
+        "  - Why it matters: Payment failure may lock the account within 48 hours.",
+      ].join("\n"),
+    );
+  });
+
+  it("renders an empty policy section as '(none)' and an unavailable semantic review", () => {
+    const text = formatExplainResult(
+      fullExplanation({
+        policy: { signals: [], matchedRuleIds: [], policyModifiers: [] },
+        semantic: { available: false },
+        decision: {
+          zone: "amber",
+          category: "decision-required",
+          why: "Flagged by Mail Sentinel.",
+        },
+      }),
+    );
+    expect(text).toContain("Policy & heuristics: (none)");
+    expect(text).toContain("Semantic review:\n  - unavailable — no reviewer verdict recorded");
+    expect(text).toContain("Zone decision:");
+    expect(text).toContain("  - Zone: AMBER");
+    // No confidence on the alert → label degrades to "unknown".
+    expect(text).toContain("  - Confidence: unknown");
+  });
+
+  it("treats an available-but-empty semantic result as unavailable", () => {
+    const text = formatExplainResult(
+      fullExplanation({ semantic: { available: true, result: undefined } }),
+    );
+    expect(text).toContain("Semantic review:\n  - unavailable — no reviewer verdict recorded");
+  });
+
+  it("renders 'none' when the reviewer classified no category and shows only present score parts", () => {
+    const text = formatExplainResult(
+      fullExplanation({
+        policy: {
+          signals: [],
+          matchedRuleIds: [],
+          policyModifiers: [],
+          adjustedScore: 4,
+        },
+        semantic: {
+          available: true,
+          result: {
+            decisionRequired: false,
+            financialRelevance: false,
+            riskEscalation: false,
+            confidence: 30,
+            urgency: "low",
+            reason: "Low-signal message.",
+            deadlineDetected: false,
+            amountDetected: false,
+            suggestedZone: "gray",
+          },
+        },
+      }),
+    );
+    expect(text).toContain("  - Classified: none");
+    // Only adjustedScore is present, so the score line carries just that part.
+    expect(text).toContain("  - Score: adjusted 4");
+    expect(text).not.toContain("base");
+  });
+
+  it("renders only the base score when adjustedScore is absent", () => {
+    const text = formatExplainResult(
+      fullExplanation({
+        policy: { signals: [], matchedRuleIds: [], policyModifiers: [], score: 6 },
+      }),
+    );
+    expect(text).toContain("  - Score: base 6");
+    expect(text).not.toContain("adjusted");
+  });
+
+  it("omits the score line entirely when neither score is present", () => {
+    const text = formatExplainResult(
+      fullExplanation({
+        policy: { signals: ["x"], matchedRuleIds: [], policyModifiers: [] },
+      }),
+    );
+    expect(text).not.toContain("Score:");
+    expect(text).toContain("  - Signals: x");
+  });
+
+  it("lists all three classification flags when the reviewer set them", () => {
+    const text = formatExplainResult(
+      fullExplanation({
+        semantic: {
+          available: true,
+          result: {
+            decisionRequired: true,
+            financialRelevance: true,
+            riskEscalation: true,
+            confidence: 90,
+            urgency: "high",
+            reason: "Escalating risk.",
+            deadlineDetected: true,
+            amountDetected: true,
+            suggestedZone: "red",
+          },
+        },
+      }),
+    );
+    expect(text).toContain(
+      "  - Classified: decision-required, financial-relevance, risk-escalation",
+    );
+  });
+
+  it("renders an ambiguous result with the candidate list, like feedback", () => {
+    const text = formatExplainResult({
+      instanceId: "ms-core",
+      status: "ambiguous",
+      ref: "aa",
+      candidates: [
+        {
+          alertId: "aa000000-0000-0000-0000-000000000000",
+          shortRef: "aa0000",
+          subject: "One",
+          from: "a@x.com",
+        },
+        {
+          alertId: "aa111111-0000-0000-0000-000000000000",
+          shortRef: "aa1111",
+          subject: "Two",
+          from: "b@y.com",
+        },
+      ],
+    });
+    expect(text).toBe(
+      [
+        "Ambiguous: 'aa' matches 2 items. Reply with one of:",
+        "- [aa0000] 'One' from a@x.com",
+        "- [aa1111] 'Two' from b@y.com",
+      ].join("\n"),
+    );
   });
 });

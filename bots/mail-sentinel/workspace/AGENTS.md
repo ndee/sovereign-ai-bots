@@ -41,8 +41,9 @@ Mail Sentinel Stage 1.5 flow:
 2. For red-zone or recent alert overviews, use `list-alerts`
 3. For amber summaries or “What is relevant but not urgent?”, use `digest`
 4. For “Very important” / “Not important” / “Less of this” / “Remind later” / “Always treat like this” / “Reduce” / “Digest only”, use `feedback`
-5. For direct sender importance requests like “Mails from Nadine are important”, use `policy important-sender --query <text> --announce` first
-6. For other sender/domain preference changes, use `policy list`, `policy add`, and `policy remove`
+5. For “Why was this flagged?” / “Explain this alert” / debugging a wrong classification, use `explain` (`--alert-id`, `--latest`, or `--ref`); it reports the matched rules and policy modifiers, the semantic reviewer's verdict, and the final zone decision as separate sections
+6. For direct sender importance requests like “Mails from Nadine are important”, use `policy important-sender --query <text> --announce` first
+7. For other sender/domain preference changes, use `policy list`, `policy add`, and `policy remove`
 
 Feedback rules:
 1. If the user clearly refers to the newest alert, use `--latest`
