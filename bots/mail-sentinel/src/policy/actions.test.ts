@@ -235,6 +235,36 @@ describe("policy/actions", () => {
     });
   });
 
+  it("derives a sender-scoped mute policy on the mute path", () => {
+    for (const zone of ["red", "amber", "gray"] as const) {
+      const derived = derivePolicyFromFeedback({ ...richAlert, zone }, "mute", "sender");
+      expect(derived?.type).toBe("mute");
+      expect(derived?.entry.match).toBe("alice@example.com");
+      expect(derived?.entry.action).toBe("mute");
+      expect(derived?.entry.minZone).toBeUndefined();
+      expect(derived?.entry.maxZone).toBeUndefined();
+      expect(derived?.entry.reason).toBe("Derived from mute feedback for alice@example.com");
+    }
+  });
+
+  it("derives a domain-scoped mute policy", () => {
+    const derived = derivePolicyFromFeedback(richAlert, "mute", "domain");
+    expect(derived?.type).toBe("mute");
+    expect(derived?.entry.match).toBe("example.com");
+    expect(derived?.entry.action).toBe("mute");
+  });
+
+  it("returns null for a subject/content mute (the matcher cannot match text)", () => {
+    expect(derivePolicyFromFeedback(richAlert, "mute", "subject")).toBeNull();
+    expect(derivePolicyFromFeedback(richAlert, "mute", "content", { contains: "x" })).toBeNull();
+  });
+
+  it("returns null for a sender mute when the sender is unknown", () => {
+    expect(
+      derivePolicyFromFeedback({ ...richAlert, fromAddress: undefined }, "mute", "sender"),
+    ).toBeNull();
+  });
+
   it("matches the applyLearningAdjustment golden fixture", () => {
     expect({
       increment: (() => {

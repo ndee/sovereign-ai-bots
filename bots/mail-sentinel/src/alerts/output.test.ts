@@ -125,6 +125,68 @@ describe("alerts/output", () => {
     );
   });
 
+  it("echoes the canonical interpretation alongside scope and rule", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Policy updated locally. Similar mail will be hidden.",
+        actionLabel: "hide these",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        policyId: "pol-1",
+        scope: "sender",
+        ruleSummary: "mute sender billing@example.com",
+      }),
+    ).toBe(
+      "Interpreted as \"hide these\". Policy updated locally. Similar mail will be hidden. Applied to: [a1b2c3] 'Invoice overdue' from billing@example.com. Scope: this sender. Created rule: mute sender billing@example.com. Policy pol-1 created.",
+    );
+  });
+
+  it("prefixes the interpretation on a plain applied confirmation", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback applied. Alert marked as important.",
+        actionLabel: "important",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "Billing <billing@example.com>",
+        scope: "item",
+      }),
+    ).toBe(
+      "Interpreted as \"important\". Feedback applied. Alert marked as important. Applied to: [a1b2c3] 'Invoice overdue' from Billing <billing@example.com>. Scope: this item only.",
+    );
+  });
+
+  it("prefixes the interpretation on a reminder confirmation", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Reminder scheduled.",
+        actionLabel: "remind me later",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        scope: "item",
+        nextReminderAt: "2026-04-08T16:00:00Z",
+      }),
+    ).toBe(
+      "Interpreted as \"remind me later\". Reminder scheduled. Applied to: [a1b2c3] 'Invoice overdue'. Scope: this item only. Will be revisited at 2026-04-08T16:00:00Z.",
+    );
+  });
+
+  it("omits the interpretation prefix when actionLabel is empty", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback recorded.",
+        actionLabel: "",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+      }),
+    ).toBe("Feedback recorded. Applied to: [a1b2c3] 'Invoice overdue'.");
+  });
+
   it("states scope without a rule clause for item-scoped feedback", () => {
     expect(
       formatFeedbackResult({

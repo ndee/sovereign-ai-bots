@@ -60,6 +60,8 @@ export interface FeedbackResult {
   shortRef?: string;
   subject?: string;
   from?: string;
+  /** Canonical action in plain words, echoed as the interpreted intent. */
+  actionLabel?: string;
   scope?: FeedbackScope;
   ruleSummary?: string;
   dryRun?: boolean;
@@ -118,6 +120,13 @@ export const formatFeedbackResult = (result: FeedbackResult): string => {
     ].join("\n");
   }
   const target = describeTarget(result);
+  // Echo the canonical interpretation first so the user always sees *what the
+  // system understood* in plain words (the #108 action axis), then the explicit
+  // scope + exact rule (the #100 scope axis).
+  const interpreted =
+    typeof result.actionLabel === "string" && result.actionLabel.length > 0
+      ? `Interpreted as "${result.actionLabel}". `
+      : "";
   // Dry run: nothing was written. State the scope and exact rule that *would*
   // be created so the control plane can show the preview before committing.
   if (result.dryRun === true) {
@@ -126,15 +135,15 @@ export const formatFeedbackResult = (result: FeedbackResult): string => {
         ? ""
         : ` Rule: ${result.ruleSummary}.`;
     const scopeLabel = result.scope === undefined ? "" : ` Scope: ${SCOPE_LABELS[result.scope]}.`;
-    return `Dry run — would apply to: ${target}.${scopeLabel}${rulePart} (nothing written)`;
+    return `${interpreted}Dry run — would apply to: ${target}.${scopeLabel}${rulePart} (nothing written)`;
   }
   const scopePart = describeScope(result);
   if (result.policyId !== undefined) {
-    return `${result.note} Applied to: ${target}.${scopePart} Policy ${result.policyId} created.`;
+    return `${interpreted}${result.note} Applied to: ${target}.${scopePart} Policy ${result.policyId} created.`;
   }
   return result.nextReminderAt === undefined
-    ? `${result.note} Applied to: ${target}.${scopePart}`
-    : `${result.note} Applied to: ${target}.${scopePart} Will be revisited at ${result.nextReminderAt}.`;
+    ? `${interpreted}${result.note} Applied to: ${target}.${scopePart}`
+    : `${interpreted}${result.note} Applied to: ${target}.${scopePart} Will be revisited at ${result.nextReminderAt}.`;
 };
 
 export interface ListAlertsResult {

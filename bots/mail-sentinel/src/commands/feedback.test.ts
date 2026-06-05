@@ -211,6 +211,66 @@ describe("commands/feedback", () => {
     expect(runtime.state.alerts[0]?.feedbackState).toBe("digest-only");
   });
 
+  it("creates a sender-scoped mute policy and echoes the canonical label", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert({ zone: "amber" })];
+    const result = applied(
+      await applyFeedback({
+        instance: "ms-core",
+        alertId: "alert-1",
+        action: "mute",
+        scope: "sender",
+      }),
+    );
+    expect(result.policyId).toBeDefined();
+    expect(result.action).toBe("mute");
+    expect(result.actionLabel).toBe("hide these");
+    expect(result.note).toBe("Policy updated locally. Similar mail will be hidden.");
+    expect(runtime.policy.mutePolicies).toHaveLength(1);
+    expect(runtime.policy.mutePolicies[0]?.match).toBe("alice@example.com");
+    expect(runtime.policy.mutePolicies[0]?.action).toBe("mute");
+    expect(runtime.policy.senderPolicies).toHaveLength(0);
+    expect(runtime.state.alerts[0]?.feedbackState).toBe("mute");
+    // mute is a routing change, not a learning nudge.
+    expect(runtime.state.learning.senderWeights["alice@example.com"]).toBeUndefined();
+  });
+
+  it("creates a domain-scoped mute policy", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert({ zone: "amber" })];
+    await applyFeedback({
+      instance: "ms-core",
+      alertId: "alert-1",
+      action: "mute",
+      scope: "domain",
+    });
+    expect(runtime.policy.mutePolicies).toHaveLength(1);
+    expect(runtime.policy.mutePolicies[0]?.match).toBe("example.com");
+    expect(runtime.policy.mutePolicies[0]?.action).toBe("mute");
+  });
+
+  it("rejects a subject/content scope for mute (the matcher cannot match text)", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert({ zone: "amber" })];
+    await expect(
+      applyFeedback({
+        instance: "ms-core",
+        alertId: "alert-1",
+        action: "mute",
+        scope: "subject",
+      }),
+    ).rejects.toThrow("does not contain enough information to derive a subject rule");
+  });
+
+  it("populates a plain-words actionLabel for every applied action", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [baseAlert()];
+    const result = applied(
+      await applyFeedback({ instance: "ms-core", alertId: "alert-1", action: "important" }),
+    );
+    expect(result.actionLabel).toBe("important");
+  });
+
   it("throws when the alert does not contain enough info to derive a sender rule", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts = [baseAlert({ fromAddress: undefined })];
@@ -291,6 +351,11 @@ describe("commands/feedback", () => {
         action: "digest-only",
         scope: "sender",
         note: "Policy updated locally. Similar signals routed to digest only.",
+      },
+      {
+        action: "mute",
+        scope: "sender",
+        note: "Policy updated locally. Similar mail will be hidden.",
       },
     ];
     for (const { action, scope, note } of cases) {

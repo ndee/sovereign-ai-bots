@@ -40,7 +40,7 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
   if (command === "feedback") {
     if (typeof options.action !== "string") {
       throw new Error(
-        "Expected --action <important|not-important|less-often|remind-later|always-like-this|reduce|digest-only>",
+        "Expected --action <important|not-important|less-often|remind-later|always-like-this|reduce|digest-only|mute>",
       );
     }
     const selectorCount = [

@@ -9,7 +9,8 @@ export type FeedbackState =
   | "less-often"
   | "always-like-this"
   | "reduce"
-  | "digest-only";
+  | "digest-only"
+  | "mute";
 
 export type FeedbackAction =
   | "important"
@@ -18,7 +19,8 @@ export type FeedbackAction =
   | "remind-later"
   | "always-like-this"
   | "reduce"
-  | "digest-only";
+  | "digest-only"
+  | "mute";
 
 /**
  * What a feedback action applies to. Resolved explicitly for every feedback

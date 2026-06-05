@@ -104,11 +104,14 @@ export const subjectToken = (subject: string): string => {
 };
 
 // The zone fields and reason verb are driven by the action; the scope only
-// decides what the rule matches against. Returning null here means the action
-// derives no policy (e.g. it is not a policy-deriving action).
+// decides what the rule matches against. `mute` is a policy action with no zone
+// change — it routes onto the engine's mutePolicies path so future similar mail
+// is hidden rather than re-zoned. Returning null means the action derives no
+// policy (e.g. it is not a policy-deriving action).
 interface ActionShape {
   minZone?: Zone;
   maxZone?: Zone;
+  mute?: boolean;
   verb: string;
 }
 
@@ -122,6 +125,9 @@ const actionShape = (action: FeedbackAction, zone: Zone): ActionShape | null => 
   if (action === "digest-only") {
     return { maxZone: "amber", verb: "digest-only feedback" };
   }
+  if (action === "mute") {
+    return { mute: true, verb: "mute feedback" };
+  }
   return null;
 };
 
@@ -131,6 +137,11 @@ const actionShape = (action: FeedbackAction, zone: Zone): ActionShape | null => 
  * still records feedbackState + learning for that one alert). `sender`/`domain`
  * match the alert's address/domain; `subject`/`content` produce a `content`
  * policy keyed on a token — derived from the subject or supplied via `contains`.
+ *
+ * `mute` is special: the engine's mute matcher only globs the sender address,
+ * sender name, and domain (never the subject or body), so a mute can only be
+ * scoped to `sender` or `domain`. A `subject`/`content` mute would never match,
+ * so it is rejected (null) rather than written as a dead rule.
  */
 export const derivePolicyFromFeedback = (
   alert: Pick<StoredAlert, "fromAddress" | "domain" | "zone"> & { subject?: string | undefined },
@@ -145,10 +156,13 @@ export const derivePolicyFromFeedback = (
   const zoneFields = {
     ...(shape.minZone === undefined ? {} : { minZone: shape.minZone }),
     ...(shape.maxZone === undefined ? {} : { maxZone: shape.maxZone }),
+    ...(shape.mute === true ? { action: "mute" as const } : {}),
   };
+  // A mute writes onto the mutePolicies bucket; everything else stays in the
+  // bucket named by its scope.
   const build = (type: PolicyType, extra: PolicyEntryBase, target: string): DerivedPolicy => ({
     id: randomUUID(),
-    type,
+    type: shape.mute === true ? "mute" : type,
     entry: {
       id: randomUUID(),
       ...extra,
@@ -168,6 +182,11 @@ export const derivePolicyFromFeedback = (
       return null;
     }
     return build("domain", { match: alert.domain }, alert.domain);
+  }
+  // subject / content require matching message text, which the mute matcher
+  // cannot do — so mute only supports sender/domain scopes.
+  if (shape.mute === true) {
+    return null;
   }
   // subject / content both produce a scoped content policy keyed on a regex.
   const policyScope: PolicyScope = scope === "subject" ? "subject" : "body";
