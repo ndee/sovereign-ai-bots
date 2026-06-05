@@ -11,6 +11,7 @@ import type {
   ZoneDecision,
 } from "../types.js";
 import { compactText } from "../util/normalize.js";
+import type { BulkDetectionResult } from "./bulk.js";
 import { applyZoneCeiling, applyZoneFloor } from "./zone.js";
 
 export const quoteLobsterArg = (value: unknown): string => JSON.stringify(String(value));
@@ -131,10 +132,17 @@ export interface DetermineZoneInput {
   policyResult: PolicyEvaluationResult;
   llmResult: LlmResult | null;
   rules: RulesDocument;
+  /**
+   * Bulk/newsletter detection. When present and `isBulk`, its `ceiling` caps the
+   * zone *before* the user policy floor is applied — so an explicit user floor
+   * always wins over bulk suppression. Absent/null leaves behavior unchanged.
+   */
+  bulk?: BulkDetectionResult | null;
 }
 
 export const determineZone = (input: DetermineZoneInput): ZoneDecision => {
   const { scored, policyResult, llmResult, rules } = input;
+  const bulk = input.bulk ?? null;
   const adjustedScore = scored.score + policyResult.scoreModifier;
   const adjustedCategoryScore =
     (scored.categoryScores[scored.category] ?? 0) + policyResult.scoreModifier;
@@ -202,7 +210,29 @@ export const determineZone = (input: DetermineZoneInput): ZoneDecision => {
     }
   }
 
+  // Precedence: bulk ceiling (down) → user floor (up) → user ceiling (down).
+  // The bulk ceiling is applied BEFORE the user floor so an explicit floor can
+  // lift the zone back above the bulk cap — user policy always beats bulk
+  // suppression. The user's own maxZone ceiling still applies last.
+  const bulkCeiling = bulk?.isBulk === true ? bulk.ceiling : null;
+  const beforeBulk = zone;
+  zone = applyZoneCeiling(zone, bulkCeiling);
+  // `zone` only changes here when a bulk ceiling was present, which in turn
+  // requires `bulk` to be a non-null bulk result — so `bulk` is non-null
+  // whenever `cappedByBulk` is true.
+  const cappedByBulk = bulk !== null && zone !== beforeBulk;
+  if (cappedByBulk) {
+    reasons.push(`Held at ${zone}: looks like a newsletter — ${bulk.signals.join(", ")}`);
+  }
+
+  const beforeFloor = zone;
   zone = applyZoneFloor(zone, policyResult.zoneFloor);
+  // A floor that lifts the zone past where bulk had capped it means the user's
+  // explicit policy overrode the bulk suppression — name that in the audit trail.
+  if (cappedByBulk && zone !== beforeFloor) {
+    reasons.push("user policy floor overrides bulk suppression");
+  }
+
   zone = applyZoneCeiling(zone, policyResult.zoneCeiling);
   return {
     zone,
