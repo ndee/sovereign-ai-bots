@@ -13,6 +13,28 @@ import type {
 } from "../types.js";
 import { matchGlob } from "../util/normalize.js";
 
+/**
+ * Recipient addresses a receiver policy should be matched against. An explicit
+ * `target` narrows matching to one provenance bucket; an omitted target keeps
+ * the legacy union behaviour (any recipient). `to` is the union surface as well,
+ * since To is the default recipient field and the union already includes it.
+ */
+export const receiverCandidates = (
+  message: ParsedMessage,
+  target: PolicyEntryBase["target"],
+): string[] => {
+  if (target === "cc") {
+    return message.ccAddresses ?? [];
+  }
+  if (target === "delivered_to") {
+    return message.deliveredToAddresses ?? [];
+  }
+  if (target === "alias") {
+    return message.aliasTargets ?? [];
+  }
+  return message.toAddresses;
+};
+
 export const matchesPolicyEntry = (message: ParsedMessage, entry: PolicyEntryBase): boolean => {
   const candidate = entry.match ?? entry.pattern;
   if (typeof candidate !== "string" || candidate.length === 0) {
@@ -141,7 +163,8 @@ export const evaluatePolicy = (
 
   for (const entry of normalized.receiverPolicies) {
     const pattern = entry.match ?? "";
-    if (pattern.length > 0 && message.toAddresses.some((addr) => matchGlob(addr, pattern))) {
+    const candidates = receiverCandidates(message, entry.target);
+    if (pattern.length > 0 && candidates.some((addr) => matchGlob(addr, pattern))) {
       noteMatch(entry);
     }
   }

@@ -96,11 +96,11 @@ interface ImapReadResult {
   };
 }
 
-export const parseReceiverAddresses = (
-  to: unknown,
-  cc: unknown,
-  headers: Record<string, string>,
-): string[] => {
+/**
+ * Normalize one or more raw address sources (arrays or comma-joined strings)
+ * into a de-duplicated, order-preserving list of canonical addresses.
+ */
+export const collectAddresses = (...sources: unknown[]): string[] => {
   const seen = new Set<string>();
   const add = (raw: unknown): void => {
     if (Array.isArray(raw)) {
@@ -119,16 +119,44 @@ export const parseReceiverAddresses = (
       }
     }
   };
-  add(to);
-  add(cc);
-  for (const headerKey of ["to", "cc", "delivered-to"]) {
-    const value = headers[headerKey];
-    if (typeof value === "string" && value.length > 0) {
-      add(value);
-    }
+  for (const source of sources) {
+    add(source);
   }
   return [...seen];
 };
+
+export const parseReceiverAddresses = (
+  to: unknown,
+  cc: unknown,
+  headers: Record<string, string>,
+): string[] => collectAddresses(to, cc, headers.to, headers.cc, headers["delivered-to"]);
+
+/** Per-recipient-field address buckets, tagged by where the address appeared. */
+export interface ReceiverBuckets {
+  /** Union of every recipient (backward-compatible `toAddresses`). */
+  toAddresses: string[];
+  /** Cc recipients only (Cc field + `cc` header). */
+  ccAddresses: string[];
+  /** Addresses from the `Delivered-To` header. */
+  deliveredToAddresses: string[];
+  /** Alias / catch-all from `x-original-to`, `envelope-to`, `x-forwarded-to`. */
+  aliasTargets: string[];
+}
+
+export const parseReceiverBuckets = (
+  to: unknown,
+  cc: unknown,
+  headers: Record<string, string>,
+): ReceiverBuckets => ({
+  toAddresses: parseReceiverAddresses(to, cc, headers),
+  ccAddresses: collectAddresses(cc, headers.cc),
+  deliveredToAddresses: collectAddresses(headers["delivered-to"]),
+  aliasTargets: collectAddresses(
+    headers["x-original-to"],
+    headers["envelope-to"],
+    headers["x-forwarded-to"],
+  ),
+});
 
 export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): ParsedMessage => {
   const message = readResult.message;
@@ -138,6 +166,7 @@ export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): 
   const text = compactText(message.text ?? "");
   const domain = extractDomain(fromAddress);
   const headers = normalizeHeaderMap(message.headers);
+  const buckets = parseReceiverBuckets(message.to, message.cc, headers);
   return {
     key: buildMessageKey(messageId, message.uid),
     uid: message.uid as number,
@@ -151,7 +180,12 @@ export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): 
     text,
     snippet: text.slice(0, 500),
     headers,
-    toAddresses: parseReceiverAddresses(message.to, message.cc, headers),
+    toAddresses: buckets.toAddresses,
+    ...(buckets.ccAddresses.length === 0 ? {} : { ccAddresses: buckets.ccAddresses }),
+    ...(buckets.deliveredToAddresses.length === 0
+      ? {}
+      : { deliveredToAddresses: buckets.deliveredToAddresses }),
+    ...(buckets.aliasTargets.length === 0 ? {} : { aliasTargets: buckets.aliasTargets }),
     amountSignal: parseHighestAmount(`${message.subject ?? ""}\n${text}`),
     deadlineDetected: detectDeadlineSignal(`${message.subject ?? ""}\n${text}`),
   };

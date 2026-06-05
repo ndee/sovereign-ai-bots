@@ -122,4 +122,16 @@ describe("state/schema", () => {
       maxZone: "gray",
     });
   });
+
+  it("preserves a receiver-policy target through a normalize round-trip", () => {
+    const normalized = normalizePolicy({
+      receiverPolicies: [{ id: "r1", match: "cc@business.com", target: "cc", minZone: "amber" }],
+    });
+    expect(normalized.receiverPolicies[0]).toEqual({
+      id: "r1",
+      match: "cc@business.com",
+      target: "cc",
+      minZone: "amber",
+    });
+  });
 });
