@@ -1,52 +1,30 @@
-Mail Sentinel — subject-based policy rules (issue #98)
-Live E2E validation summary — 3/3 scenarios passed.
+=== sovereign-ai-bots #98 — subject-policy live E2E proof ===
+Date (UTC): 2026-06-05T02:48:24Z
+Node: root@204.168.143.168  Homeserver: https://brave-freedom-badger-ad52.sovereign-ai-node.com
+Bots ref: 74d18d7 (botsCommitSha 74d18d7fb62afa5837b8600164e74703283ebe28, PR#113+#114 merged)
+Browser-proof marker: subjpolicy-1780627205
 
-Acceptance criteria exercised:
-  1. Create + inspect subject rules (subject "contains" and subject "matches").
-  2. Subject rules applied during classification (real mail through a live mailbox).
-  3. Rules visible in `show policies` + audit output.
-
-------------------------------------------------------------------
-SHOW POLICIES + FORCED-CLASSIFICATION (AUDIT)
-------------------------------------------------------------------
-### show policies (policy list) — subject-scoped rule present ###
+=== [1] subject-scoped policy present in 'show policies' (policy list --json) ===
 {
-    "instanceId": "mail-sentinel-core",
-    "count": 1,
-    "policies": [
-        {
-            "type": "content",
-            "id": "e6ad3488-3f0f-4a6a-87fc-0c606d2b8032",
-            "pattern": "subjshot-1780612097",
-            "scope": "subject",
-            "minZone": "red",
-            "reason": "e2e:subject-policy-screenshot"
-        }
-    ]
+  "id": "0b3174cd-8ffd-4f65-9db4-68e7066547ce",
+  "type": "content",
+  "scope": "subject",
+  "pattern": "subjpolicy-1780627205",
+  "minZone": "red",
+  "reason": "e2e:subject-policy browser-proof subjpolicy-1780627205"
 }
 
-### classification proof: the subjshot-1780612097 email forced to RED by the subject rule ###
-{
-  "subject": "subjshot-1780612097: nightly status — node DOWN",
-  "zone": "red",
-  "category": "risk-escalation",
-  "policyModifiers": [
-    "e2e:subject-policy-screenshot"
-  ],
-  "why": "Automated status alert indicates node outage; explicitly informational with no action required."
-}
+=== [2] classification: subject rule forced the informational note to RED ===
+(zone history + alert audit, from mail-sentinel-state.json)
+zoneHistory entries for proof message: 1
+final zone: red  reason: e2e:subject-policy browser-proof subjpolicy-1780627205
+alert recorded: True
+alert policyModifiers: ['e2e:subject-policy browser-proof subjpolicy-1780627205']
 
-------------------------------------------------------------------
-RESULTING RED ALERT (operator-facing, in the alert room)
-------------------------------------------------------------------
-ROOM: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
-🔴 RED · Risk / Escalation
-
-subjshot-1780612097: nightly status — node DOWN
-
-From: Status Monitor
-Why it matters: Automated status alert indicates node outage; explicitly informational with no action required.
-Confidence: high (75%)
-
-Reply in thread with:
-very important · not important · remind later · always treat like this · less of this
+=== [3] Visible in Matrix alert room (operator-facing) ===
+mail-sentinel posted:  🔴 RED · Risk / Escalation
+  subjpolicy-1780627205: nightly status — node DOWN
+  From: sovereign-ai-node-test
+  Why it matters: Automated status digest - node recovered, no action required, informational message
+  Confidence: low (30%)   <-- low-signal note FORCED to RED purely by the subject rule
+(captured live in Element.io — see element-alert-room.png / subject-policy-proof.png / subject-policy-run.webm)
