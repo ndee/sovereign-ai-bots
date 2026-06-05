@@ -520,6 +520,72 @@ describe("commands/scan", () => {
     expect(runtime.state.digest.pendingAmber).toEqual([]);
     expect(send).toHaveBeenCalled();
   });
+
+  // Regression for #122: subject-scope on content policies must be honored on the
+  // live classification path (the full scan loop), not only in the isolated
+  // evaluatePolicy unit tests or via the e2e stub. The bug it guards against is
+  // the subject filter being silently skipped so a subject-scoped rule matches
+  // the message body too, mis-classifying out-of-scope mail.
+  describe("subject-scoped content policy through the live scan path (#122)", () => {
+    // The scan harness reads "Invoice #1" as the subject and "Please pay $500 for
+    // invoice." as the body; we plant the rule term in exactly one of them per case.
+    const subjectScopedPolicy = (entry: {
+      pattern: string;
+      minZone?: "red" | "amber" | "gray";
+      maxZone?: "red" | "amber" | "gray";
+    }) => ({
+      version: 1,
+      senderPolicies: [],
+      domainPolicies: [],
+      receiverPolicies: [],
+      categoryPolicies: [],
+      contentPolicies: [{ id: "c-subject", scope: "subject" as const, ...entry }],
+      timePolicies: [],
+      mutePolicies: [],
+    });
+
+    it("fires when the term is in the subject (suppresses to gray, no alert)", async () => {
+      const runtime = setupRuntimeForScan();
+      // "invoice" is in the subject ("Invoice #1") → subject scope matches.
+      runtime.policy = subjectScopedPolicy({ pattern: "invoice", maxZone: "gray" });
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      const result = await scan({ instance: "ms-core" });
+      expect(result.redAlertsSent).toBe(0);
+      expect(result.amberQueued).toBe(0);
+      expect(send).not.toHaveBeenCalled();
+      expect(runtime.state.zoneHistory.at(-1)?.zone).toBe("gray");
+    });
+
+    it("does NOT fire when the term is only in the body (out-of-scope mail stays classified)", async () => {
+      const runtime = setupRuntimeForScan();
+      // "$500" lives only in the body ("Please pay $500 for invoice."), never in
+      // the subject. A subject-scoped suppress rule must NOT match it — otherwise
+      // the live node mis-classifies the out-of-scope message (the #122 bug).
+      runtime.policy = subjectScopedPolicy({ pattern: "\\$500", maxZone: "gray" });
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      const result = await scan({ instance: "ms-core" });
+      expect(result.redAlertsSent).toBe(1);
+      expect(send).toHaveBeenCalled();
+      const alert = runtime.state.alerts.at(-1);
+      expect(alert?.zone).toBe("red");
+      expect(alert?.policyModifiers ?? []).not.toContain("subject matches /\\$500/");
+    });
+
+    it("escalates with a scope-aware audit reason when the subject matches", async () => {
+      const runtime = setupRuntimeForScan();
+      // Drop the LLM to amber so the subject rule's red floor is what lifts it.
+      runtime.classifyCandidate = async () =>
+        makeLlm({ suggestedZone: "amber", riskEscalation: false });
+      runtime.policy = subjectScopedPolicy({ pattern: "invoice", minZone: "red" });
+      const result = await scan({ instance: "ms-core" });
+      const alert = runtime.state.alerts.at(-1);
+      expect(alert?.zone).toBe("red");
+      expect(result.redAlertsSent).toBe(1);
+      // The scope-aware default reason surfaces the matched subject filter in the
+      // operator-facing audit trail.
+      expect(alert?.policyModifiers).toContain("subject matches /invoice/");
+    });
+  });
 });
 
 describe("commands/scan > flushDigestIfDue", () => {
