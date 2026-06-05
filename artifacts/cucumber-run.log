@@ -2,44 +2,44 @@ Use of `require-module` option normally means you should specify your support co
 [e2e] Operator logged into Matrix and joined alert room
 [e2e] Mail Sentinel state reset; removed 0 orphan e2e policies
 [e2e] Bot Matrix token is valid
-[e2e] Run ID: e2e-1780614899404
-[e2e] Alert room: <alert-room-id>
+[e2e] Run ID: e2e-1780628620351
+[e2e] Alert room: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
 [e2e] Scan timer overridden to 1min
 ..[e2e] Mail Sentinel startup: timer active, policy profile loaded (0 policies)
-.[e2e] Added content body policy id=b297910b-1835-404b-9e6d-ff892900e259 term="contentbody-e2e-1780614899404" minZone=RED maxZone=-
-.[e2e] Sent content-body email with run ID e2e-1780614899404
+.[e2e] Added content body policy id=afb962e5-5419-4978-853a-be7307f3f5a7 term="contentbody-e2e-1780628620351" minZone=RED maxZone=-
+.[e2e] Sent content-body email with run ID e2e-1780628620351
 .[e2e] Waiting up to 5min for "content-body" (subject pattern="Routine weekly status summary") to be ingested and classified...
-[e2e] Found zone history for "content-body" messageKey=msg:<e2e-1780614899404-content-body@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
-.[e2e] "content-body" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
-.[e2e] Removed temporary content policy b297910b-1835-404b-9e6d-ff892900e259
-....[e2e] Added content snippet policy id=cc26ea0f-db86-44ab-9677-f68618f5b8de term="snippethit-e2e-1780614899404" minZone=RED maxZone=-
-.[e2e] Sent content-snippet-hit email with run ID e2e-1780614899404
+[e2e] Found zone history for "content-body" messageKey=msg:<e2e-1780628620351-content-body@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780628620351"
+.[e2e] "content-body" zone history newest=red reason="e2e:content-policy body e2e-1780628620351"
+.[e2e] Removed temporary content policy afb962e5-5419-4978-853a-be7307f3f5a7
+....[e2e] Added content snippet policy id=ea8bbcd9-d9c8-43e2-8f73-8a40166353b9 term="snippethit-e2e-1780628620351" minZone=RED maxZone=-
+.[e2e] Sent content-snippet-hit email with run ID e2e-1780628620351
 .[e2e] Waiting up to 5min for "content-snippet-hit" (subject pattern="Daily preview reference note") to be ingested and classified...
-[e2e] Found zone history for "content-snippet-hit" messageKey=msg:<e2e-1780614899404-content-snippet-hit@e2e.sovereign-ai> zone=red reason="e2e:content-policy snippet e2e-1780614899404"
-.[e2e] "content-snippet-hit" zone history newest=red reason="e2e:content-policy snippet e2e-1780614899404"
-.[e2e] Removed temporary content policy cc26ea0f-db86-44ab-9677-f68618f5b8de
-....[e2e] Added content snippet policy id=10d8f55f-2047-4fbb-b227-cbe073fd7938 term="snippetmiss-e2e-1780614899404" minZone=RED maxZone=-
-.[e2e] Sent content-snippet-miss email with run ID e2e-1780614899404
+[e2e] Found zone history for "content-snippet-hit" messageKey=msg:<e2e-1780628620351-content-snippet-hit@e2e.sovereign-ai> zone=red reason="e2e:content-policy snippet e2e-1780628620351"
+.[e2e] "content-snippet-hit" zone history newest=red reason="e2e:content-policy snippet e2e-1780628620351"
+.[e2e] Removed temporary content policy ea8bbcd9-d9c8-43e2-8f73-8a40166353b9
+....[e2e] Added content snippet policy id=0dbf8f3c-74ef-43e1-a3e8-7dc0be3467c0 term="snippetmiss-e2e-1780628620351" minZone=RED maxZone=-
+.[e2e] Sent content-snippet-miss email with run ID e2e-1780628620351
 .[e2e] Waiting up to 5min for "content-snippet-miss" (subject pattern="Weekly archival reference note") to be ingested and classified...
-[e2e] Found zone history for "content-snippet-miss" messageKey=msg:<e2e-1780614899404-content-snippet-miss@e2e.sovereign-ai> zone=amber reason="Routine informational note requires no action and contains no deadlines or monetary amounts."
-.[e2e] "content-snippet-miss" stayed at baseline zone=amber (not red), reason="Routine informational note requires no action and contains no deadlines or monetary amounts." — snippet rule correctly inert past 500-char window
+[e2e] Found zone history for "content-snippet-miss" messageKey=msg:<e2e-1780628620351-content-snippet-miss@e2e.sovereign-ai> zone=amber reason="Flagged for review; confirmed informational with no actionable items or deadlines."
+.[e2e] "content-snippet-miss" stayed at baseline zone=amber (not red), reason="Flagged for review; confirmed informational with no actionable items or deadlines." — snippet rule correctly inert past 500-char window
 .[e2e] No RED alert recorded for "content-snippet-miss" — snippet rule did not escalate
-.[e2e] Removed temporary content policy 10d8f55f-2047-4fbb-b227-cbe073fd7938
-....[e2e] Added content body policy id=114c1af5-2fba-4733-8e3e-56392468b12e term="bodydeep-e2e-1780614899404" minZone=RED maxZone=-
-.[e2e] Sent content-body-deep email with run ID e2e-1780614899404
+.[e2e] Removed temporary content policy 0dbf8f3c-74ef-43e1-a3e8-7dc0be3467c0
+....[e2e] Added content body policy id=6a2daff3-4716-4644-9a7c-a67332b46ad3 term="bodydeep-e2e-1780628620351" minZone=RED maxZone=-
+.[e2e] Sent content-body-deep email with run ID e2e-1780628620351
 .[e2e] Waiting up to 5min for "content-body-deep" (subject pattern="Monthly archival reference note") to be ingested and classified...
-[e2e] Found zone history for "content-body-deep" messageKey=msg:<e2e-1780614899404-content-body-deep@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780614899404"
-.[e2e] "content-body-deep" zone history newest=red reason="e2e:content-policy body e2e-1780614899404"
-.[e2e] Removed temporary content policy 114c1af5-2fba-4733-8e3e-56392468b12e
-....[e2e] Added content body policy id=edfddba8-b7a5-4b7a-9763-9deadd3d7428 term="showbody-e2e-1780614899404" minZone=- maxZone=GRAY
-.[e2e] Added content snippet policy id=32a768a8-5aaa-4cc1-ba95-75ad0ee18d48 term="showsnippet-e2e-1780614899404" minZone=RED maxZone=-
-..[e2e] Policy listing includes content rule: type=content scope=body pattern="showbody-e2e-1780614899404"
-.[e2e] Policy listing includes content rule: type=content scope=snippet pattern="showsnippet-e2e-1780614899404"
-.[e2e] Removed temporary content policy edfddba8-b7a5-4b7a-9763-9deadd3d7428
-[e2e] Removed temporary content policy 32a768a8-5aaa-4cc1-ba95-75ad0ee18d48
+[e2e] Found zone history for "content-body-deep" messageKey=msg:<e2e-1780628620351-content-body-deep@e2e.sovereign-ai> zone=red reason="e2e:content-policy body e2e-1780628620351"
+.[e2e] "content-body-deep" zone history newest=red reason="e2e:content-policy body e2e-1780628620351"
+.[e2e] Removed temporary content policy 6a2daff3-4716-4644-9a7c-a67332b46ad3
+....[e2e] Added content body policy id=44e3631d-2282-435f-897c-0bba57c83eeb term="showbody-e2e-1780628620351" minZone=- maxZone=GRAY
+.[e2e] Added content snippet policy id=270938af-8a34-41f0-a05e-739a24f27f89 term="showsnippet-e2e-1780628620351" minZone=RED maxZone=-
+..[e2e] Policy listing includes content rule: type=content scope=body pattern="showbody-e2e-1780628620351"
+.[e2e] Policy listing includes content rule: type=content scope=snippet pattern="showsnippet-e2e-1780628620351"
+.[e2e] Removed temporary content policy 44e3631d-2282-435f-897c-0bba57c83eeb
+[e2e] Removed temporary content policy 270938af-8a34-41f0-a05e-739a24f27f89
 .[e2e] Scan timer restored
 
 
 5 scenarios (5 passed)
 32 steps (32 passed)
-9m46.870s (executing steps: 9m06.356s)
+9m58.937s (executing steps: 9m12.237s)
