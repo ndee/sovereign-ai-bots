@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import {
   formatDigestResult,
+  formatExplainResult,
   formatFeedbackResult,
   formatListAlertsResult,
   formatPolicyActionResult,
@@ -11,6 +12,7 @@ import {
   printOutput,
 } from "./alerts/output.js";
 import { digest } from "./commands/digest.js";
+import { explainAlert, isAmbiguousExplain } from "./commands/explain.js";
 import { applyFeedback, isAmbiguousFeedback } from "./commands/feedback.js";
 import { listAlerts } from "./commands/list-alerts.js";
 import { policyAdd, policyImportantSender, policyList, policyRemove } from "./commands/policy.js";
@@ -21,7 +23,7 @@ import type { CommandOptions } from "./types.js";
 export const runCli = async (argv: readonly string[]): Promise<void> => {
   const { command, options } = parseArgs(argv);
   if (typeof command !== "string" || command.length === 0) {
-    throw new Error("Expected a command: scan, digest, feedback, list-alerts, or policy");
+    throw new Error("Expected a command: scan, digest, feedback, explain, list-alerts, or policy");
   }
   if (typeof options.instance !== "string" || options.instance.length === 0) {
     throw new Error("Expected --instance <id>");
@@ -54,6 +56,24 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
     // Ambiguous feedback applied no change — signal failure so callers (the
     // Matrix bridge, the agent loop) re-prompt rather than treat it as success.
     if (isAmbiguousFeedback(result)) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+  if (command === "explain") {
+    const selectorCount = [
+      typeof options.alertId === "string",
+      options.latest === true,
+      typeof options.ref === "string",
+    ].filter(Boolean).length;
+    if (selectorCount !== 1) {
+      throw new Error("Use exactly one of --alert-id, --latest, or --ref");
+    }
+    const result = await explainAlert(options);
+    printOutput(result, options, formatExplainResult);
+    // An ambiguous ref produced no explanation — signal failure so callers (the
+    // Matrix bridge, the agent loop) re-prompt rather than treat it as success.
+    if (isAmbiguousExplain(result)) {
       process.exitCode = 1;
     }
     return;

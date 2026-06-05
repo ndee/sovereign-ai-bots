@@ -1,4 +1,8 @@
+import type { ExplainCommandResult, ExplainResult } from "../commands/explain.js";
+import { isAmbiguousExplain } from "../commands/explain.js";
 import type { AlertSummary, CommandOptions, FlattenedPolicyEntry } from "../types.js";
+import { formatConfidenceLabel } from "../util/time.js";
+import { formatSignalChip } from "./evidence.js";
 import { formatAlertLine } from "./format.js";
 
 export interface ScanResult {
@@ -160,6 +164,99 @@ export const formatPolicyActionResult = (result: PolicyActionResult): string => 
     );
   }
   return lines.join("\n");
+};
+
+// Render one labelled section as "Heading:" plus indented "- item" lines, or a
+// single "Heading: <empty>" line when there is nothing to list. Keeps the three
+// explanation sections visually parallel.
+const renderSection = (heading: string, lines: readonly string[]): string[] =>
+  lines.length === 0
+    ? [`${heading}: (none)`]
+    : [`${heading}:`, ...lines.map((line) => `  - ${line}`)];
+
+// The policy/heuristic half: the matched scoring rules, the signal chip built
+// from the same `reasons` the alert shows, the policy modifiers that fired, and
+// the score path. This is the deterministic side of the decision — kept wholly
+// separate from the semantic reviewer's verdict below.
+const renderPolicySection = (policy: ExplainCommandResult["policy"]): string[] => {
+  const lines: string[] = [];
+  const chip = formatSignalChip(policy.signals);
+  if (chip !== undefined) {
+    lines.push(`Signals: ${chip}`);
+  }
+  if (policy.matchedRuleIds.length > 0) {
+    lines.push(`Matched rules: ${policy.matchedRuleIds.join(", ")}`);
+  }
+  for (const modifier of policy.policyModifiers) {
+    lines.push(`Policy: ${modifier}`);
+  }
+  const scoreParts: string[] = [];
+  if (typeof policy.score === "number") {
+    scoreParts.push(`base ${String(policy.score)}`);
+  }
+  if (typeof policy.adjustedScore === "number") {
+    scoreParts.push(`adjusted ${String(policy.adjustedScore)}`);
+  }
+  if (scoreParts.length > 0) {
+    lines.push(`Score: ${scoreParts.join(" → ")}`);
+  }
+  return renderSection("Policy & heuristics", lines);
+};
+
+// The semantic half: the reviewer's verdict verbatim, or an explicit
+// "unavailable" line when no LLM result was recorded for this alert. Never
+// mixes in policy mechanics.
+const renderSemanticSection = (semantic: ExplainCommandResult["semantic"]): string[] => {
+  if (!semantic.available || semantic.result === undefined) {
+    return renderSection("Semantic review", ["unavailable — no reviewer verdict recorded"]);
+  }
+  const result = semantic.result;
+  const flags = [
+    result.decisionRequired ? "decision-required" : null,
+    result.financialRelevance ? "financial-relevance" : null,
+    result.riskEscalation ? "risk-escalation" : null,
+  ].filter((flag): flag is string => flag !== null);
+  return renderSection("Semantic review", [
+    `Verdict: ${result.reason}`,
+    `Classified: ${flags.length === 0 ? "none" : flags.join(", ")}`,
+    `Urgency: ${result.urgency}`,
+    `Suggested zone: ${result.suggestedZone}`,
+    `Confidence: ${formatConfidenceLabel(result.confidence)}`,
+    `Extracted signals: deadline=${String(result.deadlineDetected)}, amount=${String(
+      result.amountDetected,
+    )}`,
+  ]);
+};
+
+// The outcome: zone, category, confidence, and the operator-facing one-liner.
+const renderDecisionSection = (decision: ExplainCommandResult["decision"]): string[] =>
+  renderSection("Zone decision", [
+    `Zone: ${decision.zone.toUpperCase()}`,
+    `Category: ${decision.category}`,
+    `Confidence: ${formatConfidenceLabel(decision.confidence)}`,
+    `Why it matters: ${decision.why}`,
+  ]);
+
+export const formatExplainResult = (result: ExplainResult): string => {
+  // Ambiguous: same shape as feedback — name the candidates with their short
+  // refs so the user can re-ask unambiguously. Nothing was explained.
+  if (isAmbiguousExplain(result)) {
+    return [
+      `Ambiguous: '${result.ref}' matches ${String(result.candidates.length)} items. Reply with one of:`,
+      ...result.candidates.map(
+        (candidate) => `- [${candidate.shortRef}] '${candidate.subject}' from ${candidate.from}`,
+      ),
+    ].join("\n");
+  }
+  return [
+    `Explanation for [${result.shortRef}] '${result.subject}' from ${result.from}`,
+    "",
+    ...renderPolicySection(result.policy),
+    "",
+    ...renderSemanticSection(result.semantic),
+    "",
+    ...renderDecisionSection(result.decision),
+  ].join("\n");
 };
 
 export const printOutput = <T>(

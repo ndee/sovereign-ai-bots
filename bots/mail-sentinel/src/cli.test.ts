@@ -180,6 +180,83 @@ describe("cli", () => {
     expect(runtime.state.alerts.every((a) => a.feedbackState === "pending")).toBe(true);
   });
 
+  it("rejects explain with no selector (neither --latest, --alert-id, nor --ref)", async () => {
+    await expect(runCli(["explain", "--instance", "ms-core"])).rejects.toThrow(
+      "Use exactly one of --alert-id, --latest, or --ref",
+    );
+  });
+
+  it("dispatches explain via --latest and prints the three sections", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push({
+      alertId: "aaaaaaaa-0000-0000-0000-000000000000",
+      shortRef: "aaaaaa",
+      zone: "red",
+      category: "financial-relevance",
+      subject: "Invoice overdue",
+      from: "Alice <alice@example.com>",
+      fromAddress: "alice@example.com",
+      why: "Payment failure may lock the account.",
+      sentAt: "2026-04-08T09:00:00Z",
+      feedbackState: "pending",
+      reasons: ["amount detected"],
+      matchedRuleIds: ["rule-amount"],
+      policyModifiers: [],
+      score: 5,
+      adjustedScore: 5,
+      confidence: 80,
+      llmResult: {
+        decisionRequired: true,
+        financialRelevance: true,
+        riskEscalation: false,
+        confidence: 80,
+        urgency: "high",
+        reason: "Payment failure may lock the account.",
+        deadlineDetected: false,
+        amountDetected: true,
+        suggestedZone: "red",
+      },
+    });
+    await runCli(["explain", "--instance", "ms-core", "--latest"]);
+    const out = String(stdoutSpy.mock.calls[0]?.[0]);
+    expect(out).toContain("Explanation for [aaaaaa] 'Invoice overdue'");
+    expect(out).toContain("Policy & heuristics:");
+    expect(out).toContain("Semantic review:");
+    expect(out).toContain("Zone decision:");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("sets a non-zero exit code when --ref explain is ambiguous", async () => {
+    const runtime = getFakeRuntime();
+    const base = {
+      zone: "amber" as const,
+      category: "financial-relevance" as const,
+      from: "Alice <alice@example.com>",
+      fromAddress: "alice@example.com",
+      why: "w",
+      sentAt: "2026-04-08T09:00:00Z",
+      feedbackState: "pending" as const,
+      matchedRuleIds: [],
+    };
+    runtime.state.alerts.push(
+      {
+        ...base,
+        alertId: "aa000000-0000-0000-0000-000000000000",
+        shortRef: "aa0000",
+        subject: "One",
+      },
+      {
+        ...base,
+        alertId: "aa111111-0000-0000-0000-000000000000",
+        shortRef: "aa1111",
+        subject: "Two",
+      },
+    );
+    await runCli(["explain", "--instance", "ms-core", "--ref", "aa"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("Ambiguous: 'aa' matches 2 items");
+    expect(process.exitCode).toBe(1);
+  });
+
   it("rejects list-alerts without a valid --view", async () => {
     await expect(runCli(["list-alerts", "--instance", "ms-core"])).rejects.toThrow(
       "Expected --view",
