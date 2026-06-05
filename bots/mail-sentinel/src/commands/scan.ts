@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { buildExcerpt } from "../alerts/evidence.js";
 import {
   buildDigestMessage,
   buildRedAlertMessage,
@@ -244,6 +245,10 @@ export const scan = async (
         }
 
         const alertId = randomUUID();
+        // Copy a capped excerpt onto the alert now, from the local snippet only,
+        // so the alert is self-contained and survives pruning (#102). Omitted
+        // cleanly when the message had no usable snippet.
+        const excerpt = buildExcerpt(parsed.snippet);
         const alert: StoredAlert = {
           alertId,
           // Mint a stable short handle, lengthening past the default only if a
@@ -265,6 +270,7 @@ export const scan = async (
           ...(parsed.domain === undefined ? {} : { domain: parsed.domain }),
           toAddresses: parsed.toAddresses,
           why: buildUserFacingWhy(zoneDecision, llmResult),
+          ...(excerpt === undefined ? {} : { excerpt }),
           sentAt: scanAt,
           score: scored.score,
           adjustedScore: zoneDecision.adjustedScore,
