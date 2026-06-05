@@ -108,6 +108,121 @@ describe("alerts/output", () => {
     );
   });
 
+  it("appends scope and the created rule when a scoped rule was applied", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Policy updated locally. Similar signals reduced.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        policyId: "pol-1",
+        scope: "domain",
+        ruleSummary: "domain example.com -> max-zone gray",
+      }),
+    ).toBe(
+      "Policy updated locally. Similar signals reduced. Applied to: [a1b2c3] 'Invoice overdue' from billing@example.com. Scope: this domain. Created rule: domain example.com -> max-zone gray. Policy pol-1 created.",
+    );
+  });
+
+  it("states scope without a rule clause for item-scoped feedback", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback applied to this item only.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        scope: "item",
+        ruleSummary: "this item only",
+      }),
+    ).toBe(
+      "Feedback applied to this item only. Applied to: [a1b2c3] 'Invoice overdue' from billing@example.com. Scope: this item only.",
+    );
+  });
+
+  it("includes scope on a reminder confirmation", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Reminder scheduled.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        scope: "item",
+        ruleSummary: "this item only",
+        nextReminderAt: "2026-04-08T16:00:00Z",
+      }),
+    ).toBe(
+      "Reminder scheduled. Applied to: [a1b2c3] 'Invoice overdue'. Scope: this item only. Will be revisited at 2026-04-08T16:00:00Z.",
+    );
+  });
+
+  it("renders a dry-run preview with the would-be rule and writes-nothing marker", () => {
+    expect(
+      formatFeedbackResult({
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        scope: "sender",
+        ruleSummary: "sender billing@example.com -> max-zone amber",
+        dryRun: true,
+      }),
+    ).toBe(
+      "Dry run — would apply to: [a1b2c3] 'Invoice overdue' from billing@example.com. Scope: this sender. Rule: sender billing@example.com -> max-zone amber. (nothing written)",
+    );
+  });
+
+  it("renders a dry-run preview for an item scope without a rule clause", () => {
+    expect(
+      formatFeedbackResult({
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        scope: "item",
+        ruleSummary: "this item only",
+        dryRun: true,
+      }),
+    ).toBe(
+      "Dry run — would apply to: [a1b2c3] 'Invoice overdue'. Scope: this item only. (nothing written)",
+    );
+  });
+
+  it("renders a dry-run preview even when scope is absent", () => {
+    expect(
+      formatFeedbackResult({
+        alertId: "alert-1",
+        dryRun: true,
+      }),
+    ).toBe("Dry run — would apply to: Alert alert-1. (nothing written)");
+  });
+
+  it("states a non-item scope with no rule clause when ruleSummary is missing", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Policy updated locally.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        scope: "sender",
+      }),
+    ).toBe("Policy updated locally. Applied to: [a1b2c3] 'Invoice overdue'. Scope: this sender.");
+  });
+
+  it("renders a sender-scope dry run with no rule clause when ruleSummary is missing", () => {
+    expect(
+      formatFeedbackResult({
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        scope: "sender",
+        dryRun: true,
+      }),
+    ).toBe(
+      "Dry run — would apply to: [a1b2c3] 'Invoice overdue'. Scope: this sender. (nothing written)",
+    );
+  });
+
   it("lists candidates with their short refs for ambiguous feedback", () => {
     expect(
       formatFeedbackResult({

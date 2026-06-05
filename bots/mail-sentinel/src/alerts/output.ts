@@ -8,7 +8,13 @@ import {
   mergeDuplicatePolicies,
   resolveEffectiveRouting,
 } from "../policy/summary.js";
-import type { AlertSummary, CommandOptions, FlattenedPolicyEntry, PolicyType } from "../types.js";
+import type {
+  AlertSummary,
+  CommandOptions,
+  FeedbackScope,
+  FlattenedPolicyEntry,
+  PolicyType,
+} from "../types.js";
 import { formatConfidenceLabel } from "../util/time.js";
 import { formatSignalChip } from "./evidence.js";
 import { formatAlertLine } from "./format.js";
@@ -54,12 +60,26 @@ export interface FeedbackResult {
   shortRef?: string;
   subject?: string;
   from?: string;
+  scope?: FeedbackScope;
+  ruleSummary?: string;
+  dryRun?: boolean;
   nextReminderAt?: string;
   policyId?: string;
   status?: "ambiguous";
   ref?: string;
   candidates?: readonly FeedbackResultCandidate[];
 }
+
+// Plain-language label for each scope, so the confirmation reads the way the
+// scope menu offers it ("this sender", "this subject pattern", …) rather than
+// echoing the bare enum id.
+const SCOPE_LABELS: Record<FeedbackScope, string> = {
+  item: "this item only",
+  sender: "this sender",
+  domain: "this domain",
+  subject: "this subject pattern",
+  content: "this content pattern",
+};
 
 // Name the exact item a confirmation applies to: "[shortRef] 'subject' from
 // sender". Falls back to the bare alertId when the enriched fields are absent,
@@ -70,6 +90,19 @@ const describeTarget = (result: FeedbackResult): string => {
     return `[${result.shortRef}] '${result.subject}'${sender}`;
   }
   return `Alert ${String(result.alertId)}`;
+};
+
+// "Scope: this sender. Created rule: …" — the explicit-scope half of the
+// confirmation. Item scope writes no rule, so it stops after the scope label.
+const describeScope = (result: FeedbackResult): string => {
+  if (result.scope === undefined) {
+    return "";
+  }
+  const scopeLine = ` Scope: ${SCOPE_LABELS[result.scope]}.`;
+  if (result.scope === "item" || result.ruleSummary === undefined) {
+    return scopeLine;
+  }
+  return `${scopeLine} Created rule: ${result.ruleSummary}.`;
 };
 
 export const formatFeedbackResult = (result: FeedbackResult): string => {
@@ -85,12 +118,23 @@ export const formatFeedbackResult = (result: FeedbackResult): string => {
     ].join("\n");
   }
   const target = describeTarget(result);
+  // Dry run: nothing was written. State the scope and exact rule that *would*
+  // be created so the control plane can show the preview before committing.
+  if (result.dryRun === true) {
+    const rulePart =
+      result.scope === "item" || result.ruleSummary === undefined
+        ? ""
+        : ` Rule: ${result.ruleSummary}.`;
+    const scopeLabel = result.scope === undefined ? "" : ` Scope: ${SCOPE_LABELS[result.scope]}.`;
+    return `Dry run — would apply to: ${target}.${scopeLabel}${rulePart} (nothing written)`;
+  }
+  const scopePart = describeScope(result);
   if (result.policyId !== undefined) {
-    return `${result.note} Applied to: ${target}. Policy ${result.policyId} created.`;
+    return `${result.note} Applied to: ${target}.${scopePart} Policy ${result.policyId} created.`;
   }
   return result.nextReminderAt === undefined
-    ? `${result.note} Applied to: ${target}.`
-    : `${result.note} Applied to: ${target}. Will be revisited at ${result.nextReminderAt}.`;
+    ? `${result.note} Applied to: ${target}.${scopePart}`
+    : `${result.note} Applied to: ${target}.${scopePart} Will be revisited at ${result.nextReminderAt}.`;
 };
 
 export interface ListAlertsResult {
