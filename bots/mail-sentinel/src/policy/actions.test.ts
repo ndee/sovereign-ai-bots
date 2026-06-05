@@ -140,6 +140,22 @@ describe("policy/actions", () => {
     expect(derivePolicyFromFeedback({ zone: "amber" }, "digest-only")).toBeNull();
   });
 
+  it("derives a sender-scoped mute policy on the mute path", () => {
+    for (const zone of ["red", "amber", "gray"] as const) {
+      const derived = derivePolicyFromFeedback({ fromAddress: "alice@example.com", zone }, "mute");
+      expect(derived?.type).toBe("mute");
+      expect(derived?.entry.match).toBe("alice@example.com");
+      expect(derived?.entry.action).toBe("mute");
+      expect(derived?.entry.minZone).toBeUndefined();
+      expect(derived?.entry.maxZone).toBeUndefined();
+      expect(derived?.entry.reason).toBe("Derived from mute feedback for alice@example.com");
+    }
+  });
+
+  it("returns null for mute when the sender is unknown", () => {
+    expect(derivePolicyFromFeedback({ zone: "amber" }, "mute")).toBeNull();
+  });
+
   it("matches the applyLearningAdjustment golden fixture", () => {
     expect({
       increment: (() => {

@@ -94,6 +94,20 @@ export const derivePolicyFromFeedback = (
       },
     };
   }
+  if (action === "mute") {
+    // A mute is a sender-scoped entry routed onto the engine's mutePolicies path
+    // (action: "mute") so future similar mail is hidden rather than re-zoned.
+    return {
+      id: randomUUID(),
+      type: "mute" as PolicyType,
+      entry: {
+        id: randomUUID(),
+        match: alert.fromAddress,
+        action: "mute",
+        reason: `Derived from mute feedback for ${alert.fromAddress}`,
+      },
+    };
+  }
   return null;
 };
 
