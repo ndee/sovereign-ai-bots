@@ -1,0 +1,589 @@
+[
+  {
+    "description": "  Content-scoped policy rules (sovereign-ai-bots #99) let an operator teach\n  Mail Sentinel from the message body or local preview text, not just the\n  sender or subject. #99 extended the #98 `scope` field on the existing\n  `content` policy type with two new values: `body` (matches the full locally\n  parsed message text) and `snippet` (matches `message.snippet`, the first 500\n  chars of the local preview). These scenarios drive a real email with a body\n  marker through the live mailbox and assert that the rule is created locally,\n  shown in the policy listing, and applied during local classification — and\n  that snippet matching is bounded to the 500-char preview window.",
+    "elements": [
+      {
+        "description": "",
+        "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules;a-body-scoped-\"contains\"-rule-escalates-on-body-only-text-to-red",
+        "keyword": "Scenario",
+        "line": 17,
+        "name": "A body-scoped \"contains\" rule escalates on body-only text to RED",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 1428604069
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 42698145403
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 302032813
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 23,
+            "name": "a temporary content rule with scope \"body\" matching \"contentbody-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 447841797
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 24,
+            "name": "I send a \"content-body\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2389988977
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 25,
+            "name": "I wait up to 5 minutes for the \"content-body\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 76525551195
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 26,
+            "name": "the \"content-body\" email should land in zone \"red\" in the zone history",
+            "match": {
+              "location": "steps/content-policy.steps.ts:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 225801802
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 267899701
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@content-policy-cleanup",
+            "line": 16
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules;a-snippet-scoped-\"contains\"-rule-matches-the-local-preview-and-escalates-to-red",
+        "keyword": "Scenario",
+        "line": 29,
+        "name": "A snippet-scoped \"contains\" rule matches the local preview and escalates to RED",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 527169175
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 39279108597
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 268292
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 34,
+            "name": "a temporary content rule with scope \"snippet\" matching \"snippethit-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 268423260
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 35,
+            "name": "I send a \"content-snippet-hit\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3131183832
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 36,
+            "name": "I wait up to 5 minutes for the \"content-snippet-hit\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 91777546519
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 37,
+            "name": "the \"content-snippet-hit\" email should land in zone \"red\" in the zone history",
+            "match": {
+              "location": "steps/content-policy.steps.ts:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 226716956
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 270878604
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@content-policy-cleanup",
+            "line": 28
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules;a-snippet-scoped-rule-does-not-match-a-marker-past-the-500-char-window",
+        "keyword": "Scenario",
+        "line": 40,
+        "name": "A snippet-scoped rule does NOT match a marker past the 500-char window",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 541092613
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 41970100286
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 239289
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 47,
+            "name": "a temporary content rule with scope \"snippet\" matching \"snippetmiss-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 270952423
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 48,
+            "name": "I send a \"content-snippet-miss\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2922894952
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 49,
+            "name": "I wait up to 5 minutes for the \"content-snippet-miss\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 76785319004
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 50,
+            "name": "the \"content-snippet-miss\" email should not be escalated to zone \"red\" in the zone history",
+            "match": {
+              "location": "steps/content-policy.steps.ts:171"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 289932269
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 51,
+            "name": "no direct RED alert should be recorded for the \"content-snippet-miss\" email",
+            "match": {
+              "location": "steps/content-policy.steps.ts:212"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 289203019
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 265784456
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@content-policy-cleanup",
+            "line": 39
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules;a-body-scoped-rule-does-match-the-same-deep-marker-the-snippet-rule-missed",
+        "keyword": "Scenario",
+        "line": 54,
+        "name": "A body-scoped rule DOES match the same deep marker the snippet rule missed",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 609283569
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 35092672879
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 169462
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 60,
+            "name": "a temporary content rule with scope \"body\" matching \"bodydeep-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 354696953
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 61,
+            "name": "I send a \"content-body-deep\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2355028579
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 62,
+            "name": "I wait up to 5 minutes for the \"content-body-deep\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 92301601193
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 63,
+            "name": "the \"content-body-deep\" email should land in zone \"red\" in the zone history",
+            "match": {
+              "location": "steps/content-policy.steps.ts:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 291827594
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 260156389
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@content-policy-cleanup",
+            "line": 53
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules;content-rules-are-created,-shown-in-the-policy-listing,-and-inspectable",
+        "keyword": "Scenario",
+        "line": 66,
+        "name": "Content rules are created, shown in the policy listing, and inspectable",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 604819507
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 35927745087
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1337357
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 72,
+            "name": "a temporary content rule with scope \"body\" matching \"showbody-{runId}\" with maxZone \"GRAY\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:108"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 268276674
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 73,
+            "name": "a temporary content rule with scope \"snippet\" matching \"showsnippet-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 262649674
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 74,
+            "name": "I list the Mail Sentinel content policies",
+            "match": {
+              "location": "steps/content-policy.steps.ts:232"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 266409848
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 75,
+            "name": "the policy listing should include a content rule with scope \"body\" matching \"showbody-{runId}\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:244"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 322866
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 76,
+            "name": "the policy listing should include a content rule with scope \"snippet\" matching \"showsnippet-{runId}\"",
+            "match": {
+              "location": "steps/content-policy.steps.ts:244"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2298928
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 535193033
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@content-policy-cleanup",
+            "line": 65
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "mail-sentinel-body--and-snippet-scoped-content-policy-rules",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "Mail Sentinel body- and snippet-scoped content policy rules",
+    "tags": [],
+    "uri": "features/content-policy-rules.feature"
+  }
+]
