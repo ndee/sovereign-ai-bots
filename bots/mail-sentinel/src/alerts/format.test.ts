@@ -135,10 +135,14 @@ describe("alerts/format", () => {
       ],
       "12h",
     );
-    expect(msg.body).toContain("\n1. First subject\n");
-    expect(msg.body).toContain("\n2. Second subject\n");
-    expect(msg.formattedBody).toContain("<strong>1. First subject</strong>");
-    expect(msg.formattedBody).toContain("<strong>2. Second subject</strong>");
+    expect(msg.body).toContain("\n1. [alert1] First subject\n");
+    expect(msg.body).toContain("\n2. [alert1] Second subject\n");
+    expect(msg.formattedBody).toContain(
+      "<strong>1.</strong> <code>[alert1]</code> <strong>First subject</strong>",
+    );
+    expect(msg.formattedBody).toContain(
+      "<strong>2.</strong> <code>[alert1]</code> <strong>Second subject</strong>",
+    );
   });
 
   it("never renders an alertId, Alert ID label, or Message ID in the digest", () => {
@@ -166,16 +170,16 @@ describe("alerts/format", () => {
   it("trims overly long digest subjects with an ellipsis", () => {
     const longSubject = `Re: ${"subject ".repeat(30)}end`;
     const msg = buildDigestMessage([{ ...sampleAlert, subject: longSubject }], "12h");
-    const line = msg.body.split("\n").find((entry) => entry.startsWith("1. Re:"));
+    const line = msg.body.split("\n").find((entry) => entry.startsWith("1. [alert1] Re:"));
     expect(line).toBeDefined();
     expect((line as string).endsWith("…")).toBe(true);
-    // "1. " prefix adds 3 chars beyond the 120-char subject cap.
-    expect((line as string).length).toBeLessThanOrEqual(123);
+    // "1. [alert1] " prefix adds 12 chars beyond the 120-char subject cap.
+    expect((line as string).length).toBeLessThanOrEqual(132);
   });
 
   it("keeps short digest subjects intact (no trim)", () => {
     const msg = buildDigestMessage([{ ...sampleAlert, subject: "Invoice #short" }], "12h");
-    expect(msg.body).toContain("\n1. Invoice #short\n");
+    expect(msg.body).toContain("\n1. [alert1] Invoice #short\n");
     expect(msg.body).not.toContain("…");
   });
 

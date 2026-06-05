@@ -1,8 +1,17 @@
 import { CATEGORY_LABELS } from "../constants.js";
 import type { AlertSummary, StoredAlert } from "../types.js";
 import { formatConfidenceLabel } from "../util/time.js";
+import { deriveShortRef } from "./short-ref.js";
 
 type AlertKind = AlertSummary["kind"];
+
+// The short handle shown to users for an alert: the persisted `shortRef` when
+// present, else a derived prefix of `alertId` so older stored alerts (minted
+// before the field existed) still render and stay resolvable.
+export const alertShortRef = (alert: Pick<StoredAlert, "alertId" | "shortRef">): string =>
+  typeof alert.shortRef === "string" && alert.shortRef.length > 0
+    ? alert.shortRef
+    : deriveShortRef(alert.alertId);
 
 export interface MatrixMessageBody {
   body: string;
@@ -32,7 +41,7 @@ const ZONE_EMOJI: Record<string, string> = {
 };
 
 const DIGEST_SUBJECT_MAX = 120;
-const DIGEST_VISIBLE_LIMIT = 10;
+export const DIGEST_VISIBLE_LIMIT = 10;
 
 const categoryLabel = (category: string): string => CATEGORY_LABELS[category] ?? category;
 
@@ -108,9 +117,9 @@ const renderCodeOptions = (options: readonly string[]): string =>
   options.map((option) => `<code>${escapeHtml(option)}</code>`).join(" · ");
 
 export const formatAlertLine = (
-  alert: Pick<StoredAlert, "alertId" | "zone" | "category" | "from" | "subject">,
+  alert: Pick<StoredAlert, "alertId" | "shortRef" | "zone" | "category" | "from" | "subject">,
 ): string =>
-  `- [${alert.alertId}] ${zoneLabel(alert.zone)} | ${categoryLabel(alert.category)} | ${
+  `- [${alertShortRef(alert)}] ${zoneLabel(alert.zone)} | ${categoryLabel(alert.category)} | ${
     alert.from
   } | ${alert.subject}`;
 
@@ -119,6 +128,7 @@ export const mapAlertToSummary = (
   kind: AlertKind = "new-alert",
 ): AlertSummary => ({
   alertId: alert.alertId,
+  shortRef: alertShortRef(alert),
   kind,
   zone: alert.zone,
   category: alert.category,
@@ -139,11 +149,14 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
   const zone = zoneLabel(alert.zone);
   const emoji = zoneEmoji(alert.zone);
   const reminderSuffix = kind === "reminder" ? " · reminder" : "";
+  // Bracketed so the handle reads as a typeable reference, not prose. Users
+  // reply "feedback <ref> not important" to target this exact alert.
+  const ref = `[${alertShortRef(alert)}]`;
 
   const bodyLines = [
     `${emoji} ${zone} · ${category}${reminderSuffix}`,
     "",
-    subject,
+    `${ref} ${subject}`,
     "",
     `From: ${sender}`,
     `Why it matters: ${alert.why}`,
@@ -155,7 +168,7 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
 
   const formattedBody = [
     `<p>${emoji} <strong>${escapeHtml(`${zone} · ${category}${reminderSuffix}`)}</strong></p>`,
-    `<p><strong>${escapeHtml(subject)}</strong></p>`,
+    `<p><code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong></p>`,
     "<p>",
     `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
     `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}<br>`,
@@ -192,17 +205,20 @@ export const buildDigestMessage = (
     const sender = formatSenderDisplay(alert.from);
     const confidence = formatCategoryConfidence(alert.category, alert.confidence);
     const position = String(index + 1);
+    // The position is digest-scoped (it shifts between digests); the bracketed
+    // ref is stable, so both are shown and either targets this item.
+    const ref = `[${alertShortRef(alert)}]`;
 
     bodyLines.push(
       "",
-      `${position}. ${subject}`,
+      `${position}. ${ref} ${subject}`,
       `From: ${sender}`,
       confidence,
       `Why it matters: ${alert.why}`,
     );
     htmlParts.push(
       "<p>",
-      `<strong>${position}. ${escapeHtml(subject)}</strong><br>`,
+      `<strong>${position}.</strong> <code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong><br>`,
       `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
       `${escapeHtml(confidence)}<br>`,
       `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}`,

@@ -63,6 +63,74 @@ describe("alerts/output", () => {
     ).toBe(loadGolden("formatFeedbackResult.policy"));
   });
 
+  it("names the matched item (ref, subject, sender) when the enriched fields are present", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Feedback applied. Alert marked as important.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "Billing <billing@example.com>",
+      }),
+    ).toBe(
+      "Feedback applied. Alert marked as important. Applied to: [a1b2c3] 'Invoice overdue' from Billing <billing@example.com>.",
+    );
+  });
+
+  it("omits the sender clause when from is absent but ref+subject are present", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Reminder scheduled.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        nextReminderAt: "2026-04-08T16:00:00Z",
+      }),
+    ).toBe(
+      "Reminder scheduled. Applied to: [a1b2c3] 'Invoice overdue'. Will be revisited at 2026-04-08T16:00:00Z.",
+    );
+  });
+
+  it("names the matched item alongside a created policy", () => {
+    expect(
+      formatFeedbackResult({
+        note: "Policy updated locally.",
+        alertId: "alert-1",
+        shortRef: "a1b2c3",
+        subject: "Invoice overdue",
+        from: "billing@example.com",
+        policyId: "pol-1",
+      }),
+    ).toBe(
+      "Policy updated locally. Applied to: [a1b2c3] 'Invoice overdue' from billing@example.com. Policy pol-1 created.",
+    );
+  });
+
+  it("lists candidates with their short refs for ambiguous feedback", () => {
+    expect(
+      formatFeedbackResult({
+        status: "ambiguous",
+        ref: "invoice",
+        candidates: [
+          { shortRef: "a1b2c3", subject: "Invoice March", from: "billing@example.com" },
+          { shortRef: "d4e5f6", subject: "Invoice April", from: "ar@vendor.com" },
+        ],
+      }),
+    ).toBe(
+      [
+        "Ambiguous: 'invoice' matches 2 items. Reply with one of:",
+        "- [a1b2c3] 'Invoice March' from billing@example.com",
+        "- [d4e5f6] 'Invoice April' from ar@vendor.com",
+      ].join("\n"),
+    );
+  });
+
+  it("renders an ambiguous result with no ref/candidates without throwing", () => {
+    expect(formatFeedbackResult({ status: "ambiguous" })).toBe(
+      "Ambiguous: '' matches 0 items. Reply with one of:",
+    );
+  });
+
   it("matches the formatListAlertsResult golden fixtures", () => {
     expect(formatListAlertsResult({ view: "today", alerts: [] })).toBe(
       loadGolden("formatListAlertsResult.empty.today"),

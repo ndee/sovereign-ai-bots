@@ -159,6 +159,7 @@ export const senderState: MailSentinelState = migrateState({
 
 export const sampleAlert = {
   alertId: "alert-1",
+  shortRef: "alert1",
   zone: "red" as const,
   category: "financial-relevance" as const,
   subject: "Invoice $500",

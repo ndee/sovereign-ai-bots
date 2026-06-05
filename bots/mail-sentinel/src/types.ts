@@ -61,6 +61,13 @@ export interface StoredMessage {
 
 export interface StoredAlert {
   alertId: string;
+  /**
+   * Stable short handle for this alert — a lowercase prefix of `alertId`,
+   * minted at alert creation and lengthened only on collision. Optional so
+   * pre-existing persisted alerts (minted before this field existed) remain
+   * valid; callers derive a fallback prefix when it is absent.
+   */
+  shortRef?: string | undefined;
   messageKey?: string | undefined;
   uid?: number | undefined;
   messageId?: string | undefined;
@@ -90,6 +97,7 @@ export interface StoredAlert {
 
 export interface AlertSummary {
   alertId: string;
+  shortRef: string;
   kind: "new-alert" | "reminder" | "digest";
   zone: Zone;
   category: Category;
@@ -119,6 +127,12 @@ export interface LearningState {
 export interface DigestState {
   pendingAmber: string[];
   lastDigestAt?: string | undefined;
+  /**
+   * Ordered `alertId`s of the items shown in the most recently *sent* digest.
+   * Persisted at flush so positional feedback ("item 3") resolves against the
+   * order the user actually saw, not a freshly re-rendered digest.
+   */
+  lastDigestAlertIds?: string[] | undefined;
 }
 
 export interface MailboxState {
@@ -280,6 +294,7 @@ export interface CommandOptions {
   instance?: string | undefined;
   configPath?: string | undefined;
   alertId?: string | undefined;
+  ref?: string | undefined;
   action?: FeedbackAction | undefined;
   delay?: string | undefined;
   view?: "today" | "recent" | string | undefined;

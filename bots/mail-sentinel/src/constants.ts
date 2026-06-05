@@ -25,6 +25,10 @@ export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 export const RULE_ADJUSTMENT_FLOOR = -1;
 export const MAX_THREAD_CONTEXT_ENTRIES = 2;
 export const MAX_PENDING_AMBER_ITEMS = 200;
+// Starting length of a minted short reference (a prefix of `alertId`). Chosen
+// for typeability in chat; the minter lengthens past this only when a shorter
+// prefix would collide with another live alert's short ref.
+export const SHORT_REF_START_LENGTH = 6;
 
 export const CATEGORY_LABELS: Record<string, string> = {
   "decision-required": "Decision Required",

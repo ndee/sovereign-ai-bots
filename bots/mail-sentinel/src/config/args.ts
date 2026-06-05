@@ -18,6 +18,7 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
     "--instance",
     "--config-path",
     "--alert-id",
+    "--ref",
     "--action",
     "--delay",
     "--view",
@@ -61,6 +62,7 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
     if (token === "--instance") options.instance = value;
     if (token === "--config-path") options.configPath = value;
     if (token === "--alert-id") options.alertId = value;
+    if (token === "--ref") options.ref = value;
     if (token === "--action") options.action = value as CommandOptions["action"];
     if (token === "--delay") options.delay = value;
     if (token === "--view") options.view = value;

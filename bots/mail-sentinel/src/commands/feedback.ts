@@ -1,3 +1,4 @@
+import { alertShortRef } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import { RULE_ADJUSTMENT_FLOOR } from "../constants.js";
 import {
@@ -8,10 +9,14 @@ import {
 import { withLockedState } from "../state/io.js";
 import type { CommandOptions, FeedbackAction, StoredAlert } from "../types.js";
 import { nowIso, parseDurationMs, sortAlertsNewestFirst } from "../util/time.js";
+import { type AlertTargetCandidate, resolveAlertTarget } from "./resolve.js";
 
 export interface FeedbackCommandResult {
   instanceId: string;
   alertId: string;
+  shortRef: string;
+  subject: string;
+  from: string;
   action: FeedbackAction;
   changed: boolean;
   note: string;
@@ -19,24 +24,61 @@ export interface FeedbackCommandResult {
   policyId?: string;
 }
 
+/**
+ * Returned (instead of applying feedback) when a free-form `--ref` matches more
+ * than one alert. No state is mutated — the caller must re-prompt the user with
+ * the candidate list so they can disambiguate.
+ */
+export interface FeedbackAmbiguousResult {
+  instanceId: string;
+  status: "ambiguous";
+  ref: string;
+  changed: false;
+  candidates: AlertTargetCandidate[];
+}
+
+export type ApplyFeedbackResult = FeedbackCommandResult | FeedbackAmbiguousResult;
+
+export const isAmbiguousFeedback = (
+  result: ApplyFeedbackResult,
+): result is FeedbackAmbiguousResult => "status" in result && result.status === "ambiguous";
+
 export const applyFeedback = async (
   options: Pick<
     CommandOptions,
-    "instance" | "configPath" | "alertId" | "latest" | "action" | "delay"
+    "instance" | "configPath" | "alertId" | "ref" | "latest" | "action" | "delay"
   >,
-): Promise<FeedbackCommandResult> => {
+): Promise<ApplyFeedbackResult> => {
   if (options.instance === undefined) {
     throw new Error("Expected --instance <id>");
   }
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   return withLockedState(runtime.statePath, async () => {
     const state = await runtime.readState();
-    const alert: StoredAlert | undefined =
-      typeof options.alertId === "string"
-        ? state.alerts.find((entry) => entry.alertId === options.alertId)
-        : options.latest === true
-          ? sortAlertsNewestFirst(state.alerts)[0]
-          : undefined;
+    // Selection precedence: an explicit alertId, then --latest, then a
+    // free-form --ref routed through the central resolver. The resolver is the
+    // single seam that can report ambiguity instead of silently picking one.
+    let alert: StoredAlert | undefined;
+    if (typeof options.alertId === "string") {
+      alert = state.alerts.find((entry) => entry.alertId === options.alertId);
+    } else if (options.latest === true) {
+      alert = sortAlertsNewestFirst(state.alerts)[0];
+    } else if (typeof options.ref === "string") {
+      const resolution = resolveAlertTarget(state, options.ref);
+      if (resolution.status === "ambiguous") {
+        // Do not mutate state: hand the candidates back for disambiguation.
+        return {
+          instanceId: runtime.instanceId,
+          status: "ambiguous" as const,
+          ref: options.ref,
+          changed: false as const,
+          candidates: resolution.candidates,
+        };
+      }
+      if (resolution.status === "ok") {
+        alert = resolution.alert;
+      }
+    }
     if (alert === undefined) {
       throw new Error("No matching Mail Sentinel alert was found");
     }
@@ -119,6 +161,11 @@ export const applyFeedback = async (
     return {
       instanceId: runtime.instanceId,
       alertId: alert.alertId,
+      // Echo the matched item so the confirmation names exactly which alert was
+      // targeted — never just the ref the user typed.
+      shortRef: alertShortRef(alert),
+      subject: alert.subject,
+      from: alert.from,
       action: action as FeedbackAction,
       changed: true,
       note,
