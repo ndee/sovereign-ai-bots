@@ -1,4 +1,12 @@
-import type { AlertSummary, CommandOptions, FlattenedPolicyEntry } from "../types.js";
+import {
+  describeEffect,
+  describeRoute,
+  groupByType,
+  type MergedPolicyGroup,
+  mergeDuplicatePolicies,
+  resolveEffectiveRouting,
+} from "../policy/summary.js";
+import type { AlertSummary, CommandOptions, FlattenedPolicyEntry, PolicyType } from "../types.js";
 import { formatAlertLine } from "./format.js";
 
 export interface ScanResult {
@@ -127,16 +135,54 @@ const describePolicyEntry = (entry: FlattenedPolicyEntry): string => {
   return String(entry.match ?? entry.category ?? entry.schedule);
 };
 
+// Title-cased section headers, keyed by policy type.
+const SECTION_TITLES: Record<PolicyType, string> = {
+  sender: "Sender",
+  domain: "Domain",
+  receiver: "Receiver",
+  category: "Category",
+  content: "Content",
+  time: "Time",
+  mute: "Mute",
+};
+
+// Render one merged group as a list line: id list, target, optional collapse
+// marker, and the group's own routing effect.
+const formatPolicyGroupLine = (group: MergedPolicyGroup): string => {
+  const ids = `[${group.ids.join(",")}]`;
+  const collapse = group.count > 1 ? ` (x${String(group.count)}, collapsed)` : "";
+  const effect = describeEffect(group.entry);
+  const suffix = effect.length > 0 ? `  ${effect}` : "";
+  return `- ${ids} ${describePolicyEntry(group.entry)}${collapse}${suffix}`;
+};
+
 export const formatPolicyResult = (result: PolicyListResult): string => {
   if (result.policies.length === 0) {
     return "No Mail Sentinel policies are configured.";
   }
-  return [
-    "Mail Sentinel policies:",
-    ...result.policies.map(
-      (entry) => `- [${entry.id}] ${entry.type} ${describePolicyEntry(entry)}`,
-    ),
-  ].join("\n");
+  const merged = mergeDuplicatePolicies(result.policies);
+  const sections = groupByType(merged);
+  const routes = resolveEffectiveRouting(result.policies);
+  const ruleCount = `${String(result.policies.length)} rule${result.policies.length === 1 ? "" : "s"}`;
+  const routeCount =
+    routes.length > 0
+      ? `, ${String(routes.length)} effective route${routes.length === 1 ? "" : "s"}`
+      : "";
+  const lines = [`Mail Sentinel policies (${ruleCount}${routeCount}):`];
+  if (routes.length > 0) {
+    lines.push("", "Effective routing (mute > ceiling > floor > boost):");
+    for (const route of routes) {
+      lines.push(`  ${route.target} -> ${describeRoute(route)}`);
+    }
+  }
+  for (const section of sections) {
+    lines.push(
+      "",
+      `${SECTION_TITLES[section.type]} (${String(section.groups.length)}):`,
+      ...section.groups.map((group) => `  ${formatPolicyGroupLine(group)}`),
+    );
+  }
+  return lines.join("\n");
 };
 
 export interface PolicyActionResult {
