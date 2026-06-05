@@ -1,0 +1,64 @@
+E2E PROOF — sovereign-ai-bots #122
+Subject-scope content-policy filter on the LIVE classification path
+====================================================================
+
+Node under test
+  Host:          root@204.168.143.168 (sovereign-ai-node-e2e, Hetzner VPS)
+  Homeserver:    https://brave-freedom-badger-ad52.sovereign-ai-node.com
+  bots ref:      5ff7adb28f88e56b3152e61789f0d2e96e5a60e4  (botsVersion 2.0.0)
+                 -> includes PR #123 (merge 30708ed); compare 30708ed..5ff7adb = ahead 5, behind 0
+  node ref:      main / 2.2.2 (3e8000c)
+  Source:        /etc/sovereign-node/install-provenance.json
+
+What #122 reported
+  Subject-scope filtering was honored by the unit/e2e stubs but silently
+  SKIPPED on the live classification path (the real `scan` loop). A
+  subject-scoped content rule therefore also matched the message BODY, so
+  out-of-scope mail was mis-classified.
+
+How this run exercises the LIVE path (not a stub)
+  Real email is submitted over SMTP -> Proton Bridge -> the node's own
+  `sovereign-mail-sentinel-scan` timer (forced to 1 min for the run) ->
+  classification -> mail-sentinel state (zoneHistory / alerts) -> Matrix
+  RED alert in the operator's Element room. No stub, no mock: the same
+  scan/contentHaystack/determineZone code path the product runs.
+
+Scenarios (cucumber, run id e2e-1780680824150)  — 2/2 passed, 14/14 steps
+  1. IN-scope: marker "subjecthit-<runId>" in the SUBJECT, low-signal body.
+     Rule: content, scope=subject, contains subjecthit-<runId>, min-zone RED.
+     RESULT: classified RED; alert attributed to the subject rule
+             (policyModifiers = ["e2e:subject-policy subject e2e-1780680824150"]).
+             -> the subject haystack matched on the live path.  PASS
+
+  2. OUT-of-scope: SAME-shaped marker "subjectmiss-<runId>" in the BODY ONLY,
+     subject is marker-free ("Weekly status digest <runId>").
+     Rule: content, scope=subject, contains subjectmiss-<runId>, min-zone RED.
+     RESULT: NOT escalated. Stayed at the model's own AMBER baseline
+             (reason: "Routine status update with no action required and no
+             deadline" — the LLM's own reasoning, NOT an e2e:subject-policy
+             reason), and NO RED alert was recorded.
+             -> the subject rule did NOT leak into the body.  PASS
+
+  The asymmetry between #1 and #2 — identical rules differing only in whether
+  the marker sits in the subject vs the body — is the #122 guarantee: a
+  subject-scoped rule matches the subject and only the subject on the live path.
+
+Element web evidence (https://app.element.io, logged in as `operator`)
+  subject-scope-in-scope-red-tile.png  — the live mail-sentinel 🔴 RED alert
+                                          for "Routine subject reference" (in-scope).
+  subject-scope-alert-room-timeline.png — the Alerts room; the in-scope message
+                                          is RED, and NO "Weekly status digest"
+                                          (out-of-scope) alert is present.
+  subject-scope-out-of-scope-absent.png — timeline tail; out-of-scope subject
+                                          produced 0 alert cards (capture log:
+                                          OUT_OF_SCOPE_COUNT count=0).
+  element-login.png / element-signed-in.png / element-alert-room.png —
+                                          real Element web client + login.
+  subject-scope-element-run.webm        — screen recording of the Element session.
+
+Other files
+  cucumber-run.log         — full cucumber output for the proof run.
+  subject-scope-report.json — cucumber JSON report (2 scenarios, all steps passed).
+
+Cleanup: both temporary subject rules were removed by the @subject-policy-cleanup
+hook after each scenario (see cucumber-run.log).

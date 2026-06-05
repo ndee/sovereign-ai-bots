@@ -1,6 +1,0 @@
-{
-  "plain": "<abc@example.com>",
-  "wrapped": "<abc@example.com>",
-  "trimmed": "<abc@example.com>",
-  "noAt": "loose-id"
-}

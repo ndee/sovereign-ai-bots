@@ -1,0 +1,26 @@
+Use of `require-module` option normally means you should specify your support code paths with `require`; see https://github.com/cucumber/cucumber-js/blob/main/docs/configuration.md#finding-your-code
+[e2e] Operator logged into Matrix and joined alert room
+[e2e] Mail Sentinel state reset; removed 0 orphan e2e policies
+[e2e] Bot Matrix token is valid
+[e2e] Run ID: e2e-1780680824150
+[e2e] Alert room: !HEJrPYQpJdOrBtHLyO:brave-freedom-badger-ad52.sovereign-ai-node.com
+[e2e] Scan timer overridden to 1min
+[e2e] Mail Sentinel startup: timer active, policy profile loaded (1 policies)
+[e2e] Added subject policy id=214ec9e7-3a38-415e-8e3c-e8d5008160d5 term="subjecthit-e2e-1780680824150" minZone=RED maxZone=-
+[e2e] Sent subject-scope-hit email with run ID e2e-1780680824150
+[e2e] Waiting up to 5min for "subject-scope-hit" (subject pattern="Routine subject reference") to be ingested and classified...
+[e2e] Found zone history for "subject-scope-hit" messageKey=msg:<e2e-1780680824150-subject-scope-hit@e2e.sovereign-ai> zone=red reason="e2e:subject-policy subject e2e-1780680824150"
+[e2e] "subject-scope-hit" zone history newest=red reason="e2e:subject-policy subject e2e-1780680824150"
+[e2e] "subject-scope-hit" alert attributed to subject rule (zone=red, modifiers=["e2e:subject-policy subject e2e-1780680824150"]) — subject scope honored on the live path
+[e2e] Removed temporary subject policy 214ec9e7-3a38-415e-8e3c-e8d5008160d5
+[e2e] Added subject policy id=d80901e6-674e-40e5-967c-03342feac282 term="subjectmiss-e2e-1780680824150" minZone=RED maxZone=-
+[e2e] Sent subject-scope-miss email with run ID e2e-1780680824150
+[e2e] Waiting up to 5min for "subject-scope-miss" (subject pattern="Weekly status digest") to be ingested and classified...
+[e2e] Found zone history for "subject-scope-miss" messageKey=msg:<e2e-1780680824150-subject-scope-miss@e2e.sovereign-ai> zone=amber reason="Routine status update with no action required and no deadline"
+[e2e] "subject-scope-miss" stayed at baseline zone=amber (not red), reason="Routine status update with no action required and no deadline" — subject rule correctly inert on a body-only marker
+[e2e] No RED alert recorded for "subject-scope-miss" — subject rule did not escalate a body-only marker
+[e2e] Removed temporary subject policy d80901e6-674e-40e5-967c-03342feac282
+[e2e] Scan timer restored
+2 scenarios (2 passed)
+14 steps (14 passed)
+5m08.782s (executing steps: 4m22.755s)

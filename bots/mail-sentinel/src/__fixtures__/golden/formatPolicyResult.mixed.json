@@ -1,1 +1,0 @@
-"Mail Sentinel policies (5 rules):\n\nSender (1):\n  - [p1] alice@example.com\n\nCategory (1):\n  - [p2] risk-escalation\n\nContent (2):\n  - [p4] any:/invoice/\n  - [p5] subject:/freigegeben/\n\nTime (1):\n  - [p3] 09:00-17:00"

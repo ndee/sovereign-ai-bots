@@ -1,8 +1,0 @@
-{
-  "command": "list-alerts",
-  "options": {
-    "json": true,
-    "instance": "ms-core",
-    "view": "today"
-  }
-}

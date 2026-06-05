@@ -1,7 +1,0 @@
-{
-  "from": "Alice",
-  "fromAddress": "alice@example.com",
-  "domain": "example.com",
-  "messageCount": 5,
-  "lastSeenAt": "2026-04-08T10:00:00Z"
-}

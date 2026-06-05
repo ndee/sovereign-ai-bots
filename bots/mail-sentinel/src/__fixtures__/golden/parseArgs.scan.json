@@ -1,7 +1,0 @@
-{
-  "command": "scan",
-  "options": {
-    "json": true,
-    "instance": "ms-core"
-  }
-}

@@ -1,0 +1,259 @@
+[
+  {
+    "description": "  Subject-scoped content rules (sovereign-ai-bots #98) let an operator scope a\n  rule to the message SUBJECT only: `--type content --contains <text> --scope\n  subject`. On the live classification path the rule must match `message.subject`\n  and nothing else — never the body.\n\n  sovereign-ai-bots #122 is the regression these scenarios guard: the subject\n  filter passed the unit/e2e stubs but was silently skipped on the real scan\n  loop, so a subject-scoped rule also matched the body and mis-classified\n  out-of-scope mail. PR#123 added unit coverage of the `scan` loop; this feature\n  closes the remaining gap by driving real email through the LIVE node (SMTP ->\n  Proton Bridge -> scan -> zone history / alerts) and asserting both halves:\n    - an IN-scope message (marker in the subject) IS escalated by the rule, and\n      the alert cites the subject filter as the reason; and\n    - an OUT-of-scope message (same-shaped marker in the BODY only, marker-free\n      subject) is NOT mis-classified — the subject rule stays inert.",
+    "elements": [
+      {
+        "description": "",
+        "id": "mail-sentinel-subject-scoped-content-policy-rules-on-the-live-path;a-subject-scoped-\"contains\"-rule-escalates-an-in-scope-message-to-red",
+        "keyword": "Scenario",
+        "line": 23,
+        "name": "A subject-scoped \"contains\" rule escalates an in-scope message to RED",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 1400858642
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 19,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 41926934954
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 20,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 389838504
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 29,
+            "name": "a temporary subject rule matching \"subjecthit-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/subject-policy.steps.ts:88"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 277690208
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 30,
+            "name": "I send a \"subject-scope-hit\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3055831521
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 31,
+            "name": "I wait up to 5 minutes for the \"subject-scope-hit\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 91969315032
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 32,
+            "name": "the \"subject-scope-hit\" email should land in zone \"red\" in the zone history",
+            "match": {
+              "location": "steps/content-policy.steps.ts:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 285292671
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 33,
+            "name": "the \"subject-scope-hit\" email's alert should be attributed to the subject rule",
+            "match": {
+              "location": "steps/subject-policy.steps.ts:121"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 265990092
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 266333891
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@subject-policy-cleanup",
+            "line": 22
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "mail-sentinel-subject-scoped-content-policy-rules-on-the-live-path;a-subject-scoped-rule-does-not-match-a-marker-that-lives-only-in-the-body",
+        "keyword": "Scenario",
+        "line": 36,
+        "name": "A subject-scoped rule does NOT match a marker that lives only in the body",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 557491619
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 19,
+            "name": "the sovereign node is healthy",
+            "match": {
+              "location": "steps/cli.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 41167868179
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 20,
+            "name": "mail sentinel is running with a policy profile",
+            "match": {
+              "location": "steps/cli.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 157066
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 43,
+            "name": "a temporary subject rule matching \"subjectmiss-{runId}\" with minZone \"RED\"",
+            "match": {
+              "location": "steps/subject-policy.steps.ts:88"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 270354502
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 44,
+            "name": "I send a \"subject-scope-miss\" test email with subject containing the run ID",
+            "match": {
+              "location": "steps/email.steps.ts:4"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3548152931
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 45,
+            "name": "I wait up to 5 minutes for the \"subject-scope-miss\" email to be classified in the zone history",
+            "match": {
+              "location": "steps/policy-bypass.steps.ts:133"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 76589752529
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 46,
+            "name": "the \"subject-scope-miss\" email should stay at its model baseline and not escalate to zone \"red\"",
+            "match": {
+              "location": "steps/subject-policy.steps.ts:171"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 257696934
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 47,
+            "name": "no RED alert should be recorded for the \"subject-scope-miss\" email's subject rule",
+            "match": {
+              "location": "steps/subject-policy.steps.ts:213"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 259325208
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 266225975
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@subject-policy-cleanup",
+            "line": 35
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "mail-sentinel-subject-scoped-content-policy-rules-on-the-live-path",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "Mail Sentinel subject-scoped content policy rules on the live path",
+    "tags": [],
+    "uri": "features/subject-scope-rules.feature"
+  }
+]
