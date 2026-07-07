@@ -76,6 +76,21 @@ describe("state/schema", () => {
     expect(pruneState(migrated)).toEqual(loadGolden("pruneState"));
   });
 
+  it("drops pending-amber IDs whose alert was pruned, keeping resolvable ones", () => {
+    // A pending-amber ID pointing at an alert that no longer exists in
+    // state.alerts (evicted by the newest-500 cap on a red-heavy mailbox) would
+    // otherwise linger forever and, once every pending ID is dangling, wedge the
+    // digest permanently empty (it clears pendingAmber only on a real send).
+    const state = migrateState({
+      alerts: [{ alertId: "live-amber", sentAt: "2026-04-08T10:00:00.000Z", zone: "amber" }],
+      digest: {
+        pendingAmber: ["live-amber", "pruned-away"],
+      },
+    }) as MailSentinelState;
+    pruneState(state);
+    expect(state.digest.pendingAmber).toEqual(["live-amber"]);
+  });
+
   it("prunes state down to the retention window", () => {
     const bulkMessages: Record<string, Record<string, unknown>> = {};
     for (let i = 0; i < 5100; i += 1) {
