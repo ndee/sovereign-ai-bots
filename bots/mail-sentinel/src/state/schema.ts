@@ -97,7 +97,17 @@ export const pruneState = (state: MailSentinelState): MailSentinelState => {
     .slice()
     .sort((left, right) => left.at.localeCompare(right.at))
     .slice(-1000);
-  state.digest.pendingAmber = state.digest.pendingAmber.slice(-MAX_PENDING_AMBER_ITEMS);
+  // Drop pending-amber IDs whose alert was just pruned out of `state.alerts`.
+  // `resolvePendingAmberAlerts` resolves each pending ID against `state.alerts`
+  // and silently discards dangling ones; without this, a red-heavy mailbox can
+  // evict a queued amber alert from the newest-500 while its ID lingers in
+  // `pendingAmber`, leaving the digest permanently empty (it is only cleared on
+  // an actual send, which never happens with zero resolvable items). Applied
+  // before the count cap so the cap sees only live IDs.
+  const retainedAlertIds = new Set(state.alerts.map((alert) => alert.alertId));
+  state.digest.pendingAmber = state.digest.pendingAmber
+    .filter((alertId) => retainedAlertIds.has(alertId))
+    .slice(-MAX_PENDING_AMBER_ITEMS);
   return state;
 };
 

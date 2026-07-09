@@ -372,6 +372,66 @@ describe("commands/scan", () => {
     expect(runtime.state.mailbox.uidValidity).toBe("444");
   });
 
+  it("does not advance lastSeenUid past a too-large message that was never read", async () => {
+    // A high-UID message skipped for exceeding the read limit must NOT push the
+    // watermark past lower-UID mail that still needs processing — otherwise that
+    // mail is gated out of every future scan (silent, permanent mail loss).
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.searchMail = async () => ({
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+        },
+        { uid: 30, size: 10 * 1024 * 1024, messageId: "<big@ex>" },
+      ],
+    });
+    const result = await scan({ instance: "ms-core" });
+    expect(result.note).toContain("exceeds the IMAP read limit");
+    // UID 10 was processed; UID 30 was skipped unread, so the watermark stays at
+    // the highest *considered* UID (10), not the max searched UID (30).
+    expect(runtime.state.mailbox.lastSeenUid).toBe(10);
+  });
+
+  it("does not advance lastSeenUid past a high-UID message that failed to read", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.searchMail = async () => ({
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+        },
+        { uid: 40, size: 1000, messageId: "<unreadable@ex>" },
+      ],
+    });
+    runtime.readMail = async (selector: unknown) => {
+      if (selector === 40) {
+        throw new Error("fetch failed");
+      }
+      return {
+        message: {
+          uid: 10,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      };
+    };
+    const result = await scan({ instance: "ms-core" });
+    expect(result.note).toContain("fetch failed");
+    expect(runtime.state.mailbox.lastSeenUid).toBe(10);
+  });
+
   it("falls back to the default why when zone reasons are empty", async () => {
     const runtime = setupRuntimeForScan();
     // Create a scenario where determineZone returns empty reasons.

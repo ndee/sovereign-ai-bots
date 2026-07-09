@@ -156,6 +156,13 @@ export const scan = async (
       let redAlertsSent = 0;
       let amberQueued = 0;
       const alerts: AlertSummary[] = [...reminderAlerts];
+      // Watermark only ever advances past mail we actually reckoned with —
+      // messages processed this scan or already seen in a prior one. Messages
+      // skipped here without being read (too large, unreadable) must NOT push it
+      // forward, or their UID would gate every lower-UID unprocessed message out
+      // forever (silent, permanent mail loss). Seeded from the prior watermark so
+      // it never moves backward.
+      let highestConsideredUid = state.mailbox.lastSeenUid ?? 0;
 
       for (const summary of searchMessages) {
         if (typeof summary.size === "number" && summary.size > DEFAULT_IMAP_READ_MAX_BYTES) {
@@ -176,6 +183,10 @@ export const scan = async (
           continue;
         }
         const parsed = parseMessage(summary, readResult);
+        // The message was read successfully, so it is one we have reckoned with —
+        // either already known (processed in a prior scan) or a new one we are
+        // about to consider below. Either way its UID may hold the watermark.
+        highestConsideredUid = Math.max(highestConsideredUid, parsed.uid);
         const knownMessage = state.messages[parsed.key];
         const shouldConsider =
           knownMessage === undefined &&
@@ -305,10 +316,12 @@ export const scan = async (
         state.lastAlertAt = scanAt;
       }
 
-      state.mailbox.lastSeenUid = Math.max(
-        state.mailbox.lastSeenUid ?? 0,
-        ...searchMessages.map((message) => message.uid),
-      );
+      // Advance only to the highest UID we actually reckoned with this scan, not
+      // the max of every searched UID — a skipped (too-large/unreadable) message
+      // at a high UID must not bury lower-UID unprocessed mail behind the
+      // watermark. `highestConsideredUid` is seeded from the prior value, so this
+      // never moves the watermark backward.
+      state.mailbox.lastSeenUid = highestConsideredUid;
       state.lastImapSuccessAt = scanAt;
       state.lastError = undefined;
       state.consecutiveFailures = 0;
