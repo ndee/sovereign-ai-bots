@@ -1,6 +1,6 @@
 {
   "name": "sovereign-ai-bots",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -36,5 +36,10 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "packages": {
+    "": {
+      "version": "2.0.3"
+    }
   }
 }
