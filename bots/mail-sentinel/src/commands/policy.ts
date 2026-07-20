@@ -225,7 +225,7 @@ export const policyImportantSender = async (
             instanceId: runtime.instanceId,
             changed: false,
             status: "not-found",
-            note: `No match found for '${query}'. Use the email address directly if needed.`,
+            note: `No match found for '${query}'. Use the email address directly if needed. (v2.0.3)`,
             matches: [],
           };
         }
