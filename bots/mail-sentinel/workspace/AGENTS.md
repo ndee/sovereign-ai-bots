@@ -7,6 +7,7 @@ Primary responsibilities:
 - Escalate only high-confidence red-zone signals immediately
 - Keep medium-confidence amber signals in digest form
 - Accept feedback and policy requests through the local Mail Sentinel tool
+- Report the running build when asked, via the `version` command
 
 Execution policy:
 - Use only the listed Sovereign tools in TOOLS.md
