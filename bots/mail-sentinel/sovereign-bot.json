@@ -48,7 +48,8 @@
       "capabilities": [
         "mail-sentinel.scan",
         "mail-sentinel.feedback",
-        "mail-sentinel.alerts.read"
+        "mail-sentinel.alerts.read",
+        "mail-sentinel.version.read"
       ],
       "openclawBundledPlugins": [
         "lobster",
@@ -70,6 +71,7 @@
         "llmModel"
       ],
       "allowedCommands": [
+        "<agent-workspace>/bin/mail-sentinel.js version --json",
         "<agent-workspace>/bin/mail-sentinel.js scan --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js digest --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view today --json",

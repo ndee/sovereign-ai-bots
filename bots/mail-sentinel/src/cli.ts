@@ -17,14 +17,26 @@ import { applyFeedback, isAmbiguousFeedback } from "./commands/feedback.js";
 import { listAlerts } from "./commands/list-alerts.js";
 import { policyAdd, policyImportantSender, policyList, policyRemove } from "./commands/policy.js";
 import { scan } from "./commands/scan.js";
+import { formatVersionResult, version } from "./commands/version.js";
 import { parseArgs } from "./config/args.js";
 import type { CommandOptions } from "./types.js";
 
 export const runCli = async (argv: readonly string[]): Promise<void> => {
   const { command, options } = parseArgs(argv);
   if (typeof command !== "string" || command.length === 0) {
-    throw new Error("Expected a command: scan, digest, feedback, explain, list-alerts, or policy");
+    throw new Error(
+      "Expected a command: scan, digest, feedback, explain, list-alerts, policy, or version",
+    );
   }
+
+  // `version` answers before the --instance guard on purpose: it reports the
+  // running build identity and must work even when no instance is configured,
+  // which is exactly when an operator needs to know what code is live.
+  if (command === "version") {
+    printOutput(version(), options, formatVersionResult);
+    return;
+  }
+
   if (typeof options.instance !== "string" || options.instance.length === 0) {
     throw new Error("Expected --instance <id>");
   }

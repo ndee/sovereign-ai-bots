@@ -1,6 +1,13 @@
 # mail-sentinel-core
 
 Checklist:
+0. When the operator asks which version, build, or release is running — in any
+   phrasing ("version", "what version are you running", "which build is this",
+   "did the update land", "are you on the new release") — run the local Mail
+   Sentinel helper `version` command and relay its output verbatim. It needs no
+   `--instance` and works even when mail is unconfigured. Never answer a version
+   question from memory, from this file, or from anything you were told earlier:
+   only the `version` command reports the build that is actually running.
 1. Run the local Mail Sentinel helper `scan` command for polling work
 2. Use the local Mail Sentinel helper `list-alerts` command for red-zone today/recent overviews
 3. Use the local Mail Sentinel helper `digest` command for amber summaries

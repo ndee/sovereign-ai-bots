@@ -54,6 +54,26 @@ describe("cli", () => {
     await expect(runCli(["scan"])).rejects.toThrow("Expected --instance <id>");
   });
 
+  // `version` is dispatched before the --instance guard so an operator can ask
+  // what code is live on a node whose instance is unconfigured or broken.
+  it("dispatches version without requiring --instance", async () => {
+    await runCli(["version", "--json"]);
+    const payload = JSON.parse(String(stdoutSpy.mock.calls[0][0])) as Record<string, unknown>;
+    expect(payload.component).toBe("mail-sentinel");
+    expect(payload).toHaveProperty("commit");
+    expect(payload).toHaveProperty("releaseId");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("renders version as plain text without --json", async () => {
+    await runCli(["version"]);
+    expect(String(stdoutSpy.mock.calls[0][0])).toContain("Mail Sentinel ");
+  });
+
+  it("lists version among the known commands when none is given", async () => {
+    await expect(runCli([])).rejects.toThrow("version");
+  });
+
   it("dispatches scan", async () => {
     const runtime = getFakeRuntime();
     runtime.imapConfigured = false;

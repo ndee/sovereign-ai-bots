@@ -1,4 +1,65 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
 import { defineConfig } from "tsup";
+
+/**
+ * Build identity baked into bot bundles.
+ *
+ * Resolved here, at build time, because the shipped release bundle strips
+ * `.git` — the running process cannot derive any of this for itself, and the
+ * updater must not trust on-disk JSON as proof that the installed code runs.
+ *
+ * Every value degrades to "unknown" rather than to a guess: a wrong commit is
+ * far worse than an absent one, since the updater compares it against the
+ * signed release manifest.
+ */
+const UNKNOWN = "unknown";
+
+const readPackageVersion = (): string => {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync("package.json", "utf8"));
+    if (typeof parsed === "object" && parsed !== null) {
+      const version = (parsed as { version?: unknown }).version;
+      if (typeof version === "string" && version.length > 0) {
+        return version;
+      }
+    }
+  } catch {
+    // Fall through to UNKNOWN — never guess a version.
+  }
+  return UNKNOWN;
+};
+
+const readGitCommit = (): string => {
+  // SOURCE_COMMIT lets a build from an exported tree (no .git) still carry a
+  // true commit, supplied by whoever did the export.
+  const supplied = process.env.SOURCE_COMMIT?.trim();
+  if (supplied !== undefined && /^[0-9a-f]{40}$/.test(supplied)) {
+    return supplied;
+  }
+  try {
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : UNKNOWN;
+  } catch {
+    return UNKNOWN;
+  }
+};
+
+const readReleaseId = (): string => {
+  const supplied = process.env.SOVEREIGN_RELEASE_ID?.trim();
+  return supplied !== undefined && supplied.length > 0 ? supplied : UNKNOWN;
+};
+
+const BUILD_DEFINES = {
+  __MAIL_SENTINEL_VERSION__: JSON.stringify(readPackageVersion()),
+  __MAIL_SENTINEL_COMMIT__: JSON.stringify(readGitCommit()),
+  __SOVEREIGN_RELEASE_ID__: JSON.stringify(readReleaseId()),
+  __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+};
 
 export default defineConfig([
   {
@@ -25,6 +86,7 @@ export default defineConfig([
     sourcemap: true,
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
+    define: BUILD_DEFINES,
   },
   {
     entry: { "project-sentinel": "bots/project-sentinel/src/cli.ts" },
