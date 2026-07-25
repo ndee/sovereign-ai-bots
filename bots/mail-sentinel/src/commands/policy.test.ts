@@ -342,7 +342,7 @@ describe("commands/policy", () => {
       });
       expect(result.status).toBe("not-found");
       expect(result.note).toContain("No match found for 'nobody'");
-      expect(result.note).toContain("(v2.0.3)");
+      expect(result.note).toContain("(v2.0.4-test.1)");
     });
 
     it("creates a sender policy when a unique match is found", async () => {
