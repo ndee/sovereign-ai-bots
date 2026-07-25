@@ -25,6 +25,7 @@ import type {
   StoredAlert,
 } from "../types.js";
 import { nowIso, parseDurationMs } from "../util/time.js";
+import { announceBuildIfChanged } from "./announce-build.js";
 
 interface DigestFlushResult {
   sent: boolean;
@@ -91,6 +92,11 @@ export const scan = async (
     throw new Error("Expected --instance <id>");
   }
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
+  // Announce a changed build before the scan body, and outside the state lock
+  // (it locks its own record). It runs even when IMAP is unconfigured, because
+  // an operator verifying an update needs the notice regardless — and it never
+  // throws, so it cannot stop a scan.
+  await announceBuildIfChanged(runtime);
   return withLockedState(runtime.statePath, async () => {
     const state = await runtime.readState();
     const policy = await runtime.readPolicy();
