@@ -232,7 +232,7 @@ export const policyImportantSender = async (
             // canary. Remove it — and its assertion in policy.test.ts — once
             // runtime identity is confirmed on a device. It MUST track the
             // shipped version; a stale marker is worse than none.
-            note: `No match found for '${query}'. Use the email address directly if needed. (v2.0.4-test.1)`,
+            note: `No match found for '${query}'. Use the email address directly if needed. (v2.0.4)`,
             matches: [],
           };
         }
