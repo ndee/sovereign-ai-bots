@@ -10,6 +10,8 @@ import { mintShortRef } from "../alerts/short-ref.js";
 import type { MailSentinelRuntime } from "../config/runtime.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../constants.js";
+import { deriveDegradationState } from "../health/degradation.js";
+import { announceDegradationIfChanged } from "../health/notice.js";
 import { parseMessage } from "../imap/parse.js";
 import { evaluatePolicy } from "../policy/engine.js";
 import { detectBulkSignals } from "../scoring/bulk.js";
@@ -82,6 +84,12 @@ export interface ScanCommandResult {
   remindersSent: number;
   lastPollAt: string;
   note?: string;
+  /**
+   * Total non-fatal warnings this scan produced (F-13). `note` still carries
+   * only the first one, so a scan that skipped 40 messages no longer reports
+   * the same as one that skipped a single message.
+   */
+  warningCount?: number;
   alerts: AlertSummary[];
 }
 
@@ -106,7 +114,15 @@ export const scan = async (
     if (!runtime.imapConfigured) {
       state.lastError = undefined;
       state.consecutiveFailures = 0;
+      // Nothing was scanned, so nothing is degraded. Clearing the counters here
+      // stops a node that had IMAP removed from sitting on a stale "degraded"
+      // record forever, and lets the recovery notice fire once.
+      state.lastScanLlmFailures = 0;
+      state.lastScanCandidates = 0;
+      state.lastScanWarnings = 0;
+      state.degradationState = "healthy";
       await runtime.writeState(state);
+      await announceDegradationIfChanged(runtime, "healthy");
       return {
         instanceId: runtime.instanceId,
         configured: false,
@@ -161,6 +177,11 @@ export const scan = async (
       }
       let redAlertsSent = 0;
       let amberQueued = 0;
+      // F-01: a failing semantic reviewer never reaches the outer catch, so it
+      // leaves `consecutiveFailures` at 0 and looks identical to a healthy scan.
+      // These two counters are the only evidence that survives the loop.
+      let llmFailures = 0;
+      let llmCandidates = 0;
       const alerts: AlertSummary[] = [...reminderAlerts];
       // Watermark only ever advances past mail we actually reckoned with —
       // messages processed this scan or already seen in a prior one. Messages
@@ -233,11 +254,13 @@ export const scan = async (
           continue;
         }
         let llmResult: LlmResult | null = null;
+        llmCandidates += 1;
         try {
           llmResult = await runtime.classifyCandidate(
             buildLlmCandidate(parsed, scored, policyResult, state),
           );
         } catch (error) {
+          llmFailures += 1;
           warnings.push(
             `Semantic review failed for UID ${String(parsed.uid)}: ${
               error instanceof Error ? error.message : String(error)
@@ -331,7 +354,21 @@ export const scan = async (
       state.lastImapSuccessAt = scanAt;
       state.lastError = undefined;
       state.consecutiveFailures = 0;
+      // Record what this scan actually observed *before* the state is written,
+      // so `doctor` reads the same counters the notice below is derived from.
+      state.lastScanLlmFailures = llmFailures;
+      state.lastScanCandidates = llmCandidates;
+      state.lastScanWarnings = warnings.length;
+      const degradation = deriveDegradationState({
+        consecutiveFailures: state.consecutiveFailures,
+        lastScanLlmFailures: llmFailures,
+        lastScanCandidates: llmCandidates,
+      });
+      state.degradationState = degradation;
       await runtime.writeState(state);
+      // Outside the send-bearing loop but still inside the state lock, matching
+      // how the digest and alert sends already work. It never throws.
+      await announceDegradationIfChanged(runtime, degradation);
       return {
         instanceId: runtime.instanceId,
         configured: true,
@@ -344,7 +381,9 @@ export const scan = async (
         digestsSent: digestResult.sent ? 1 : 0,
         remindersSent: reminderAlerts.length,
         lastPollAt: scanAt,
-        ...(warnings.length === 0 ? {} : { note: warnings[0] as string }),
+        ...(warnings.length === 0
+          ? {}
+          : { note: warnings[0] as string, warningCount: warnings.length }),
         alerts,
       };
     } catch (error) {
@@ -354,7 +393,16 @@ export const scan = async (
         retryable: false,
       };
       state.consecutiveFailures += 1;
+      // The notice has to run here too, or `scans-failing` — the state that
+      // means no mail is being retrieved at all — could never be announced.
+      const degradation = deriveDegradationState({
+        consecutiveFailures: state.consecutiveFailures,
+        lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
+        lastScanCandidates: state.lastScanCandidates ?? 0,
+      });
+      state.degradationState = degradation;
       await runtime.writeState(state);
+      await announceDegradationIfChanged(runtime, degradation);
       throw error;
     }
   });

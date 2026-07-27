@@ -24,6 +24,10 @@ export const createDefaultState = (): MailSentinelState => ({
   lastImapSuccessAt: undefined,
   lastError: undefined,
   consecutiveFailures: 0,
+  lastScanLlmFailures: undefined,
+  lastScanCandidates: undefined,
+  lastScanWarnings: undefined,
+  degradationState: undefined,
   mailbox: {
     lastSeenUid: undefined,
     uidValidity: undefined,
@@ -49,12 +53,26 @@ type PartialState = Partial<MailSentinelState> & {
   digest?: Partial<MailSentinelState["digest"]>;
 };
 
+/**
+ * Coerce a persisted degradation counter (F-01). State files written before the
+ * degradation fields existed simply omit them, and a hand-edited file could
+ * carry anything; either way the counter must land on `undefined` rather than
+ * poisoning `deriveDegradationState` with a NaN or a string.
+ */
+const readCounter = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+
 export const migrateState = (state: unknown): MailSentinelState => {
   const defaults = createDefaultState();
   const source = (state ?? {}) as PartialState;
   const next: MailSentinelState = {
     ...defaults,
     ...source,
+    lastScanLlmFailures: readCounter(source.lastScanLlmFailures),
+    lastScanCandidates: readCounter(source.lastScanCandidates),
+    lastScanWarnings: readCounter(source.lastScanWarnings),
+    degradationState:
+      typeof source.degradationState === "string" ? source.degradationState : undefined,
     mailbox: {
       ...defaults.mailbox,
       ...(source.mailbox ?? {}),

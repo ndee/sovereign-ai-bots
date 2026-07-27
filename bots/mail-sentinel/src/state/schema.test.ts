@@ -102,6 +102,77 @@ describe("state/schema", () => {
     expect(Object.keys(state.messages)).toHaveLength(5000);
   });
 
+  // F-01 added degradation counters to the state file. Nodes upgrading in place
+  // load a state document written before those fields existed, and it must not
+  // fault or invent counts.
+  describe("degradation-field migration (F-01)", () => {
+    const preDegradationState = {
+      version: 2,
+      lastPollAt: "2026-04-08T10:00:00.000Z",
+      lastAlertAt: "2026-04-08T09:00:00.000Z",
+      lastImapSuccessAt: "2026-04-08T10:00:00.000Z",
+      consecutiveFailures: 0,
+      mailbox: { lastSeenUid: 42, uidValidity: "111" },
+      messages: {},
+      alerts: [],
+      feedback: [],
+      learning: { senderWeights: {}, domainWeights: {}, ruleAdjustments: {} },
+      digest: { pendingAmber: [] },
+      zoneHistory: [],
+    };
+
+    it("loads a pre-degradation state file without inventing counters", () => {
+      const migrated = migrateState(preDegradationState);
+      expect(migrated.lastScanLlmFailures).toBeUndefined();
+      expect(migrated.lastScanCandidates).toBeUndefined();
+      expect(migrated.lastScanWarnings).toBeUndefined();
+      expect(migrated.degradationState).toBeUndefined();
+    });
+
+    it("preserves everything else from a pre-degradation state file", () => {
+      const migrated = migrateState(preDegradationState);
+      expect(migrated.mailbox.lastSeenUid).toBe(42);
+      expect(migrated.mailbox.uidValidity).toBe("111");
+      expect(migrated.lastPollAt).toBe("2026-04-08T10:00:00.000Z");
+      expect(migrated.version).toBe(2);
+    });
+
+    it("round-trips persisted degradation counters", () => {
+      const migrated = migrateState({
+        ...preDegradationState,
+        lastScanLlmFailures: 3,
+        lastScanCandidates: 7,
+        lastScanWarnings: 2,
+        degradationState: "classification-degraded",
+      });
+      expect(migrated.lastScanLlmFailures).toBe(3);
+      expect(migrated.lastScanCandidates).toBe(7);
+      expect(migrated.lastScanWarnings).toBe(2);
+      expect(migrated.degradationState).toBe("classification-degraded");
+    });
+
+    it("keeps zero counters as zero rather than dropping them", () => {
+      const migrated = migrateState({ ...preDegradationState, lastScanLlmFailures: 0 });
+      expect(migrated.lastScanLlmFailures).toBe(0);
+    });
+
+    // A NaN or a string counter reaching deriveDegradationState would silently
+    // break the comparison, so a hand-edited file falls back to "unknown".
+    it("discards non-numeric, negative, and non-finite counters", () => {
+      const migrated = migrateState({
+        ...preDegradationState,
+        lastScanLlmFailures: "many",
+        lastScanCandidates: -1,
+        lastScanWarnings: Number.POSITIVE_INFINITY,
+        degradationState: 42,
+      } as unknown);
+      expect(migrated.lastScanLlmFailures).toBeUndefined();
+      expect(migrated.lastScanCandidates).toBeUndefined();
+      expect(migrated.lastScanWarnings).toBeUndefined();
+      expect(migrated.degradationState).toBeUndefined();
+    });
+  });
+
   it("matches the normalizePolicy golden fixture", () => {
     expect({
       empty: normalizePolicy(undefined),
