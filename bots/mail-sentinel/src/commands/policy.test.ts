@@ -342,7 +342,9 @@ describe("commands/policy", () => {
       });
       expect(result.status).toBe("not-found");
       expect(result.note).toContain("No match found for 'nobody'");
-      expect(result.note).toContain("(v2.0.4)");
+      // The note carries no version marker: operator-facing copy should not be
+      // a version-reporting channel. Use the `version` command for that.
+      expect(result.note).not.toMatch(/\(v\d+\.\d+\.\d+/);
     });
 
     it("creates a sender policy when a unique match is found", async () => {
