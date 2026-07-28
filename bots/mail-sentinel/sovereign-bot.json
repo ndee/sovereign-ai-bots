@@ -339,6 +339,16 @@
             "type": "int",
             "default": 0
           },
+          "lastScanLlmFailures": {
+            "path": "lastScanLlmFailures",
+            "type": "int",
+            "default": 0
+          },
+          "lastScanWarnings": {
+            "path": "lastScanWarnings",
+            "type": "int",
+            "default": 0
+          },
           "lastError": {
             "path": "lastError",
             "type": "object"
@@ -350,6 +360,13 @@
           "kind": "field-threshold",
           "id": "consecutive-failures",
           "field": "consecutiveFailures",
+          "warnGte": 1,
+          "failGte": 3
+        },
+        {
+          "kind": "field-threshold",
+          "id": "llm-classification-failures",
+          "field": "lastScanLlmFailures",
           "warnGte": 1,
           "failGte": 3
         }

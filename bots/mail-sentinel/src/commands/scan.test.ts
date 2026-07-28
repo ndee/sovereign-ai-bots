@@ -1,3 +1,7 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFakeRuntime, resetFakeRuntime } from "../__fixtures__/fake-runtime.js";
@@ -644,6 +648,222 @@ describe("commands/scan", () => {
       // The scope-aware default reason surfaces the matched subject filter in the
       // operator-facing audit trail.
       expect(alert?.policyModifiers).toContain("subject matches /invoice/");
+    });
+  });
+
+  // F-01: a failing semantic reviewer never reaches the outer catch, so the scan
+  // completes, resets consecutiveFailures to 0, and the outage is invisible to
+  // both the Matrix room and `doctor`. These cover the counters and the notice.
+  describe("degradation visibility (F-01)", () => {
+    /** Real temp statePath so the notice sidecar actually reads and writes. */
+    const useRealStatePath = async (runtime: ReturnType<typeof setupRuntimeForScan>) => {
+      const dir = await mkdtemp(join(tmpdir(), "ms-scan-degradation-"));
+      runtime.statePath = join(dir, "mail-sentinel-state.json");
+      return runtime;
+    };
+
+    const failingLlm = () => async () => {
+      throw new Error("llm down");
+    };
+
+    it("records zero LLM failures and a healthy state on a clean scan", async () => {
+      const runtime = setupRuntimeForScan();
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.lastScanLlmFailures).toBe(0);
+      expect(runtime.state.lastScanCandidates).toBe(1);
+      expect(runtime.state.degradationState).toBe("healthy");
+    });
+
+    it("counts an LLM failure and marks the state classification-degraded", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.classifyCandidate = failingLlm();
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.lastScanLlmFailures).toBe(1);
+      expect(runtime.state.lastScanCandidates).toBe(1);
+      expect(runtime.state.degradationState).toBe("classification-degraded");
+      // The whole finding: the scan still "succeeded", so this counter is the
+      // only thing `doctor` can see.
+      expect(runtime.state.consecutiveFailures).toBe(0);
+    });
+
+    it("resets the failure counter once the reviewer recovers", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.classifyCandidate = failingLlm();
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.lastScanLlmFailures).toBe(1);
+
+      runtime.classifyCandidate = async () => makeLlm();
+      // A new UID so the message is considered again rather than skipped as known.
+      runtime.searchMail = async () => ({
+        messages: [
+          {
+            uid: 11,
+            size: 1000,
+            messageId: "<m2@ex>",
+            from: ["Alice <alice@example.com>"],
+            subject: "Invoice #2",
+          },
+        ],
+      });
+      runtime.readMail = async () => ({
+        message: {
+          uid: 11,
+          messageId: "<m2@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #2",
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      });
+      await scan({ instance: "ms-core" });
+
+      expect(runtime.state.lastScanLlmFailures).toBe(0);
+      expect(runtime.state.degradationState).toBe("healthy");
+    });
+
+    it("clears the counters and reports healthy when IMAP is unconfigured", async () => {
+      const runtime = getFakeRuntime();
+      runtime.imapConfigured = false;
+      runtime.state.lastScanLlmFailures = 4;
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.lastScanLlmFailures).toBe(0);
+      expect(runtime.state.degradationState).toBe("healthy");
+    });
+
+    it("records scans-failing on state once the scan has thrown three times", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.searchMail = async () => {
+        throw new Error("imap down");
+      };
+      runtime.state.consecutiveFailures = 2;
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap down");
+      expect(runtime.state.consecutiveFailures).toBe(3);
+      expect(runtime.state.degradationState).toBe("scans-failing");
+    });
+
+    it("stays healthy on the first scan failure, below the threshold", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.searchMail = async () => {
+        throw new Error("imap blip");
+      };
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap blip");
+      expect(runtime.state.degradationState).toBe("healthy");
+    });
+
+    it("announces the degradation to Matrix on the scan path", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.classifyCandidate = failingLlm();
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      await scan({ instance: "ms-core" });
+      const bodies = send.mock.calls.map(([message]) =>
+        typeof message === "string" ? message : message.body,
+      );
+      expect(bodies.some((body) => body.includes("SAN-LLM-001"))).toBe(true);
+    });
+
+    it("announces scans-failing to Matrix from the failure path", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.searchMail = async () => {
+        throw new Error("imap down");
+      };
+      runtime.state.consecutiveFailures = 2;
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap down");
+      const bodies = send.mock.calls.map(([message]) =>
+        typeof message === "string" ? message : message.body,
+      );
+      expect(bodies.some((body) => body.includes("SAN-MAIL-001"))).toBe(true);
+    });
+
+    // A notice is strictly less important than the scan it rides on.
+    it("completes the scan even when the degradation notice fails to send", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.classifyCandidate = failingLlm();
+      runtime.sendMatrixRoomMessage = async () => {
+        throw new Error("matrix unreachable");
+      };
+      const result = await scan({ instance: "ms-core" });
+      expect(result.configured).toBe(true);
+      expect(runtime.state.lastScanLlmFailures).toBe(1);
+    });
+
+    it("still rethrows the original scan error when the notice send fails", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.searchMail = async () => {
+        throw new Error("imap down");
+      };
+      runtime.state.consecutiveFailures = 2;
+      runtime.sendMatrixRoomMessage = async () => {
+        throw new Error("matrix unreachable");
+      };
+      // The scan error, not the notice error.
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap down");
+    });
+
+    // Sentinel values planted in the state the scan actually processes: none of
+    // them may reach a rendered notice.
+    it("never leaks mail content into the degradation notice", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.searchMail = async () => ({
+        messages: [
+          {
+            uid: 10,
+            size: 1000,
+            messageId: "<m1@ex>",
+            from: ["TEST_SENDER_DO_NOT_LEAK <leaky@secret-domain-do-not-leak.example>"],
+            subject: "TEST_SUBJECT_DO_NOT_LEAK Invoice #1",
+          },
+        ],
+      });
+      runtime.readMail = async () => ({
+        message: {
+          uid: 10,
+          messageId: "<m1@ex>",
+          from: ["TEST_SENDER_DO_NOT_LEAK <leaky@secret-domain-do-not-leak.example>"],
+          subject: "TEST_SUBJECT_DO_NOT_LEAK Invoice #1",
+          text: "TEST_EMAIL_BODY_DO_NOT_LEAK Please pay $500 for invoice.",
+          headers: [],
+        },
+      });
+      runtime.classifyCandidate = failingLlm();
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+
+      await scan({ instance: "ms-core" });
+
+      const notices = send.mock.calls
+        .map(([message]) => (typeof message === "string" ? message : message.body))
+        .filter((body) => body.includes("SAN-LLM-001"));
+      expect(notices).toHaveLength(1);
+      for (const notice of notices) {
+        expect(notice).not.toContain("TEST_SUBJECT_DO_NOT_LEAK");
+        expect(notice).not.toContain("TEST_SENDER_DO_NOT_LEAK");
+        expect(notice).not.toContain("TEST_EMAIL_BODY_DO_NOT_LEAK");
+        expect(notice).not.toContain("secret-domain-do-not-leak");
+        expect(notice).not.toContain("@");
+      }
+    });
+
+    // F-13: `note` carries only the first warning, so a scan that skipped many
+    // messages used to report the same as one that skipped a single message.
+    it("reports the full warning count alongside the first warning", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.searchMail = async () => ({
+        messages: [
+          { uid: 21, size: 10 * 1024 * 1024, messageId: "<big1@ex>" },
+          { uid: 22, size: 10 * 1024 * 1024, messageId: "<big2@ex>" },
+        ],
+      });
+      const result = await scan({ instance: "ms-core" });
+      expect(result.warningCount).toBe(2);
+      expect(result.note).toContain("exceeds the IMAP read limit");
+      expect(runtime.state.lastScanWarnings).toBe(2);
+    });
+
+    it("omits the warning count on a clean scan", async () => {
+      const runtime = setupRuntimeForScan();
+      const result = await scan({ instance: "ms-core" });
+      expect(result.warningCount).toBeUndefined();
+      expect(runtime.state.lastScanWarnings).toBe(0);
     });
   });
 });

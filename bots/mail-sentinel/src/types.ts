@@ -200,6 +200,21 @@ export interface MailSentinelState {
   lastImapSuccessAt?: string | undefined;
   lastError?: StateErrorInfo | undefined;
   consecutiveFailures: number;
+  /**
+   * Candidates whose semantic review threw during the most recent scan (F-01).
+   *
+   * A failing LLM never increments `consecutiveFailures`, because the scan
+   * itself completes — mail is still retrieved, it is just never escalated past
+   * amber. Persisting the per-scan count is what makes that outage visible to
+   * `doctor`, which otherwise sees a perfectly healthy state file.
+   */
+  lastScanLlmFailures?: number | undefined;
+  /** Candidates that reached the semantic reviewer during the most recent scan. */
+  lastScanCandidates?: number | undefined;
+  /** Non-fatal warnings recorded during the most recent scan (F-13). */
+  lastScanWarnings?: number | undefined;
+  /** Last derived `DegradationState`, for notice dedup and `doctor` visibility. */
+  degradationState?: string | undefined;
   mailbox: MailboxState;
   messages: Record<string, StoredMessage>;
   alerts: StoredAlert[];
