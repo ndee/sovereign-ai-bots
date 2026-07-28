@@ -541,9 +541,7 @@ describe("catalog validator", () => {
     ).resolves.toBe(0);
     expect(commandLines).toContain("Typecheck passed for 5 bot packages.");
     expect(commandLines).toContain("Catalog tests passed for 5 bot packages.");
-    expect(commandLines.some((line) => line.startsWith("Smoked mail-sentinel@2.0.4-test.1"))).toBe(
-      true,
-    );
+    expect(commandLines.some((line) => line.startsWith("Smoked mail-sentinel@2.0.5"))).toBe(true);
     expect(commandLines.some((line) => line.startsWith("Smoked project-sentinel@2.0.0"))).toBe(
       true,
     );

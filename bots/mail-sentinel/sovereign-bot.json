@@ -2,7 +2,7 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "mail-sentinel",
-  "version": "2.0.4-test.1",
+  "version": "2.0.5",
   "displayName": "Mail Sentinel",
   "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them with Lobster plus llm-task, applies personal policy, and chooses red, amber, or gray handling.",
   "defaultInstall": true,
@@ -537,7 +537,7 @@
   ],
   "agentTemplate": {
     "id": "mail-sentinel",
-    "version": "2.0.4-test.1",
+    "version": "2.0.5",
     "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them semantically, applies policy, and chooses red alerts, amber digests, or gray silence.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {

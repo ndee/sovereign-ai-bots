@@ -225,14 +225,7 @@ export const policyImportantSender = async (
             instanceId: runtime.instanceId,
             changed: false,
             status: "not-found",
-            // The trailing version marker is the LEGACY update-verification
-            // hack (edfac62): it proves a redeploy by surfacing the version in
-            // a reply an operator can trigger from chat. It is superseded by
-            // the `version` command and is kept only as a fallback for this
-            // canary. Remove it — and its assertion in policy.test.ts — once
-            // runtime identity is confirmed on a device. It MUST track the
-            // shipped version; a stale marker is worse than none.
-            note: `No match found for '${query}'. Use the email address directly if needed. (v2.0.4-test.1)`,
+            note: `No match found for '${query}'. Use the email address directly if needed.`,
             matches: [],
           };
         }
