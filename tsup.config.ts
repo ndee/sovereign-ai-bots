@@ -127,6 +127,10 @@ export default defineConfig([
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
     define: NODE_OPERATOR_DEFINES,
+    // The workspace artifact runs standalone from the agent workspace — no
+    // node_modules exists there. tsup externalizes package.json dependencies
+    // by default, which left `import "zod"` unresolvable at runtime.
+    noExternal: ["zod"],
   },
   {
     entry: { "project-sentinel": "bots/project-sentinel/src/cli.ts" },
