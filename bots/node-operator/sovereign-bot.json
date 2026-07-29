@@ -2,11 +2,11 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "node-operator",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "displayName": "Node Operator",
-  "description": "Conversational operator that manages Sovereign Node and managed agents.",
-  "defaultInstall": false,
-  "helloMessage": "Node Operator. Provides Sovereign AI Node and system status.",
+  "description": "Conversational operator for daily node status, health explanations and guided support.",
+  "defaultInstall": true,
+  "helloMessage": "Node Operator here. Mention me with `status` for a health summary, or `help` to see what I can do.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "node-operator"
@@ -21,10 +21,32 @@
     }
   },
   "configDefaults": {},
+  "toolTemplates": [
+    {
+      "kind": "sovereign-tool-template",
+      "id": "node-operator-tool",
+      "version": "2.1.0",
+      "description": "Read-only partner-support commands rendered from the product-safe diagnostics model",
+      "capabilities": [
+        "node.diagnostics.read"
+      ],
+      "requiredConfigKeys": [],
+      "requiredSecretRefs": [],
+      "allowedCommands": [
+        "<agent-workspace>/bin/node-operator.js status",
+        "<agent-workspace>/bin/node-operator.js health",
+        "<agent-workspace>/bin/node-operator.js explain <code>",
+        "<agent-workspace>/bin/node-operator.js support",
+        "<agent-workspace>/bin/node-operator.js help",
+        "<agent-workspace>/bin/node-operator.js version"
+      ],
+      "openclawToolNames": []
+    }
+  ],
   "toolInstances": [
     {
-      "id": "node-operator-cli",
-      "templateRef": "node-cli-ops@1.0.0",
+      "id": "node-operator-core",
+      "templateRef": "node-operator-tool@2.1.0",
       "config": {},
       "secretRefs": {}
     }
@@ -93,26 +115,38 @@
         "source": "workspace/skills/node-operator-core/SKILL.md",
         "writePolicy": "always"
       }
+    },
+    {
+      "id": "workspace-bin",
+      "kind": "managedFile",
+      "spec": {
+        "path": {
+          "join": [
+            {
+              "from": "agent.workspace"
+            },
+            "/bin/node-operator.js"
+          ]
+        },
+        "source": "workspace/bin/dist/node-operator.js",
+        "mode": "0755",
+        "writePolicy": "always"
+      }
     }
   ],
   "agentTemplate": {
     "id": "node-operator",
-    "version": "2.0.0",
-    "description": "Conversational operator that manages Sovereign Node and managed agents.",
+    "version": "2.1.0",
+    "description": "Conversational operator for daily node status, health explanations and guided support.",
     "matrix": {
       "localpartPrefix": "node-operator"
     },
     "requiredToolTemplates": [
       {
-        "id": "node-cli-ops",
-        "version": "1.0.0"
+        "id": "node-operator-tool",
+        "version": "2.1.0"
       }
     ],
-    "optionalToolTemplates": [
-      {
-        "id": "imap-readonly",
-        "version": "1.0.0"
-      }
-    ]
+    "optionalToolTemplates": []
   }
 }
