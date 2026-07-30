@@ -4,7 +4,14 @@ import { pathToFileURL } from "node:url";
 import { explainCode, formatExplainResult } from "./commands/explain.js";
 import { formatHealth, formatStatus, getDiagnostics } from "./commands/status.js";
 import { formatHelpResult, formatSupportResult } from "./commands/support.js";
+import { formatVerifyResult, verifyChallenge } from "./commands/verify.js";
 import { formatVersionResult, version } from "./commands/version.js";
+import {
+  acquireDiagnosticsSlot,
+  CONCURRENT_TEXT,
+  type GuardDecision,
+  RATE_LIMITED_TEXT,
+} from "./guard.js";
 
 /**
  * Deterministic command router for the Node Operator bot binary.
@@ -20,7 +27,15 @@ import { formatVersionResult, version } from "./commands/version.js";
  * echoed back when invalid.
  */
 
-export const COMMANDS = ["status", "health", "explain", "support", "help", "version"] as const;
+export const COMMANDS = [
+  "status",
+  "health",
+  "explain",
+  "support",
+  "help",
+  "version",
+  "verify",
+] as const;
 
 export type ParsedInvocation = {
   command: string | undefined;
@@ -82,25 +97,48 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
     return;
   }
 
-  if (command === "status" || command === "health") {
-    const result = await getDiagnostics();
-    if (json) {
-      printJson(result.kind === "ok" ? result.diagnostics : { unavailable: true });
-      return;
-    }
-    print(command === "status" ? formatStatus(result) : formatHealth(result));
-    return;
-  }
-
-  if (command === "explain") {
-    const result = await explainCode(argument);
-    print(formatExplainResult(result));
-    if (result.kind === "invalid-input" || result.kind === "unknown-code") {
-      // Non-zero so the agent loop knows the lookup did not succeed and can
-      // re-prompt, mirroring mail-sentinel's ambiguity convention.
+  // `verify` is the installer's challenge echo: deterministic, read-only,
+  // and deliberately NOT rate-limited — install verification may retry, and
+  // the command execs nothing.
+  if (command === "verify") {
+    const result = verifyChallenge(argument);
+    print(formatVerifyResult(result));
+    if (result.kind === "invalid-nonce") {
       process.exitCode = 1;
     }
     return;
+  }
+
+  if (command === "status" || command === "health" || command === "explain") {
+    // These exec the node CLI; bound how often and how concurrently that can
+    // happen so a chatty room or a looping agent cannot flood diagnostics.
+    const slot: GuardDecision = await acquireDiagnosticsSlot();
+    if (!slot.ok) {
+      print(slot.reason === "concurrent" ? CONCURRENT_TEXT : RATE_LIMITED_TEXT);
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      if (command === "explain") {
+        const result = await explainCode(argument);
+        print(formatExplainResult(result));
+        if (result.kind === "invalid-input" || result.kind === "unknown-code") {
+          // Non-zero so the agent loop knows the lookup did not succeed and
+          // can re-prompt, mirroring mail-sentinel's ambiguity convention.
+          process.exitCode = 1;
+        }
+        return;
+      }
+      const result = await getDiagnostics();
+      if (json) {
+        printJson(result.kind === "ok" ? result.diagnostics : { unavailable: true });
+        return;
+      }
+      print(command === "status" ? formatStatus(result) : formatHealth(result));
+      return;
+    } finally {
+      await slot.release();
+    }
   }
 
   if (command === "support") {

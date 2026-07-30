@@ -1,22 +1,70 @@
 /**
- * `support` and `help` — fixed navigation text.
+ * `support` and `help` — navigation text.
  *
  * `support` deliberately never generates a package, attaches a file, or
  * embeds any credential or token: support packages are created and reviewed
  * only in the authenticated local web interface, so nothing sensitive travels
- * through chat. The text below is constant — there is nothing dynamic to leak.
+ * through chat.
+ *
+ * A configured local Node Status URL may be included — but only after strict
+ * validation: plain http(s), no userinfo, no query, no fragment, so a
+ * session/bearer/activation token can never ride along. Anything that fails
+ * validation degrades to the fixed navigation instructions.
  */
 
-export const formatSupportResult = (): string =>
-  [
+/** Accept only a bare local http(s) origin/path — nothing that can carry a credential. */
+export const sanitizeNodeStatusUrl = (raw: string | undefined): string | undefined => {
+  if (typeof raw !== "string" || raw.trim().length === 0 || raw.length > 200) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw.trim());
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return undefined;
+  }
+  if (parsed.username !== "" || parsed.password !== "") {
+    return undefined;
+  }
+  if (parsed.search !== "") {
+    return undefined;
+  }
+  // The only fragment ever allowed is the Node Status route itself.
+  if (parsed.hash !== "" && parsed.hash !== "#/node-status") {
+    return undefined;
+  }
+  return parsed.toString();
+};
+
+export const formatSupportResult = (
+  env: Record<string, string | undefined> = process.env,
+): string => {
+  const configured = sanitizeNodeStatusUrl(env.SOVEREIGN_NODE_STATUS_URL);
+  const lines = [
     "Support tools live in the local web interface, so nothing sensitive goes through chat.",
     "",
-    "1. On a device in your home network, open the Sovereign AI Node interface in your browser — the same address you used during setup (for example http://sovereign.local:8789/).",
-    "2. Select Node Status.",
+  ];
+  if (configured !== undefined) {
+    lines.push(
+      `1. On a device in your home network, open ${configured} in your browser.`,
+      "2. Select Node Status if it isn't already open.",
+    );
+  } else {
+    lines.push(
+      "1. On a device in your home network, open the Sovereign AI Node interface in your browser — the same address you used during setup (for example http://sovereign.local:8789/).",
+      "2. Select Node Status.",
+    );
+  }
+  lines.push(
     "3. From there you can run diagnostics, create a support package on the device, review exactly what it contains, and download it.",
     "",
     "The support package is created locally and is never sent anywhere automatically.",
-  ].join("\n");
+  );
+  return lines.join("\n");
+};
 
 /** Partner-facing commands only — no founder or experimental surface. */
 export const formatHelpResult = (): string =>

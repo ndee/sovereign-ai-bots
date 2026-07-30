@@ -4,20 +4,21 @@
   "id": "node-operator",
   "version": "2.1.0",
   "displayName": "Node Operator",
-  "description": "Conversational operator for daily node status, health explanations and guided support.",
+  "description": "Conversational operator for daily node status, health explanations and guided support, in the dedicated Sovereign Node control room.",
   "defaultInstall": true,
-  "helloMessage": "Node Operator here. Mention me with `status` for a health summary, or `help` to see what I can do.",
+  "helloMessage": "Node Operator here. This is your node's control room \u2014 ask for `status` any time, or `help` to see what I can do.",
   "matrixIdentity": {
     "mode": "dedicated-account",
     "localpartPrefix": "node-operator"
   },
   "matrixRouting": {
+    "room": "operator",
     "dm": {
       "enabled": true
     },
     "alertRoom": {
-      "autoReply": false,
-      "requireMention": true
+      "autoReply": true,
+      "requireMention": false
     }
   },
   "configDefaults": {},
@@ -38,7 +39,8 @@
         "<agent-workspace>/bin/node-operator.js explain <code>",
         "<agent-workspace>/bin/node-operator.js support",
         "<agent-workspace>/bin/node-operator.js help",
-        "<agent-workspace>/bin/node-operator.js version"
+        "<agent-workspace>/bin/node-operator.js version",
+        "<agent-workspace>/bin/node-operator.js verify <nonce>"
       ],
       "openclawToolNames": []
     }
@@ -137,7 +139,7 @@
   "agentTemplate": {
     "id": "node-operator",
     "version": "2.1.0",
-    "description": "Conversational operator for daily node status, health explanations and guided support.",
+    "description": "Conversational operator for daily node status, health explanations and guided support, in the dedicated Sovereign Node control room.",
     "matrix": {
       "localpartPrefix": "node-operator"
     },

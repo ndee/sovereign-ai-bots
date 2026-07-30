@@ -98,31 +98,41 @@ export const UNAVAILABLE_TEXT = [
   "Open the Sovereign AI Node local interface and select Node Status, or try again in a minute.",
 ].join("\n");
 
-/** Concise summary: overall, one line per component, headline, codes. */
+const SEVERITY_RANK: Record<Diagnostics["components"][number]["status"], number> = {
+  failed: 3,
+  degraded: 2,
+  unknown: 1,
+  healthy: 0,
+};
+
+/**
+ * `status` — the short answer: overall state, headline, and the single most
+ * important non-healthy component with its code and next step. The full
+ * component list is `health`'s job; keeping the two distinct means the quick
+ * question gets a quick answer.
+ */
 export const formatStatus = (result: StatusCommandResult): string => {
   if (result.kind === "unavailable") {
     return UNAVAILABLE_TEXT;
   }
   const diagnostics = result.diagnostics;
   const lines = [`Node status: ${OVERALL_WORDS[diagnostics.overall]}`, ""];
-  for (const component of diagnostics.components) {
-    lines.push(`${component.label}: ${componentWord(component)}`);
-  }
-  if (diagnostics.components.length > 0) {
-    lines.push("");
-  }
   lines.push(diagnostics.headline);
-  const codes = [
-    ...new Set(
-      diagnostics.components
-        .filter((component) => component.code !== undefined)
-        .map((component) => component.code as string),
-    ),
-  ];
-  if (codes.length > 0) {
-    lines.push("", `Code: ${codes.join(", ")}`);
+
+  const worst = [...diagnostics.components].sort(
+    (a, b) => SEVERITY_RANK[b.status] - SEVERITY_RANK[a.status],
+  )[0];
+  if (worst !== undefined && SEVERITY_RANK[worst.status] > 0) {
+    lines.push("", `${worst.label}: ${componentWord(worst)} — ${worst.summary}`);
+    if (worst.code !== undefined) {
+      lines.push(`Code: ${worst.code}`);
+    }
+    if (worst.action !== undefined) {
+      lines.push(`Next step: ${worst.action}`);
+    }
   }
-  lines.push("Open Node Status for details.");
+
+  lines.push("", "Ask for `health` for every component, or open Node Status for details.");
   return lines.join("\n");
 };
 

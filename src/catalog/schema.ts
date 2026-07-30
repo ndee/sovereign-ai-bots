@@ -136,6 +136,9 @@ export const manifestSchema = z
     matrixRouting: z
       .object({
         defaultAccount: z.boolean().optional(),
+        // Which node room the bot lives in: "alert" (default, Sovereign
+        // Alerts) or "operator" (the dedicated Sovereign Node control room).
+        room: z.enum(["alert", "operator"]).optional(),
         dm: z.object({ enabled: z.boolean().optional() }).passthrough().optional(),
         alertRoom: z
           .object({

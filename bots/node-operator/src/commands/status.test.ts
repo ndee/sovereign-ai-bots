@@ -103,36 +103,64 @@ describe("getDiagnostics", () => {
 });
 
 describe("formatStatus", () => {
-  it("renders the concise partner summary with a deduplicated code line", () => {
+  it("renders overall, headline, and only the most important degraded component", () => {
     const text = formatStatus({ kind: "ok", diagnostics: degradedDiagnostics });
     expect(text).toBe(
       [
         "Node status: Degraded",
         "",
-        "Mailbox: Healthy",
-        "Matrix: Healthy",
-        "Mail Sentinel: Running",
-        "Semantic classification: Unavailable",
-        "",
         "Mail is still being retrieved, but semantic classification is currently unavailable, so alert quality may be reduced.",
         "",
+        "Semantic classification: Unavailable — Semantic classification is unavailable; alerts continue at reduced confidence.",
         "Code: SAN-LLM-001",
-        "Open Node Status for details.",
+        "Next step: Check the classification provider key on the Node Status page, then retry.",
+        "",
+        "Ask for `health` for every component, or open Node Status for details.",
       ].join("\n"),
     );
+    // The healthy components do NOT appear — that detail is health's job.
+    expect(text).not.toContain("Mailbox:");
+    expect(text).not.toContain("Matrix:");
   });
 
-  it("renders the fixed unavailable text when diagnostics cannot be read", () => {
-    expect(formatStatus({ kind: "unavailable" })).toBe(UNAVAILABLE_TEXT);
-    expect(UNAVAILABLE_TEXT).not.toContain("/");
+  it("prefers a failed component over a degraded one", () => {
+    const diagnostics: Diagnostics = {
+      overall: "action_required",
+      checkedAt: "2026-07-29T12:00:00.000Z",
+      headline: "One or more components need attention.",
+      components: [
+        {
+          id: "classification-provider",
+          label: "Semantic classification",
+          status: "degraded",
+          code: "SAN-LLM-001",
+          summary: "s1",
+        },
+        {
+          id: "mailbox",
+          label: "Mailbox",
+          status: "failed",
+          code: "SAN-IMAP-001",
+          summary: "s2",
+          action: "a2",
+        },
+      ],
+    };
+    const text = formatStatus({ kind: "ok", diagnostics });
+    expect(text).toContain("Mailbox: Failed — s2");
+    expect(text).toContain("Code: SAN-IMAP-001");
+    expect(text).not.toContain("Semantic classification");
   });
 
-  it("omits the code line when nothing carries a code and handles empty components", () => {
+  it("renders a healthy node without any component lines", () => {
     const healthy: Diagnostics = {
       overall: "healthy",
       checkedAt: "2026-07-29T12:00:00.000Z",
       headline: "All components are working normally.",
-      components: [],
+      components: [
+        { id: "matrix", label: "Matrix", status: "healthy", summary: "s" },
+        { id: "mailbox", label: "Mailbox", status: "healthy", summary: "s" },
+      ],
     };
     const text = formatStatus({ kind: "ok", diagnostics: healthy });
     expect(text).toBe(
@@ -140,38 +168,15 @@ describe("formatStatus", () => {
         "Node status: Healthy",
         "",
         "All components are working normally.",
-        "Open Node Status for details.",
+        "",
+        "Ask for `health` for every component, or open Node Status for details.",
       ].join("\n"),
     );
   });
 
-  it("labels a running node-operator as Running and an unknown provider as Unknown", () => {
-    const diagnostics: Diagnostics = {
-      overall: "healthy",
-      checkedAt: "2026-07-29T12:00:00.000Z",
-      headline: "All components are working normally.",
-      components: [
-        { id: "node-operator", label: "Node Operator", status: "healthy", summary: "s" },
-        {
-          id: "classification-provider",
-          label: "Semantic classification",
-          status: "unknown",
-          summary: "s",
-        },
-        { id: "sovereign-ai-node", label: "Sovereign AI Node", status: "failed", summary: "s" },
-        {
-          id: "classification-provider",
-          label: "Classification",
-          status: "failed",
-          summary: "s",
-        },
-      ],
-    };
-    const text = formatStatus({ kind: "ok", diagnostics });
-    expect(text).toContain("Node Operator: Running");
-    expect(text).toContain("Semantic classification: Unknown");
-    expect(text).toContain("Sovereign AI Node: Failed");
-    expect(text).toContain("Classification: Unavailable");
+  it("renders the fixed unavailable text when diagnostics cannot be read", () => {
+    expect(formatStatus({ kind: "unavailable" })).toBe(UNAVAILABLE_TEXT);
+    expect(UNAVAILABLE_TEXT).not.toContain("/");
   });
 });
 
@@ -193,5 +198,24 @@ describe("formatHealth", () => {
 
   it("renders the fixed unavailable text when diagnostics cannot be read", () => {
     expect(formatHealth({ kind: "unavailable" })).toBe(UNAVAILABLE_TEXT);
+  });
+
+  it("labels a FAILED classification provider as Unavailable too", () => {
+    const diagnostics: Diagnostics = {
+      overall: "action_required",
+      checkedAt: "2026-07-29T12:00:00.000Z",
+      headline: "One or more components need attention.",
+      components: [
+        {
+          id: "classification-provider",
+          label: "Semantic classification",
+          status: "failed",
+          summary: "s",
+        },
+      ],
+    };
+    expect(formatHealth({ kind: "ok", diagnostics })).toContain(
+      "Semantic classification: Unavailable",
+    );
   });
 });

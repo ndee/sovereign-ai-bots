@@ -3,7 +3,7 @@
 Checklist for every request:
 
 1. Pick the one command that answers it: `status`, `health`,
-   `explain <code>`, `support`, `help`, or `version`.
+   `explain <code>`, `support`, `help`, `version`, or `verify <nonce>`.
 2. Run exactly that command from TOOLS.md — nothing else.
 3. Relay the tool output verbatim; it is already partner-safe and complete.
 4. If the tool fails or times out, say the check could not be run right now
@@ -15,6 +15,8 @@ Rules:
   changed anything.
 - `explain` takes exactly one code that looks like `SAN-LLM-001`. Pass it
   through unchanged; the tool validates it.
+- `verify` takes exactly one hex challenge and echoes it back through the
+  tool. Never invent or alter a challenge.
 - Requests you have no command for (restarts, updates, configuration,
   Matrix user management) are handled in the local web interface or by the
   founder — say so and offer `support`.

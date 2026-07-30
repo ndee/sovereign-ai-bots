@@ -1,7 +1,12 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isMainModule, parseInvocation, runCli, UNKNOWN_COMMAND_TEXT } from "./cli.js";
 import type { StatusCommandResult } from "./commands/status.js";
+import { CONCURRENT_TEXT, RATE_LIMIT_MAX_RUNS, RATE_LIMITED_TEXT } from "./guard.js";
 
 const statusMocks = vi.hoisted(() => ({
   getDiagnostics: vi.fn(),
@@ -33,8 +38,11 @@ const healthyResult: StatusCommandResult = {
 
 let written: string[];
 let originalExitCode: typeof process.exitCode;
+let guardRoot: string;
 
-beforeEach(() => {
+beforeEach(async () => {
+  guardRoot = await mkdtemp(join(tmpdir(), "node-operator-cli-guard-"));
+  process.env.NODE_OPERATOR_GUARD_PATH = join(guardRoot, "guard.json");
   written = [];
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
     written.push(String(chunk));
@@ -45,11 +53,13 @@ beforeEach(() => {
   explainMocks.explainCode.mockResolvedValue({ kind: "invalid-input" });
 });
 
-afterEach(() => {
+afterEach(async () => {
   process.exitCode = originalExitCode;
   vi.restoreAllMocks();
   statusMocks.getDiagnostics.mockReset();
   explainMocks.explainCode.mockReset();
+  delete process.env.NODE_OPERATOR_GUARD_PATH;
+  await rm(guardRoot, { recursive: true, force: true });
 });
 
 const output = (): string => written.join("");
@@ -82,7 +92,7 @@ describe("runCli", () => {
   it("renders status text", async () => {
     await runCli(["status"]);
     expect(output()).toContain("Node status: Healthy");
-    expect(output()).toContain("Open Node Status for details.");
+    expect(output()).toContain("open Node Status for details.");
   });
 
   it("renders health text", async () => {
@@ -161,6 +171,61 @@ describe("runCli", () => {
     await runCli([]);
     expect(output().trim()).toBe(UNKNOWN_COMMAND_TEXT);
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe("runCli verify", () => {
+  it("echoes a valid challenge without touching diagnostics", async () => {
+    await runCli(["verify", "deadbeefdeadbeefdeadbeefdeadbeef"]);
+    expect(output()).toContain("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed.");
+    expect(statusMocks.getDiagnostics).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(originalExitCode);
+  });
+
+  it("rejects a malformed challenge without echoing it", async () => {
+    await runCli(["verify", "$(reboot)"]);
+    expect(output()).toContain("doesn't look like a verification challenge");
+    expect(output()).not.toContain("reboot");
+    expect(process.exitCode).toBe(1);
+  });
+});
+
+describe("runCli diagnostics guard", () => {
+  it("rate-limits repeated diagnostic commands with fixed copy", async () => {
+    for (let i = 0; i < RATE_LIMIT_MAX_RUNS; i += 1) {
+      written = [];
+      await runCli(["status"]);
+      expect(output()).toContain("Node status:");
+    }
+    written = [];
+    await runCli(["status"]);
+    expect(output().trim()).toBe(RATE_LIMITED_TEXT);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("refuses a concurrent diagnostics run with fixed copy", async () => {
+    let releaseDiagnostics: (() => void) | undefined;
+    statusMocks.getDiagnostics.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseDiagnostics = () => resolve(healthyResult);
+        }),
+    );
+    const first = runCli(["health"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    written = [];
+    await runCli(["status"]);
+    expect(output().trim()).toBe(CONCURRENT_TEXT);
+    releaseDiagnostics?.();
+    await first;
+  });
+
+  it("does not guard fixed-text commands", async () => {
+    for (let i = 0; i < RATE_LIMIT_MAX_RUNS + 2; i += 1) {
+      written = [];
+      await runCli(["help"]);
+      expect(output()).toContain("I can help with your Sovereign AI Node");
+    }
   });
 });
 
