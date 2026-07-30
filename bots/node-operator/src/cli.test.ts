@@ -14,6 +14,9 @@ const statusMocks = vi.hoisted(() => ({
 const explainMocks = vi.hoisted(() => ({
   explainCode: vi.fn(),
 }));
+const matrixReplyMocks = vi.hoisted(() => ({
+  sendOwnRoomMessage: vi.fn(async () => true),
+}));
 
 vi.mock("./commands/status.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("./commands/status.js")>();
@@ -22,6 +25,10 @@ vi.mock("./commands/status.js", async (importOriginal) => {
 vi.mock("./commands/explain.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("./commands/explain.js")>();
   return { ...original, explainCode: explainMocks.explainCode };
+});
+vi.mock("./matrix-reply.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./matrix-reply.js")>();
+  return { ...original, sendOwnRoomMessage: matrixReplyMocks.sendOwnRoomMessage };
 });
 
 const healthyResult: StatusCommandResult = {
@@ -58,6 +65,8 @@ afterEach(async () => {
   vi.restoreAllMocks();
   statusMocks.getDiagnostics.mockReset();
   explainMocks.explainCode.mockReset();
+  matrixReplyMocks.sendOwnRoomMessage.mockReset();
+  matrixReplyMocks.sendOwnRoomMessage.mockResolvedValue(true);
   delete process.env.NODE_OPERATOR_GUARD_PATH;
   await rm(guardRoot, { recursive: true, force: true });
 });
@@ -175,17 +184,29 @@ describe("runCli", () => {
 });
 
 describe("runCli verify", () => {
-  it("echoes a valid challenge without touching diagnostics", async () => {
+  it("echoes a valid challenge and posts it to the room deterministically", async () => {
     await runCli(["verify", "deadbeefdeadbeefdeadbeefdeadbeef"]);
     expect(output()).toContain("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed.");
     expect(statusMocks.getDiagnostics).not.toHaveBeenCalled();
+    // The nonce echo must not depend on the LLM relaying tool output: the
+    // binary posts it to the bot's own room itself.
+    expect(matrixReplyMocks.sendOwnRoomMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed."),
+    );
     expect(process.exitCode).toBe(originalExitCode);
   });
 
-  it("rejects a malformed challenge without echoing it", async () => {
+  it("still prints the echo when the direct room post fails", async () => {
+    matrixReplyMocks.sendOwnRoomMessage.mockResolvedValueOnce(false);
+    await runCli(["verify", "deadbeefdeadbeefdeadbeefdeadbeef"]);
+    expect(output()).toContain("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed.");
+  });
+
+  it("rejects a malformed challenge without echoing or posting it", async () => {
     await runCli(["verify", "$(reboot)"]);
     expect(output()).toContain("doesn't look like a verification challenge");
     expect(output()).not.toContain("reboot");
+    expect(matrixReplyMocks.sendOwnRoomMessage).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
 });

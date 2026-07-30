@@ -12,6 +12,7 @@ import {
   type GuardDecision,
   RATE_LIMITED_TEXT,
 } from "./guard.js";
+import { sendOwnRoomMessage } from "./matrix-reply.js";
 
 /**
  * Deterministic command router for the Node Operator bot binary.
@@ -102,7 +103,15 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
   // the command execs nothing.
   if (command === "verify") {
     const result = verifyChallenge(argument);
-    print(formatVerifyResult(result));
+    const text = formatVerifyResult(result);
+    if (result.kind === "confirmed") {
+      // Post the echo to the room DETERMINISTICALLY: the correlated setup
+      // check must not depend on the LLM choosing to relay tool output.
+      // Fail-soft — when the direct post is impossible the printed text
+      // still gives the LLM path a chance.
+      await sendOwnRoomMessage(text);
+    }
+    print(text);
     if (result.kind === "invalid-nonce") {
       process.exitCode = 1;
     }
