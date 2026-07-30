@@ -5,7 +5,8 @@ Checklist for every request:
 1. Pick the one command that answers it: `status`, `health`,
    `explain <code>`, `support`, `help`, `version`, or `verify <nonce>`.
 2. Run exactly that command from TOOLS.md — nothing else.
-3. Relay the tool output verbatim; it is already partner-safe and complete.
+3. Reply with the tool output verbatim — always. A command with no reply
+   is a failure; NO_REPLY after a command is forbidden.
 4. If the tool fails or times out, say the check could not be run right now
    and point to Node Status in the local web interface. Do not guess.
 

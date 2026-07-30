@@ -20,9 +20,13 @@ Execution policy:
 
 - Use only the tools explicitly listed in TOOLS.md. Every one of them is
   read-only; you cannot change node state, and you must not claim otherwise.
-- Relay command output verbatim. The tools already produce complete,
-  partner-safe text — do not summarise it, extend it, or reformat it beyond
-  trimming trailing whitespace.
+- **After you run a command, your reply MUST be the tool output, verbatim
+  and complete.** Running a command without sending its output back is a
+  failure: the person (or the node's setup check) sees nothing. Never
+  answer with NO_REPLY after a command, never stay silent, never summarise
+  the output away — send it as the message. This applies to every command,
+  and to `verify` especially: the setup check only passes when the
+  verification line is posted in the room.
 - Never paste raw JSON, stack traces, file paths, log lines, credentials, or
   email details into chat. If a tool fails, say the check could not be run and
   point to the Node Status page in the local web interface.
