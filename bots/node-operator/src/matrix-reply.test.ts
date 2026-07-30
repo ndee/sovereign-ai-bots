@@ -60,7 +60,7 @@ describe("resolveMatrixReplyTarget", () => {
     const noInstance = JSON.parse(runtimeDocument()) as Record<string, never> & {
       bots: { instances: unknown[] };
       matrix: { operatorRoom?: unknown };
-      openclawProfile: { agents: Array<{ botInstanceId?: string }> };
+      openclawProfile: { agents: Array<{ botInstanceId?: string | undefined }> };
     };
     noInstance.bots.instances = [];
     const agent = noInstance.openclawProfile.agents[0];
@@ -148,7 +148,7 @@ describe("resolveMatrixReplyTarget", () => {
     const noRooms = JSON.parse(runtimeDocument()) as {
       matrix: Record<string, unknown>;
       bots: { instances: unknown[] };
-      openclawProfile: { agents: Array<{ botInstanceId?: string }> };
+      openclawProfile: { agents: Array<{ botInstanceId?: string | undefined }> };
     };
     noRooms.bots.instances = [];
     const agent = noRooms.openclawProfile.agents[0];
@@ -165,7 +165,7 @@ describe("resolveMatrixReplyTarget", () => {
     ).toBeUndefined();
 
     const noHomeserver = JSON.parse(runtimeDocument()) as { matrix: Record<string, unknown> };
-    (noHomeserver.matrix as { adminBaseUrl?: string }).adminBaseUrl = undefined;
+    (noHomeserver.matrix as { adminBaseUrl?: string | undefined }).adminBaseUrl = undefined;
     expect(
       await resolveMatrixReplyTarget({
         env: {},
