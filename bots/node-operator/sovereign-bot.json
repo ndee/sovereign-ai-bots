@@ -13,15 +13,18 @@
   },
   "matrixRouting": {
     "room": "operator",
+    "dispatch": "deterministic",
     "dm": {
-      "enabled": true
+      "enabled": false
     },
     "alertRoom": {
       "autoReply": true,
       "requireMention": false
     }
   },
-  "configDefaults": {},
+  "configDefaults": {
+    "allowOperatorDms": false
+  },
   "toolTemplates": [
     {
       "kind": "sovereign-tool-template",
@@ -133,6 +136,60 @@
         "source": "workspace/bin/dist/node-operator.js",
         "mode": "0755",
         "writePolicy": "always"
+      }
+    },
+    {
+      "id": "operator-service",
+      "kind": "systemdService",
+      "spec": {
+        "name": "sovereign-node-operator.service",
+        "description": "Sovereign Node Operator (deterministic Matrix control-plane daemon)",
+        "after": [
+          "network-online.target"
+        ],
+        "wants": [
+          "network-online.target"
+        ],
+        "type": "simple",
+        "user": {
+          "from": "node.openclaw.serviceUser"
+        },
+        "group": {
+          "from": "node.openclaw.serviceGroup"
+        },
+        "workingDirectory": {
+          "from": "agent.workspace"
+        },
+        "environment": {
+          "HOME": {
+            "from": "node.openclaw.serviceHome"
+          },
+          "SOVEREIGN_NODE_CONFIG": {
+            "from": "node.paths.configPath"
+          },
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        },
+        "execStart": [
+          "/usr/bin/node",
+          {
+            "join": [
+              {
+                "from": "agent.workspace"
+              },
+              "/bin/node-operator.js"
+            ]
+          },
+          "serve"
+        ],
+        "restart": "always",
+        "restartSec": "5",
+        "wantedBy": [
+          "multi-user.target"
+        ],
+        "desiredState": {
+          "enabled": true,
+          "active": true
+        }
       }
     }
   ],

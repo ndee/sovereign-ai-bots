@@ -33,11 +33,9 @@ describe("verifyChallenge", () => {
 });
 
 describe("formatVerifyResult", () => {
-  it("echoes the exact confirmed nonce", () => {
+  it("emits exactly the VERIFY_OK line for a confirmed challenge", () => {
     const nonce = "deadbeefdeadbeefdeadbeefdeadbeef";
-    const text = formatVerifyResult({ kind: "confirmed", nonce });
-    expect(text).toContain(`Verification ${nonce} confirmed.`);
-    expect(text).toContain("executed a command");
+    expect(formatVerifyResult({ kind: "confirmed", nonce })).toBe(`VERIFY_OK ${nonce}`);
   });
 
   it("never echoes an invalid challenge", () => {

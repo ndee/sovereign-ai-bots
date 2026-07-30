@@ -1,30 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { formatHelpResult, formatSupportResult, sanitizeNodeStatusUrl } from "./support.js";
+import { buildNodeStatusUrl, formatHelpResult, formatSupportResult } from "./support.js";
 
-describe("sanitizeNodeStatusUrl", () => {
-  it("accepts a bare local http(s) URL, optionally with the node-status route", () => {
-    expect(sanitizeNodeStatusUrl("http://sovereign.local:8789/setup-ui/")).toBe(
-      "http://sovereign.local:8789/setup-ui/",
-    );
-    expect(sanitizeNodeStatusUrl("http://sovereign.local:8789/setup-ui/#/node-status")).toBe(
+describe("buildNodeStatusUrl", () => {
+  it("CONSTRUCTS the URL from a bare trusted origin plus the fixed route", () => {
+    expect(buildNodeStatusUrl("http://sovereign.local:8789")).toBe(
       "http://sovereign.local:8789/setup-ui/#/node-status",
+    );
+    expect(buildNodeStatusUrl("https://sovereign.local:8789/")).toBe(
+      "https://sovereign.local:8789/setup-ui/#/node-status",
     );
   });
 
-  it("rejects anything that could carry a credential or wrong scheme", () => {
+  it("rejects anything beyond scheme+host+port — the application owns the path", () => {
     for (const raw of [
       undefined,
       "",
       "not a url",
       "ftp://sovereign.local/",
       "javascript:alert(1)",
-      "http://user:hunter2@sovereign.local:8789/",
+      "http://user:hunter2@sovereign.local:8789",
       "http://sovereign.local:8789/?token=syt_SECRET",
       "http://sovereign.local:8789/#session=abc",
+      "http://sovereign.local:8789/some/path",
+      "http://sovereign.local:8789/setup-ui/#/node-status",
       `http://sovereign.local/${"a".repeat(300)}`,
     ]) {
-      expect(sanitizeNodeStatusUrl(raw)).toBeUndefined();
+      expect(buildNodeStatusUrl(raw)).toBeUndefined();
     }
   });
 });
@@ -37,14 +39,14 @@ describe("formatSupportResult", () => {
     expect(text).toContain("never sent anywhere automatically");
   });
 
-  it("includes a configured Node Status URL only when it passes validation", () => {
+  it("includes a constructed Node Status URL only from a valid trusted origin", () => {
     const configured = formatSupportResult({
-      SOVEREIGN_NODE_STATUS_URL: "http://sovereign.local:8789/setup-ui/#/node-status",
+      SOVEREIGN_NODE_STATUS_ORIGIN: "http://sovereign.local:8789",
     });
     expect(configured).toContain("open http://sovereign.local:8789/setup-ui/#/node-status");
 
     const rejected = formatSupportResult({
-      SOVEREIGN_NODE_STATUS_URL: "http://sovereign.local:8789/?token=syt_SECRET",
+      SOVEREIGN_NODE_STATUS_ORIGIN: "http://sovereign.local:8789/?token=syt_SECRET",
     });
     expect(rejected).not.toContain("syt_SECRET");
     expect(rejected).toContain("the same address you used during setup");

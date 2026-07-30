@@ -7,6 +7,8 @@ import {
   formatHealth,
   formatStatus,
   getDiagnostics,
+  INCOMPATIBLE_TEXT,
+  isSupportedContractVersion,
   UNAVAILABLE_TEXT,
 } from "./status.js";
 
@@ -19,6 +21,7 @@ vi.mock("../node-cli.js", async (importOriginal) => {
 });
 
 const degradedDiagnostics: Diagnostics = {
+  contractVersion: "2.0.0",
   overall: "degraded",
   checkedAt: "2026-07-29T12:00:00.000Z",
   headline:
@@ -125,6 +128,7 @@ describe("formatStatus", () => {
 
   it("prefers a failed component over a degraded one", () => {
     const diagnostics: Diagnostics = {
+      contractVersion: "2.0.0",
       overall: "action_required",
       checkedAt: "2026-07-29T12:00:00.000Z",
       headline: "One or more components need attention.",
@@ -154,6 +158,7 @@ describe("formatStatus", () => {
 
   it("renders a healthy node without any component lines", () => {
     const healthy: Diagnostics = {
+      contractVersion: "2.0.0",
       overall: "healthy",
       checkedAt: "2026-07-29T12:00:00.000Z",
       headline: "All components are working normally.",
@@ -202,6 +207,7 @@ describe("formatHealth", () => {
 
   it("labels a FAILED classification provider as Unavailable too", () => {
     const diagnostics: Diagnostics = {
+      contractVersion: "2.0.0",
       overall: "action_required",
       checkedAt: "2026-07-29T12:00:00.000Z",
       headline: "One or more components need attention.",
@@ -217,5 +223,56 @@ describe("formatHealth", () => {
     expect(formatHealth({ kind: "ok", diagnostics })).toContain(
       "Semantic classification: Unavailable",
     );
+  });
+});
+
+describe("diagnostics contract compatibility", () => {
+  const envelopeWith = (contractVersion: unknown): string =>
+    JSON.stringify({
+      ok: true,
+      command: "diagnostics",
+      result: {
+        ...(contractVersion === undefined ? {} : { contractVersion }),
+        overall: "healthy",
+        checkedAt: "2026-07-30T12:00:00.000Z",
+        headline: "All components are working normally.",
+        components: [],
+      },
+    });
+
+  it("accepts the current supported contract major", async () => {
+    const result = await getDiagnostics(async () => ({ ok: true, stdout: envelopeWith("2.0.0") }));
+    expect(result.kind).toBe("ok");
+    expect(isSupportedContractVersion("2.9.3")).toBe(true);
+  });
+
+  it("rejects a missing contract version — no permissive rendering", async () => {
+    const result = await getDiagnostics(async () => ({
+      ok: true,
+      stdout: envelopeWith(undefined),
+    }));
+    expect(result).toEqual({ kind: "incompatible" });
+  });
+
+  it("rejects a future unsupported major", async () => {
+    const result = await getDiagnostics(async () => ({ ok: true, stdout: envelopeWith("3.0.0") }));
+    expect(result).toEqual({ kind: "incompatible" });
+  });
+
+  it("rejects malformed versions", async () => {
+    for (const version of ["", "two", "2", "2.0", "v2.0.0", "2.0.0-beta"]) {
+      const result = await getDiagnostics(async () => ({
+        ok: true,
+        stdout: envelopeWith(version),
+      }));
+      expect(result).toEqual({ kind: "incompatible" });
+    }
+    expect(isSupportedContractVersion(42)).toBe(false);
+  });
+
+  it("renders the fixed compatibility action for both commands", () => {
+    expect(formatStatus({ kind: "incompatible" })).toBe(INCOMPATIBLE_TEXT);
+    expect(formatHealth({ kind: "incompatible" })).toBe(INCOMPATIBLE_TEXT);
+    expect(INCOMPATIBLE_TEXT).toContain("Apply the supported release combination");
   });
 });

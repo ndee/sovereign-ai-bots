@@ -5,4 +5,4 @@ Managed by the Sovereign Node installer.
 
 This agent is the conversational operator surface for the node: daily status,
 health explanations, SAN error-code lookups, and guidance to the local Node
-Status page. All of its tools are read-only.
+Status page. All commands are read-only and dispatched deterministically in code — no LLM is involved.

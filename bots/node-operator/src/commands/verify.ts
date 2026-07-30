@@ -27,12 +27,14 @@ export const verifyChallenge = (input: string | undefined): VerifyCommandResult 
   return { kind: "confirmed", nonce: candidate };
 };
 
+/**
+ * The ONE exact response format the core verifier requires. The room reply
+ * body must be exactly this line — nothing prepended, nothing appended —
+ * so correlation is a string equality, never a heuristic.
+ */
 export const formatVerifyResult = (result: VerifyCommandResult): string => {
   if (result.kind === "confirmed") {
-    return [
-      `Verification ${result.nonce} confirmed.`,
-      "Node Operator received the challenge and executed a command for it.",
-    ].join("\n");
+    return `VERIFY_OK ${result.nonce}`;
   }
   return [
     "That doesn't look like a verification challenge.",

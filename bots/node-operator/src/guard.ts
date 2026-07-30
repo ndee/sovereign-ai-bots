@@ -3,17 +3,19 @@ import { dirname, join, resolve } from "node:path";
 
 /**
  * Execution guard for diagnostic commands: bounded rate limiting plus
- * single-flight concurrency, persisted in a small state file inside the
- * agent workspace.
+ * single-flight concurrency.
  *
- * The binary is a stateless CLI invoked per command, so throttling state
- * must live on disk. The guard is deliberately best-effort — a lost race
- * between two concurrent invocations costs one extra diagnostics run, while
- * a crashed run must never wedge the bot, so in-flight markers expire on
- * their own. Per-sender limits cannot live here (the binary never sees the
- * Matrix sender; sender authorization is enforced by the gateway allowlist
- * and room membership) — this guard bounds TOTAL execution frequency so a
- * chatty room or a looping agent cannot turn diagnostics into a DoS.
+ * The limiter is enforced IN MEMORY first — the authoritative state lives in
+ * this process, so the bot is never unbounded, not even when the workspace
+ * is unwritable. The on-disk state is a best-effort continuity layer for
+ * short-lived CLI invocations and across daemon restarts; when persistence
+ * fails, a one-time diagnostic note goes to stderr (an internal health
+ * signal, never into chat) and the in-memory bounds keep applying.
+ *
+ * Per-sender limits do not live here: the sender is authorized upstream by
+ * the explicit operator allowlist, and this guard bounds TOTAL execution
+ * frequency so even an authorized-but-looping client cannot turn
+ * diagnostics into a DoS.
  */
 
 /** Max diagnostic executions per window. */
@@ -32,6 +34,12 @@ type GuardState = {
   recentRuns: number[];
 };
 
+/** Authoritative per-path state for this process. */
+const memoryStates = new Map<string, GuardState>();
+
+/** One-time "persistence unavailable" stderr note per path. */
+const persistenceWarned = new Set<string>();
+
 /**
  * The guard file lives beside the running binary's workspace
  * (`<workspace>/bin/node-operator.js` → `<workspace>/data/…`), overridable
@@ -49,7 +57,7 @@ export const resolveGuardPath = (
   return join(binDir, "..", "data", "node-operator-guard.json");
 };
 
-const readState = async (path: string): Promise<GuardState> => {
+const readPersistedState = async (path: string): Promise<GuardState> => {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
     if (typeof parsed !== "object" || parsed === null) {
@@ -67,14 +75,35 @@ const readState = async (path: string): Promise<GuardState> => {
         : [],
     };
   } catch {
-    // Missing or corrupt state must never block a command permanently.
+    // Missing or corrupt persisted state must never block a command.
     return { recentRuns: [] };
   }
 };
 
-const writeState = async (path: string, state: GuardState): Promise<void> => {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(state)}\n`, "utf8");
+const persistState = async (path: string, state: GuardState): Promise<void> => {
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, `${JSON.stringify(state)}\n`, "utf8");
+  } catch {
+    // The IN-MEMORY state keeps enforcing the bounds; persistence is only
+    // continuity. Emit the internal health signal exactly once per path.
+    if (!persistenceWarned.has(path)) {
+      persistenceWarned.add(path);
+      process.stderr.write(
+        "node-operator: throttle state is not persistent (workspace unwritable); in-memory limits remain active\n",
+      );
+    }
+  }
+};
+
+const loadState = async (path: string): Promise<GuardState> => {
+  const memory = memoryStates.get(path);
+  if (memory !== undefined) {
+    return memory;
+  }
+  const seeded = await readPersistedState(path);
+  memoryStates.set(path, seeded);
+  return seeded;
 };
 
 /**
@@ -86,7 +115,7 @@ export const acquireDiagnosticsSlot = async (
   path: string = resolveGuardPath(),
   nowMs: number = Date.now(),
 ): Promise<GuardDecision> => {
-  const state = await readState(path);
+  const state = await loadState(path);
 
   if (state.runningSince !== undefined && nowMs - state.runningSince < CONCURRENT_RUN_EXPIRY_MS) {
     return { ok: false, reason: "concurrent" };
@@ -95,32 +124,31 @@ export const acquireDiagnosticsSlot = async (
   const windowStart = nowMs - RATE_LIMIT_WINDOW_MS;
   const recentRuns = state.recentRuns.filter((at) => at > windowStart);
   if (recentRuns.length >= RATE_LIMIT_MAX_RUNS) {
+    // Keep the pruned window in memory so the map cannot grow unbounded.
+    memoryStates.set(path, { ...state, recentRuns });
     return { ok: false, reason: "rate-limited" };
   }
 
   recentRuns.push(nowMs);
-  try {
-    await writeState(path, { runningSince: nowMs, recentRuns });
-  } catch {
-    // An unwritable workspace throttles nothing but must not break the
-    // command — availability of diagnostics beats the throttle.
-  }
+  const nextState: GuardState = { runningSince: nowMs, recentRuns };
+  memoryStates.set(path, nextState);
+  await persistState(path, nextState);
 
   return {
     ok: true,
     release: async () => {
-      try {
-        const current = await readState(path);
-        await writeState(path, { recentRuns: current.recentRuns });
-      } catch {
-        // Expiry self-heals a failed release.
-      }
+      const current = memoryStates.get(path) ?? { recentRuns };
+      const released: GuardState = { recentRuns: current.recentRuns };
+      memoryStates.set(path, released);
+      await persistState(path, released);
     },
   };
 };
 
-/** Test helper: drop guard state entirely. */
+/** Test helper: drop guard state entirely (memory and disk). */
 export const clearGuardState = async (path: string): Promise<void> => {
+  memoryStates.delete(path);
+  persistenceWarned.delete(path);
   try {
     await unlink(path);
   } catch {

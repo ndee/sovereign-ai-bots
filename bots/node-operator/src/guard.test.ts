@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -91,10 +91,12 @@ describe("acquireDiagnosticsSlot", () => {
     const missing = await acquireDiagnosticsSlot(guardPath, 3_000_000);
     expect(missing.ok).toBe(true);
 
+    await clearGuardState(guardPath);
     await writeFile(guardPath, "{not json", "utf8");
     const corrupt = await acquireDiagnosticsSlot(guardPath, 3_000_100);
     expect(corrupt.ok).toBe(true);
 
+    await clearGuardState(guardPath);
     await writeFile(
       guardPath,
       JSON.stringify({ runningSince: "nope", recentRuns: "nope" }),
@@ -103,8 +105,10 @@ describe("acquireDiagnosticsSlot", () => {
     const wrongTypes = await acquireDiagnosticsSlot(guardPath, 3_000_200);
     expect(wrongTypes.ok).toBe(true);
 
+    await clearGuardState(guardPath);
     await writeFile(guardPath, "42", "utf8");
     expect((await acquireDiagnosticsSlot(guardPath, 3_000_300)).ok).toBe(true);
+    await clearGuardState(guardPath);
     await writeFile(guardPath, "null", "utf8");
     expect((await acquireDiagnosticsSlot(guardPath, 3_000_400)).ok).toBe(true);
   });
@@ -138,11 +142,58 @@ describe("acquireDiagnosticsSlot", () => {
   });
 });
 
+describe("in-memory enforcement", () => {
+  it("stays bounded even when persistence is impossible", async () => {
+    const unwritable = join(tempRoot, "occupied", "guard.json");
+    await writeFile(join(tempRoot, "occupied"), "a file, not a dir", "utf8");
+    let at = 9_000_000;
+    for (let i = 0; i < RATE_LIMIT_MAX_RUNS; i += 1) {
+      const slot = await acquireDiagnosticsSlot(unwritable, at);
+      expect(slot.ok).toBe(true);
+      if (slot.ok) {
+        await slot.release();
+      }
+      at += 100;
+    }
+    // No file was ever written, yet the in-memory limiter still throttles —
+    // the guard is never unbounded.
+    const throttled = await acquireDiagnosticsSlot(unwritable, at);
+    expect(throttled).toEqual({ ok: false, reason: "rate-limited" });
+  });
+});
+
 describe("guard copy", () => {
   it("carries no paths, secrets, or technical detail", () => {
     for (const text of [CONCURRENT_TEXT, RATE_LIMITED_TEXT]) {
       expect(text).not.toContain("/");
       expect(text).not.toMatch(/token|path|json/i);
     }
+  });
+});
+
+describe("persisted continuity", () => {
+  it("seeds the in-memory state from a valid persisted record", async () => {
+    await clearGuardState(guardPath);
+    await mkdir(join(tempRoot, "data"), { recursive: true });
+    await writeFile(
+      guardPath,
+      JSON.stringify({ runningSince: 5_000_000, recentRuns: [5_000_000] }),
+      "utf8",
+    );
+    // A fresh process (memory cleared) honours the persisted in-flight
+    // marker within its expiry window.
+    const concurrent = await acquireDiagnosticsSlot(guardPath, 5_000_100);
+    expect(concurrent).toEqual({ ok: false, reason: "concurrent" });
+  });
+
+  it("releases safely even when the in-memory record was cleared mid-run", async () => {
+    await clearGuardState(guardPath);
+    const slot = await acquireDiagnosticsSlot(guardPath, 6_000_000);
+    expect(slot.ok).toBe(true);
+    await clearGuardState(guardPath);
+    if (slot.ok) {
+      await slot.release();
+    }
+    expect((await acquireDiagnosticsSlot(guardPath, 6_000_100)).ok).toBe(true);
   });
 });

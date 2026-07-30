@@ -29,7 +29,7 @@ type RuntimeDocument = {
   bots?: {
     instances?: Array<{
       id?: string;
-      matrix?: { alertRoom?: { roomId?: string } };
+      matrix?: { alertRoom?: { roomId?: string }; allowedUsers?: unknown[] };
     }>;
   };
   openclawProfile?: {
@@ -37,7 +37,7 @@ type RuntimeDocument = {
       id?: string;
       workspace?: string;
       botInstanceId?: string;
-      matrix?: { accessTokenSecretRef?: string };
+      matrix?: { accessTokenSecretRef?: string; userId?: string };
     }>;
   };
 };
@@ -46,6 +46,20 @@ export type MatrixReplyTarget = {
   homeserverUrl: string;
   roomId: string;
   accessToken: string;
+};
+
+/**
+ * Everything the deterministic daemon needs: the reply target plus the
+ * bot's own identity and the EXPLICIT operator authorization list. Room
+ * membership never grants command authorization — only these Matrix ids
+ * may execute commands. DMs are disabled by default for Maintained Beta;
+ * the env override exists for advanced setups and still requires the
+ * sender to be in the allowlist.
+ */
+export type ServeContext = MatrixReplyTarget & {
+  botUserId: string;
+  authorizedUserIds: string[];
+  allowOperatorDms: boolean;
 };
 
 type ResolveDeps = {
@@ -62,7 +76,7 @@ type ResolveDeps = {
  */
 export const resolveMatrixReplyTarget = async (
   deps: ResolveDeps = {},
-): Promise<MatrixReplyTarget | undefined> => {
+): Promise<ServeContext | undefined> => {
   const env = deps.env ?? process.env;
   const argv1 = deps.argv1 ?? process.argv[1];
   const readFileFn = deps.readFileFn ?? (async (path, encoding) => readFile(path, encoding));
@@ -102,7 +116,20 @@ export const resolveMatrixReplyTarget = async (
     ) {
       return undefined;
     }
-    return { homeserverUrl, roomId, accessToken };
+    const botUserId = typeof agent.matrix?.userId === "string" ? agent.matrix.userId : "";
+    const authorizedUserIds = Array.isArray(instance?.matrix?.allowedUsers)
+      ? instance.matrix.allowedUsers.filter(
+          (entry): entry is string => typeof entry === "string" && entry.startsWith("@"),
+        )
+      : [];
+    return {
+      homeserverUrl,
+      roomId,
+      accessToken,
+      botUserId,
+      authorizedUserIds,
+      allowOperatorDms: env.SOVEREIGN_NODE_OPERATOR_ALLOW_DMS === "1",
+    };
   } catch {
     return undefined;
   }
@@ -112,6 +139,8 @@ type SendDeps = {
   fetchImpl?: typeof fetch;
   resolveTarget?: () => Promise<MatrixReplyTarget | undefined>;
   txnId?: string;
+  /** Attach a reply relation to this event (the verification challenge). */
+  inReplyToEventId?: string;
 };
 
 /** Post `text` to the bot's own room. Returns whether the room accepted it. */
@@ -138,7 +167,13 @@ export const sendOwnRoomMessage = async (text: string, deps: SendDeps = {}): Pro
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ msgtype: "m.text", body: text }),
+      body: JSON.stringify({
+        msgtype: "m.text",
+        body: text,
+        ...(deps.inReplyToEventId === undefined
+          ? {}
+          : { "m.relates_to": { "m.in_reply_to": { event_id: deps.inReplyToEventId } } }),
+      }),
     });
     return response.ok;
   } catch {

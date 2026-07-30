@@ -53,6 +53,9 @@ describe("resolveMatrixReplyTarget", () => {
       homeserverUrl: "http://127.0.0.1:8008",
       roomId: "!operator:example.org",
       accessToken: "syt_token_value",
+      botUserId: "",
+      authorizedUserIds: [],
+      allowOperatorDms: false,
     });
   });
 
@@ -173,6 +176,35 @@ describe("resolveMatrixReplyTarget", () => {
         readFileFn: files(JSON.stringify(noHomeserver)),
       }),
     ).toBeUndefined();
+  });
+
+  it("resolves the bot user id and filters the authorized list to mxids", async () => {
+    const withIdentity = JSON.parse(runtimeDocument()) as {
+      openclawProfile: { agents: Array<{ matrix: Record<string, unknown> }> };
+      bots: { instances: Array<{ matrix: Record<string, unknown> }> };
+    };
+    const agent = withIdentity.openclawProfile.agents[0];
+    if (agent !== undefined) {
+      agent.matrix.userId = "@node-operator:example.org";
+    }
+    const instance = withIdentity.bots.instances[0];
+    if (instance !== undefined) {
+      instance.matrix.allowedUsers = ["@operator:example.org", 42, "not-an-mxid"];
+    }
+    const target = await resolveMatrixReplyTarget({
+      env: {},
+      argv1: BIN,
+      readFileFn: files(JSON.stringify(withIdentity)),
+    });
+    expect(target?.botUserId).toBe("@node-operator:example.org");
+    // Non-strings and non-mxids are dropped from the authorization list.
+    expect(target?.authorizedUserIds).toEqual(["@operator:example.org"]);
+    const withDms = await resolveMatrixReplyTarget({
+      env: { SOVEREIGN_NODE_OPERATOR_ALLOW_DMS: "1" },
+      argv1: BIN,
+      readFileFn: files(JSON.stringify(withIdentity)),
+    });
+    expect(withDms?.allowOperatorDms).toBe(true);
   });
 
   it("uses process defaults without throwing when nothing is configured", async () => {

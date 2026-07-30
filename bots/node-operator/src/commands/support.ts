@@ -12,14 +12,22 @@
  * validation degrades to the fixed navigation instructions.
  */
 
-/** Accept only a bare local http(s) origin/path — nothing that can carry a credential. */
-export const sanitizeNodeStatusUrl = (raw: string | undefined): string | undefined => {
-  if (typeof raw !== "string" || raw.trim().length === 0 || raw.length > 200) {
+/** The one fixed application route. Never configurable, never dynamic. */
+export const NODE_STATUS_PATH = "/setup-ui/#/node-status";
+
+/**
+ * CONSTRUCT the Node Status URL from a trusted ORIGIN only — the application
+ * decides the path. The configured value may carry scheme, host, and port;
+ * anything else (path, query, fragment, userinfo) disqualifies it entirely,
+ * so no credential or token can ever ride along.
+ */
+export const buildNodeStatusUrl = (originRaw: string | undefined): string | undefined => {
+  if (typeof originRaw !== "string" || originRaw.trim().length === 0 || originRaw.length > 200) {
     return undefined;
   }
   let parsed: URL;
   try {
-    parsed = new URL(raw.trim());
+    parsed = new URL(originRaw.trim());
   } catch {
     return undefined;
   }
@@ -29,20 +37,19 @@ export const sanitizeNodeStatusUrl = (raw: string | undefined): string | undefin
   if (parsed.username !== "" || parsed.password !== "") {
     return undefined;
   }
-  if (parsed.search !== "") {
+  if (parsed.search !== "" || parsed.hash !== "") {
     return undefined;
   }
-  // The only fragment ever allowed is the Node Status route itself.
-  if (parsed.hash !== "" && parsed.hash !== "#/node-status") {
+  if (parsed.pathname !== "/" && parsed.pathname !== "") {
     return undefined;
   }
-  return parsed.toString();
+  return `${parsed.origin}${NODE_STATUS_PATH}`;
 };
 
 export const formatSupportResult = (
   env: Record<string, string | undefined> = process.env,
 ): string => {
-  const configured = sanitizeNodeStatusUrl(env.SOVEREIGN_NODE_STATUS_URL);
+  const configured = buildNodeStatusUrl(env.SOVEREIGN_NODE_STATUS_ORIGIN);
   const lines = [
     "Support tools live in the local web interface, so nothing sensitive goes through chat.",
     "",

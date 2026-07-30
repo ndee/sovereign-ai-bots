@@ -14,8 +14,8 @@ const statusMocks = vi.hoisted(() => ({
 const explainMocks = vi.hoisted(() => ({
   explainCode: vi.fn(),
 }));
-const matrixReplyMocks = vi.hoisted(() => ({
-  sendOwnRoomMessage: vi.fn(async () => true),
+const serveMocks = vi.hoisted(() => ({
+  runServe: vi.fn(async () => {}),
 }));
 
 vi.mock("./commands/status.js", async (importOriginal) => {
@@ -26,14 +26,15 @@ vi.mock("./commands/explain.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("./commands/explain.js")>();
   return { ...original, explainCode: explainMocks.explainCode };
 });
-vi.mock("./matrix-reply.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./matrix-reply.js")>();
-  return { ...original, sendOwnRoomMessage: matrixReplyMocks.sendOwnRoomMessage };
+vi.mock("./serve.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./serve.js")>();
+  return { ...original, runServe: serveMocks.runServe };
 });
 
 const healthyResult: StatusCommandResult = {
   kind: "ok",
   diagnostics: {
+    contractVersion: "2.0.0",
     overall: "healthy",
     checkedAt: "2026-07-29T12:00:00.000Z",
     headline: "All components are working normally.",
@@ -65,8 +66,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   statusMocks.getDiagnostics.mockReset();
   explainMocks.explainCode.mockReset();
-  matrixReplyMocks.sendOwnRoomMessage.mockReset();
-  matrixReplyMocks.sendOwnRoomMessage.mockResolvedValue(true);
+  serveMocks.runServe.mockClear();
   delete process.env.NODE_OPERATOR_GUARD_PATH;
   await rm(guardRoot, { recursive: true, force: true });
 });
@@ -184,29 +184,17 @@ describe("runCli", () => {
 });
 
 describe("runCli verify", () => {
-  it("echoes a valid challenge and posts it to the room deterministically", async () => {
+  it("prints the exact VERIFY_OK line without touching diagnostics", async () => {
     await runCli(["verify", "deadbeefdeadbeefdeadbeefdeadbeef"]);
-    expect(output()).toContain("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed.");
+    expect(output().trim()).toBe("VERIFY_OK deadbeefdeadbeefdeadbeefdeadbeef");
     expect(statusMocks.getDiagnostics).not.toHaveBeenCalled();
-    // The nonce echo must not depend on the LLM relaying tool output: the
-    // binary posts it to the bot's own room itself.
-    expect(matrixReplyMocks.sendOwnRoomMessage).toHaveBeenCalledWith(
-      expect.stringContaining("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed."),
-    );
     expect(process.exitCode).toBe(originalExitCode);
   });
 
-  it("still prints the echo when the direct room post fails", async () => {
-    matrixReplyMocks.sendOwnRoomMessage.mockResolvedValueOnce(false);
-    await runCli(["verify", "deadbeefdeadbeefdeadbeefdeadbeef"]);
-    expect(output()).toContain("Verification deadbeefdeadbeefdeadbeefdeadbeef confirmed.");
-  });
-
-  it("rejects a malformed challenge without echoing or posting it", async () => {
+  it("rejects a malformed challenge without echoing it", async () => {
     await runCli(["verify", "$(reboot)"]);
     expect(output()).toContain("doesn't look like a verification challenge");
     expect(output()).not.toContain("reboot");
-    expect(matrixReplyMocks.sendOwnRoomMessage).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
 });
@@ -247,6 +235,57 @@ describe("runCli diagnostics guard", () => {
       await runCli(["help"]);
       expect(output()).toContain("I can help with your Sovereign AI Node");
     }
+  });
+});
+
+describe("runCli argument defaults", () => {
+  it("treats explain and verify without an argument as failed lookups", async () => {
+    explainMocks.explainCode.mockResolvedValue({ kind: "invalid-input" });
+    await runCli(["explain"]);
+    expect(process.exitCode).toBe(1);
+
+    process.exitCode = originalExitCode;
+    written = [];
+    await runCli(["verify"]);
+    expect(output()).toContain("doesn't look like a verification challenge");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("refuses a concurrent json diagnostics request with fixed copy", async () => {
+    let release: (() => void) | undefined;
+    statusMocks.getDiagnostics.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(healthyResult);
+        }),
+    );
+    const first = runCli(["status", "--json"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    written = [];
+    await runCli(["health", "--json"]);
+    expect(output().trim()).toBe(CONCURRENT_TEXT);
+    release?.();
+    await first;
+  });
+});
+
+describe("runCli serve", () => {
+  it("starts the deterministic daemon", async () => {
+    await runCli(["serve"]);
+    expect(serveMocks.runServe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("runCli --json guard", () => {
+  it("refuses a rate-limited json diagnostics request with fixed copy", async () => {
+    for (let i = 0; i < RATE_LIMIT_MAX_RUNS; i += 1) {
+      written = [];
+      await runCli(["status", "--json"]);
+    }
+    written = [];
+    await runCli(["health", "--json"]);
+    expect(output().trim()).toBe(RATE_LIMITED_TEXT);
+    expect(process.exitCode).toBe(1);
   });
 });
 

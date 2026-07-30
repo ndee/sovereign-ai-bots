@@ -30,11 +30,31 @@ const componentSchema = z.object({
 });
 
 export const diagnosticsSchema = z.object({
+  contractVersion: z.string().max(32).optional(),
   overall: z.enum(["healthy", "degraded", "action_required", "unavailable"]),
   checkedAt: z.string().max(64),
   headline: z.string().min(1).max(400),
   components: z.array(componentSchema).max(16),
 });
+
+/**
+ * The diagnostics contract major this Node Operator build understands. A
+ * missing, malformed, or different-major contractVersion is rejected as a
+ * whole — no partial or permissive rendering of a model this build was not
+ * written against.
+ */
+export const SUPPORTED_DIAGNOSTICS_CONTRACT_MAJOR = 2;
+
+export const isSupportedContractVersion = (value: unknown): boolean => {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const match = /^(\d+)\.\d+\.\d+$/u.exec(value.trim());
+  if (match?.[1] === undefined) {
+    return false;
+  }
+  return Number.parseInt(match[1], 10) === SUPPORTED_DIAGNOSTICS_CONTRACT_MAJOR;
+};
 
 export type Diagnostics = z.infer<typeof diagnosticsSchema>;
 
@@ -42,6 +62,7 @@ const envelopeSchema = z.object({ result: diagnosticsSchema });
 
 export type StatusCommandResult =
   | { kind: "ok"; diagnostics: Diagnostics }
+  | { kind: "incompatible" }
   | { kind: "unavailable" };
 
 export const getDiagnostics = async (
@@ -53,6 +74,9 @@ export const getDiagnostics = async (
   }
   try {
     const parsed = envelopeSchema.parse(JSON.parse(result.stdout));
+    if (!isSupportedContractVersion(parsed.result.contractVersion)) {
+      return { kind: "incompatible" };
+    }
     return { kind: "ok", diagnostics: parsed.result };
   } catch {
     return { kind: "unavailable" };
@@ -92,6 +116,12 @@ const componentWord = (component: Diagnostics["components"][number]): string => 
   return STATUS_WORDS[component.status];
 };
 
+export const INCOMPATIBLE_TEXT = [
+  "Node diagnostics are incompatible with this Node Operator version.",
+  "",
+  "Apply the supported release combination, then ask again.",
+].join("\n");
+
 export const UNAVAILABLE_TEXT = [
   "I could not read the node's health right now.",
   "",
@@ -112,6 +142,9 @@ const SEVERITY_RANK: Record<Diagnostics["components"][number]["status"], number>
  * question gets a quick answer.
  */
 export const formatStatus = (result: StatusCommandResult): string => {
+  if (result.kind === "incompatible") {
+    return INCOMPATIBLE_TEXT;
+  }
   if (result.kind === "unavailable") {
     return UNAVAILABLE_TEXT;
   }
@@ -138,6 +171,9 @@ export const formatStatus = (result: StatusCommandResult): string => {
 
 /** Slightly deeper view: per-component summaries and next steps, still fixed text. */
 export const formatHealth = (result: StatusCommandResult): string => {
+  if (result.kind === "incompatible") {
+    return INCOMPATIBLE_TEXT;
+  }
   if (result.kind === "unavailable") {
     return UNAVAILABLE_TEXT;
   }
