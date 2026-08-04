@@ -2,6 +2,7 @@ import { open, rm } from "node:fs/promises";
 import { dirname, resolve as resolvePath } from "node:path";
 
 import type { MailSentinelRuntime } from "../config/runtime.js";
+import { resolveToolExecutable } from "../config/runtime.js";
 import { readJsonFile, writeJsonFile } from "../state/io.js";
 import type { DegradationState } from "./degradation.js";
 import { shouldAnnounce } from "./degradation.js";
@@ -45,7 +46,12 @@ export interface NoticeOutcome {
 export const degradationNoticePathFor = (statePath: string): string =>
   resolvePath(dirname(statePath), DEGRADATION_NOTICE_FILENAME);
 
-const KNOWN_STATES = new Set<string>(["healthy", "classification-degraded", "scans-failing"]);
+const KNOWN_STATES = new Set<string>([
+  "healthy",
+  "classification-degraded",
+  "scans-failing",
+  "tool-unavailable",
+]);
 
 const readAnnouncedState = async (path: string): Promise<DegradationState | undefined> => {
   let record: AnnouncedNoticeRecord;
@@ -72,7 +78,7 @@ interface NoticeText {
  * on; the prose explains the IMPACT, because an operator reading a Matrix room
  * needs to know what stopped working, not which function threw.
  */
-const NOTICE_TEXT: Record<DegradationState, NoticeText> = {
+const NOTICE_TEXT: Record<Exclude<DegradationState, "tool-unavailable">, NoticeText> = {
   "classification-degraded": {
     body: [
       "⚠️ Mail Sentinel: classification degraded (SAN-LLM-001).",
@@ -107,13 +113,42 @@ const NOTICE_TEXT: Record<DegradationState, NoticeText> = {
 };
 
 /**
+ * `tool-unavailable` (SAN-TOOL-001, #324) is the one notice that renders a
+ * value: the resolved tool executable path. It is derived here from the same
+ * env/default resolution `runTool` uses — never from caller input — so the
+ * "no mail content ever reaches this module" property still holds: a path is
+ * operational metadata, not mail data, and it is exactly what the operator
+ * needs to repair the install or fix the override.
+ */
+const toolUnavailableNotice = (): NoticeText => {
+  const executable = resolveToolExecutable();
+  return {
+    body: [
+      "🔴 Mail Sentinel needs attention (SAN-TOOL-001).",
+      `Mail scanning is not running because the required local IMAP tool is unavailable at ${executable}.`,
+      "Run the node's web update (repair) or correct the configured executable path.",
+      "No email data is lost — scanning resumes automatically once the tool is available.",
+    ].join(" "),
+    formattedBody: [
+      "<b>🔴 Mail Sentinel needs attention (SAN-TOOL-001).</b><br/>",
+      `Mail scanning is not running because the required local IMAP tool is unavailable at ${executable}. `,
+      "Run the node's web update (repair) or correct the configured executable path. ",
+      "No email data is lost — scanning resumes automatically once the tool is available.",
+    ].join(""),
+  };
+};
+
+/**
  * Render the notice for a state.
  *
  * Takes only the state — no message, alert, or runtime value reaches this
  * function, which is what makes "no mail content ever leaves this module" a
- * property of the type signature rather than of reviewer diligence.
+ * property of the type signature rather than of reviewer diligence. (The
+ * tool-unavailable notice adds the resolved executable path, sourced from the
+ * environment here rather than from any caller — see above.)
  */
-export const formatDegradationNotice = (state: DegradationState): NoticeText => NOTICE_TEXT[state];
+export const formatDegradationNotice = (state: DegradationState): NoticeText =>
+  state === "tool-unavailable" ? toolUnavailableNotice() : NOTICE_TEXT[state];
 
 /**
  * Announce a degradation state change once, if it differs from the last

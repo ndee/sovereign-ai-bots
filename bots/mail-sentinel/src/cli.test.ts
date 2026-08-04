@@ -2,9 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFakeRuntime, resetFakeRuntime } from "./__fixtures__/fake-runtime.js";
 
-vi.mock("./config/runtime.js", () => ({
-  resolveToolRuntime: async () => getFakeRuntime(),
-}));
+vi.mock("./config/runtime.js", async () => {
+  const actual = await vi.importActual<typeof import("./config/runtime.js")>("./config/runtime.js");
+  return {
+    ...actual,
+    resolveToolRuntime: async () => getFakeRuntime(),
+    // Deterministic availability: the real probe would depend on whether the
+    // machine running the tests happens to have sovereign-tool installed.
+    checkToolAvailability: async () => ({
+      ok: true,
+      executable: "/usr/local/bin/sovereign-tool",
+      source: "default",
+    }),
+  };
+});
 
 vi.mock("./state/io.js", async () => {
   const actual = await vi.importActual<typeof import("./state/io.js")>("./state/io.js");
@@ -80,6 +91,25 @@ describe("cli", () => {
     await runCli(["scan", "--instance", "ms-core", "--json"]);
     expect(stdoutSpy).toHaveBeenCalled();
     expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain('"configured": false');
+  });
+
+  it("dispatches status as JSON and keeps the exit code at 0", async () => {
+    await runCli(["status", "--instance", "ms-core", "--json"]);
+    const payload = JSON.parse(String(stdoutSpy.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload.ready).toBe(true);
+    expect(payload.toolExecutable).toBe("/usr/local/bin/sovereign-tool");
+    expect(payload.toolExecutableSource).toBe("default");
+    expect(payload.degradationState).toBe("healthy");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("renders status as plain text without --json", async () => {
+    await runCli(["status", "--instance", "ms-core"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("Mail Sentinel is ready.");
+  });
+
+  it("requires --instance for status", async () => {
+    await expect(runCli(["status"])).rejects.toThrow("Expected --instance <id>");
   });
 
   it("dispatches digest", async () => {

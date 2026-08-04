@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DegradationState } from "./degradation.js";
 import {
@@ -260,6 +260,66 @@ describe("health/notice", () => {
 
     expect(outcome.announced).toBe(true);
   });
+
+  // #324: a Pro install without sovereign-tool must produce exactly one
+  // SAN-TOOL-001 notice — on the first failed scan — and one recovery notice.
+  describe("tool-unavailable (SAN-TOOL-001)", () => {
+    it("announces the transition into tool-unavailable once and then holds", async () => {
+      await settleAt("healthy");
+      const runtime = makeRuntime();
+
+      const first = await announceDegradationIfChanged(runtime, "tool-unavailable", NOW);
+      const second = await announceDegradationIfChanged(runtime, "tool-unavailable", NOW);
+
+      expect(first).toEqual({ announced: true, reason: "announced" });
+      expect(second).toEqual({ announced: false, reason: "unchanged" });
+      expect(runtime.sendMatrixRoomMessage).toHaveBeenCalledTimes(1);
+      expect(sent.at(-1)).toMatchObject({ body: expect.stringContaining("SAN-TOOL-001") });
+    });
+
+    it("persists tool-unavailable only after Matrix accepted the message", async () => {
+      await settleAt("healthy");
+
+      await announceDegradationIfChanged(makeRuntime(), "tool-unavailable", NOW);
+
+      await expect(readRecord()).resolves.toMatchObject({
+        announcedState: "tool-unavailable",
+        announcedAt: "2026-07-25T14:32:00.000Z",
+      });
+    });
+
+    it("does not record tool-unavailable when delivery fails, so the next run retries", async () => {
+      await settleAt("healthy");
+      const failing = makeRuntime(async () => {
+        throw new Error("Failed to send Matrix room message (502)");
+      });
+
+      const outcome = await announceDegradationIfChanged(failing, "tool-unavailable", NOW);
+
+      expect(outcome).toEqual({ announced: false, reason: "send-failed" });
+      await expect(readRecord()).resolves.toMatchObject({ announcedState: "healthy" });
+    });
+
+    it("announces recovery once the tool is back", async () => {
+      await settleAt("tool-unavailable");
+      const runtime = makeRuntime();
+
+      const outcome = await announceDegradationIfChanged(runtime, "healthy", NOW);
+
+      expect(outcome.announced).toBe(true);
+      expect(sent.at(-1)).toMatchObject({ body: expect.stringContaining("back to normal") });
+    });
+
+    it("treats a persisted tool-unavailable record as a valid dedup baseline", async () => {
+      await settleAt("tool-unavailable");
+      const runtime = makeRuntime();
+
+      const outcome = await announceDegradationIfChanged(runtime, "tool-unavailable", NOW);
+
+      expect(outcome).toEqual({ announced: false, reason: "unchanged" });
+      expect(runtime.sendMatrixRoomMessage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("health/notice > formatDegradationNotice", () => {
@@ -305,5 +365,52 @@ describe("health/notice > formatDegradationNotice", () => {
       expect(rendered).not.toContain("@");
       expect(rendered).not.toMatch(/subject|sender|snippet|from:|body/iu);
     }
+  });
+
+  // #324: the SAN-TOOL-001 notice carries the resolved executable path — the
+  // one operational value the operator needs — and nothing else dynamic.
+  describe("tool-unavailable (SAN-TOOL-001)", () => {
+    afterEach(() => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+    });
+
+    it("carries the SAN-TOOL-001 code, the default tool path, and the repair action", () => {
+      const message = formatDegradationNotice("tool-unavailable");
+      expect(message.body).toBe(
+        "🔴 Mail Sentinel needs attention (SAN-TOOL-001). " +
+          "Mail scanning is not running because the required local IMAP tool is unavailable " +
+          "at /usr/local/bin/sovereign-tool. " +
+          "Run the node's web update (repair) or correct the configured executable path. " +
+          "No email data is lost — scanning resumes automatically once the tool is available.",
+      );
+      expect(message.formattedBody).toContain("SAN-TOOL-001");
+      expect(message.formattedBody).toContain("/usr/local/bin/sovereign-tool");
+    });
+
+    it("renders the configured override path when SOVEREIGN_TOOL_EXECUTABLE is set", () => {
+      process.env.SOVEREIGN_TOOL_EXECUTABLE = "/opt/custom/sovereign-tool";
+      const message = formatDegradationNotice("tool-unavailable");
+      expect(message.body).toContain("unavailable at /opt/custom/sovereign-tool.");
+      expect(message.formattedBody).toContain("/opt/custom/sovereign-tool");
+    });
+
+    it("stays distinct from the mailbox failure code", () => {
+      const message = formatDegradationNotice("tool-unavailable");
+      expect(message.body).not.toContain("SAN-MAIL-001");
+      expect(message.body).not.toContain("SAN-LLM-001");
+      expect(formatDegradationNotice("scans-failing").body).not.toContain("SAN-TOOL-001");
+    });
+
+    it("never leaks mail content or credentials", () => {
+      const message = formatDegradationNotice("tool-unavailable");
+      for (const rendered of [message.body, message.formattedBody]) {
+        expect(rendered).not.toContain("@");
+        expect(rendered).not.toMatch(/subject|sender|snippet|from:|password|token|secret/iu);
+      }
+    });
+
+    it("stays within a calm one-notice length", () => {
+      expect(formatDegradationNotice("tool-unavailable").body.length).toBeLessThanOrEqual(400);
+    });
   });
 });
