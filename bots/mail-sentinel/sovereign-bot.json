@@ -2,7 +2,7 @@
   "kind": "sovereign-bot-package",
   "manifestVersion": 2,
   "id": "mail-sentinel",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "displayName": "Mail Sentinel",
   "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them with Lobster plus llm-task, applies personal policy, and chooses red, amber, or gray handling.",
   "defaultInstall": true,
@@ -49,7 +49,8 @@
         "mail-sentinel.scan",
         "mail-sentinel.feedback",
         "mail-sentinel.alerts.read",
-        "mail-sentinel.version.read"
+        "mail-sentinel.version.read",
+        "mail-sentinel.status.read"
       ],
       "openclawBundledPlugins": [
         "lobster",
@@ -72,6 +73,7 @@
       ],
       "allowedCommands": [
         "<agent-workspace>/bin/mail-sentinel.js version --json",
+        "<agent-workspace>/bin/mail-sentinel.js status --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js scan --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js digest --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view today --json",
@@ -537,7 +539,7 @@
   ],
   "agentTemplate": {
     "id": "mail-sentinel",
-    "version": "2.0.6",
+    "version": "2.0.7",
     "description": "Local-first inbox sentinel that filters heuristic candidates, reviews them semantically, applies policy, and chooses red alerts, amber digests, or gray silence.",
     "model": "qwen/qwen3.5-27b",
     "matrix": {

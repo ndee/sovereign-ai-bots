@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const readFile = vi.fn();
 const writeFile = vi.fn();
 const rm = vi.fn();
+const access = vi.fn();
 
 vi.mock("node:fs/promises", () => ({
   readFile,
   writeFile,
   rm,
+  access,
   mkdir: vi.fn().mockResolvedValue(undefined),
   open: vi.fn(),
   rename: vi.fn().mockResolvedValue(undefined),
@@ -23,7 +25,15 @@ vi.mock("node:crypto", async () => {
 });
 
 // Dynamic import after mocks.
-const { MailSentinelRuntime, resolveToolRuntime } = await import("./runtime.js");
+const {
+  MailSentinelRuntime,
+  checkToolAvailability,
+  createToolUnavailableError,
+  isToolUnavailableError,
+  resolveToolExecutable,
+  resolveToolRuntime,
+  TOOL_UNAVAILABLE_ERROR_CODE,
+} = await import("./runtime.js");
 const { setExecFileAsync } = await import("../imap/exec.js");
 
 const makeRuntimeConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -73,6 +83,7 @@ describe("config/runtime", () => {
     readFile.mockReset();
     writeFile.mockReset();
     rm.mockReset();
+    access.mockReset();
     process.env.MAIL_SENTINEL_TEST_TOKEN = "test-token";
     process.env.SOVEREIGN_TOOL_EXECUTABLE = "/usr/bin/sovereign-tool";
   });
@@ -394,6 +405,166 @@ describe("config/runtime", () => {
         setExecFileAsync(previous);
       }
       expect(capturedExecutable).toBe("/usr/local/bin/sovereign-tool");
+    });
+
+    // #324: a spawn-level ENOENT used to be collapsed into "<command> failed:
+    // ...", making "the tool binary is missing" indistinguishable from "the
+    // tool ran and broke".
+    it("maps a spawn ENOENT to a recognizable IMAP-tool-unavailable error", async () => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }));
+      const previous = setExecFileAsync(runner);
+      try {
+        const rejection = runtime.runTool(["imap-search-mail"], []);
+        await expect(rejection).rejects.toThrow(
+          "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
+            "Mail scanning cannot proceed until the tool is installed or configured.",
+        );
+        const error = await rejection.catch((caught: unknown) => caught);
+        expect(isToolUnavailableError(error)).toBe(true);
+        expect((error as NodeJS.ErrnoException).code).toBe(TOOL_UNAVAILABLE_ERROR_CODE);
+        // The default path is an installation defect, not a configuration
+        // error — the message must not point at the env override.
+        expect((error as Error).message).not.toContain("SOVEREIGN_TOOL_EXECUTABLE");
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("maps a spawn EACCES to the same tool-unavailable error", async () => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("spawn EACCES"), { code: "EACCES" }));
+      const previous = setExecFileAsync(runner);
+      try {
+        const rejection = runtime.runTool(["imap-read-mail"], []);
+        await expect(rejection).rejects.toThrow(
+          "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found.",
+        );
+        expect(isToolUnavailableError(await rejection.catch((caught: unknown) => caught))).toBe(
+          true,
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("names the SOVEREIGN_TOOL_EXECUTABLE override when a configured path is missing", async () => {
+      // beforeEach set the override to /usr/bin/sovereign-tool.
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }));
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.runTool(["imap-search-mail"], [])).rejects.toThrow(
+          "IMAP tool unavailable: /usr/bin/sovereign-tool not found. " +
+            "Mail scanning cannot proceed until the tool is installed or configured. " +
+            "(configured via SOVEREIGN_TOOL_EXECUTABLE)",
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("keeps the generic failure message for a tool that ran and failed", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("exit 1"), { code: 1, stdout: "", stderr: "tool died" }),
+        );
+      const previous = setExecFileAsync(runner);
+      try {
+        const rejection = runtime.runTool(["imap-search-mail"], []);
+        await expect(rejection).rejects.toThrow("imap-search-mail failed: tool died");
+        expect(isToolUnavailableError(await rejection.catch((caught: unknown) => caught))).toBe(
+          false,
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+  });
+
+  describe("resolveToolExecutable", () => {
+    it("prefers the SOVEREIGN_TOOL_EXECUTABLE override", () => {
+      expect(resolveToolExecutable()).toBe("/usr/bin/sovereign-tool");
+    });
+
+    it("falls back to the default path when the override is unset", () => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+      expect(resolveToolExecutable()).toBe("/usr/local/bin/sovereign-tool");
+    });
+  });
+
+  describe("checkToolAvailability", () => {
+    it("reports ok with the default source when the default executable is usable", async () => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+      access.mockResolvedValueOnce(undefined);
+      await expect(checkToolAvailability()).resolves.toEqual({
+        ok: true,
+        executable: "/usr/local/bin/sovereign-tool",
+        source: "default",
+      });
+      expect(access).toHaveBeenCalledWith("/usr/local/bin/sovereign-tool", expect.any(Number));
+    });
+
+    it("reports ok with the override source when a configured executable is usable", async () => {
+      access.mockResolvedValueOnce(undefined);
+      await expect(checkToolAvailability()).resolves.toEqual({
+        ok: true,
+        executable: "/usr/bin/sovereign-tool",
+        source: "override",
+      });
+    });
+
+    it("reports an installation defect when the default executable is unusable", async () => {
+      delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+      access.mockRejectedValueOnce(Object.assign(new Error("nf"), { code: "ENOENT" }));
+      await expect(checkToolAvailability()).resolves.toEqual({
+        ok: false,
+        executable: "/usr/local/bin/sovereign-tool",
+        source: "default",
+        reason:
+          "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
+          "Mail scanning cannot proceed until the tool is installed or configured.",
+      });
+    });
+
+    // A broken override must be reported as such, never silently ignored in
+    // favour of the default path.
+    it("reports a configuration error when a configured override is unusable", async () => {
+      access.mockRejectedValueOnce(Object.assign(new Error("nf"), { code: "ENOENT" }));
+      await expect(checkToolAvailability()).resolves.toEqual({
+        ok: false,
+        executable: "/usr/bin/sovereign-tool",
+        source: "override",
+        reason:
+          "IMAP tool unavailable: /usr/bin/sovereign-tool not found. " +
+          "Mail scanning cannot proceed until the tool is installed or configured. " +
+          "(configured via SOVEREIGN_TOOL_EXECUTABLE)",
+      });
+      expect(access).toHaveBeenCalledWith("/usr/bin/sovereign-tool", expect.any(Number));
+    });
+  });
+
+  describe("isToolUnavailableError", () => {
+    it("recognizes an error created by createToolUnavailableError", () => {
+      expect(isToolUnavailableError(createToolUnavailableError("IMAP tool unavailable: x"))).toBe(
+        true,
+      );
+    });
+
+    it("rejects plain errors and non-errors", () => {
+      expect(isToolUnavailableError(new Error("boom"))).toBe(false);
+      expect(isToolUnavailableError("MAIL_SENTINEL_TOOL_UNAVAILABLE")).toBe(false);
+      expect(isToolUnavailableError(undefined)).toBe(false);
     });
   });
 

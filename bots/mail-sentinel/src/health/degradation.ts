@@ -23,8 +23,17 @@
  *   NOT a mailbox failure, and an operator must not read it as one.
  * - `scans-failing` — the scan itself is throwing, so mail is not being
  *   retrieved at all.
+ * - `tool-unavailable` — the local sovereign-tool executable itself is missing
+ *   or not executable (#324), so no IMAP command can even be attempted. Unlike
+ *   `scans-failing` this is not a transient mailbox condition: it can never
+ *   self-heal, so it must be reported on the FIRST failed scan, not after the
+ *   scans-failing threshold.
  */
-export type DegradationState = "healthy" | "classification-degraded" | "scans-failing";
+export type DegradationState =
+  | "healthy"
+  | "classification-degraded"
+  | "scans-failing"
+  | "tool-unavailable";
 
 /** Consecutive scan failures at or above which the scan itself is considered broken. */
 export const SCANS_FAILING_THRESHOLD = 3;
@@ -40,9 +49,21 @@ export interface DegradationInput {
    * this guard an idle mailbox would look identical to a broken reviewer.
    */
   lastScanCandidates: number;
+  /**
+   * The sovereign-tool executable was missing or not executable this scan
+   * (#324). Defaults to false so existing call sites keep their behaviour.
+   */
+  toolUnavailable?: boolean;
 }
 
 export const deriveDegradationState = (input: DegradationInput): DegradationState => {
+  // Top priority: without the tool executable nothing else can even run, and
+  // waiting for the scans-failing threshold would delay an install defect that
+  // can never self-heal by ~three timer ticks — then misname it as a mailbox
+  // problem. A missing tool degrades on the FIRST failed scan.
+  if (input.toolUnavailable === true) {
+    return "tool-unavailable";
+  }
   // A failing scan subsumes a failing classifier: if mail is not being
   // retrieved, telling the operator that classification is degraded would point
   // them at the wrong subsystem.

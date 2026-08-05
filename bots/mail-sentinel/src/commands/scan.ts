@@ -8,7 +8,13 @@ import {
 } from "../alerts/format.js";
 import { mintShortRef } from "../alerts/short-ref.js";
 import type { MailSentinelRuntime } from "../config/runtime.js";
-import { resolveToolRuntime } from "../config/runtime.js";
+import {
+  checkToolAvailability,
+  createToolUnavailableError,
+  isToolUnavailableError,
+  resolveToolRuntime,
+  TOOL_UNAVAILABLE_ERROR_CODE,
+} from "../config/runtime.js";
 import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../constants.js";
 import { deriveDegradationState } from "../health/degradation.js";
 import { announceDegradationIfChanged } from "../health/notice.js";
@@ -139,6 +145,39 @@ export const scan = async (
       };
     }
 
+    // Preflight (#324): a Pro install can ship without the sovereign-tool
+    // binary, and a scan without it can NEVER succeed — so it must not take
+    // three timer ticks to degrade, and it must never be misnamed as a mailbox
+    // failure. This runs after the unconfigured-IMAP short-circuit on purpose:
+    // an unconfigured host keeps today's behaviour.
+    const availability = await checkToolAvailability();
+    if (!availability.ok) {
+      state.lastError = {
+        code: TOOL_UNAVAILABLE_ERROR_CODE,
+        message: availability.reason,
+        // The condition clears itself the moment the tool is installed or the
+        // override is corrected; the next timer tick then scans normally.
+        retryable: true,
+      };
+      // Deliberately NOT incrementing consecutiveFailures: those count mailbox
+      // scans that threw, and letting a missing binary push them toward the
+      // scans-failing threshold would mislabel an install defect as a mailbox
+      // outage in every counter-based surface (doctor, workspace-state checks).
+      const degradation = deriveDegradationState({
+        consecutiveFailures: state.consecutiveFailures,
+        lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
+        lastScanCandidates: state.lastScanCandidates ?? 0,
+        toolUnavailable: true,
+      });
+      state.degradationState = degradation;
+      await runtime.writeState(state);
+      await announceDegradationIfChanged(runtime, degradation);
+      // Rethrow like the outer catch does: the CLI turns this into a JSON
+      // error payload and a non-zero exit code. There is no path where the
+      // tool is missing and the scan reports ok.
+      throw createToolUnavailableError(availability.reason);
+    }
+
     try {
       const rules = await runtime.readRules();
       let previousLastSeenUid = state.mailbox.lastSeenUid;
@@ -202,6 +241,14 @@ export const scan = async (
         try {
           readResult = await runtime.readMail(summary.uid);
         } catch (error) {
+          // A tool that disappeared mid-scan (after the preflight and the
+          // search succeeded) must not be downgraded to a per-message warning:
+          // the scan would then finish "ok" with a quiet-inbox result while
+          // scanning is actually impossible. Escalate to the outer catch,
+          // which maps it to the tool-unavailable degradation.
+          if (isToolUnavailableError(error)) {
+            throw error;
+          }
           warnings.push(
             `Skipped UID ${String(summary.uid)} because it could not be read: ${
               error instanceof Error ? error.message : String(error)
@@ -387,18 +434,25 @@ export const scan = async (
         alerts,
       };
     } catch (error) {
+      // A tool that vanished mid-scan (preflight passed, then searchMail or
+      // readMail hit ENOENT) gets the same honest treatment as the preflight:
+      // its own error code, retryable, no mailbox-failure counter increment.
+      const toolUnavailable = isToolUnavailableError(error);
       state.lastError = {
-        code: "MAIL_SENTINEL_SCAN_FAILED",
+        code: toolUnavailable ? TOOL_UNAVAILABLE_ERROR_CODE : "MAIL_SENTINEL_SCAN_FAILED",
         message: error instanceof Error ? error.message : String(error),
-        retryable: false,
+        retryable: toolUnavailable,
       };
-      state.consecutiveFailures += 1;
+      if (!toolUnavailable) {
+        state.consecutiveFailures += 1;
+      }
       // The notice has to run here too, or `scans-failing` — the state that
       // means no mail is being retrieved at all — could never be announced.
       const degradation = deriveDegradationState({
         consecutiveFailures: state.consecutiveFailures,
         lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
         lastScanCandidates: state.lastScanCandidates ?? 0,
+        toolUnavailable,
       });
       state.degradationState = degradation;
       await runtime.writeState(state);

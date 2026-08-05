@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
@@ -53,6 +54,71 @@ const MATRIX_CUSTOM_HTML_FORMAT = "org.matrix.custom.html";
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+
+/**
+ * Tool-executable readiness (#324).
+ *
+ * Pro web installs can ship without `/usr/local/bin/sovereign-tool`, and until
+ * now the resulting ENOENT was collapsed into the generic "<command> failed"
+ * message — indistinguishable from a mailbox failure, and only surfaced after
+ * three failed timer ticks as a misleading "check the mailbox connection"
+ * notice. Everything below exists to make "the tool binary itself is unusable"
+ * a first-class, programmatically recognizable condition.
+ */
+
+/** Marker code set on errors that mean "the sovereign-tool executable is unusable". */
+export const TOOL_UNAVAILABLE_ERROR_CODE = "MAIL_SENTINEL_TOOL_UNAVAILABLE";
+
+/**
+ * Where the executable path came from. An `override` that is broken is a
+ * configuration error the operator made; a broken `default` is an installation
+ * defect (the #324 incident). Callers word their guidance on this distinction.
+ */
+export type ToolExecutableSource = "default" | "override";
+
+export type ToolAvailability =
+  | { ok: true; executable: string; source: ToolExecutableSource }
+  | { ok: false; executable: string; source: ToolExecutableSource; reason: string };
+
+/** Resolve the sovereign-tool executable path: env override, then the default. */
+export const resolveToolExecutable = (): string =>
+  process.env.SOVEREIGN_TOOL_EXECUTABLE ?? DEFAULT_TOOL_EXECUTABLE;
+
+const resolveToolExecutableSource = (): ToolExecutableSource =>
+  process.env.SOVEREIGN_TOOL_EXECUTABLE === undefined ? "default" : "override";
+
+const toolUnavailableMessage = (executable: string, source: ToolExecutableSource): string =>
+  [
+    `IMAP tool unavailable: ${executable} not found.`,
+    "Mail scanning cannot proceed until the tool is installed or configured.",
+    ...(source === "override" ? ["(configured via SOVEREIGN_TOOL_EXECUTABLE)"] : []),
+  ].join(" ");
+
+/** Build the recognizable tool-unavailable error the scan path throws and detects. */
+export const createToolUnavailableError = (message: string): Error =>
+  Object.assign(new Error(message), { code: TOOL_UNAVAILABLE_ERROR_CODE });
+
+export const isToolUnavailableError = (error: unknown): boolean =>
+  error instanceof Error && (error as NodeJS.ErrnoException).code === TOOL_UNAVAILABLE_ERROR_CODE;
+
+/**
+ * Probe whether the resolved tool executable exists and is executable.
+ *
+ * A broken `SOVEREIGN_TOOL_EXECUTABLE` override is never silently ignored in
+ * favour of the default: whatever path resolution produced is exactly what is
+ * probed, and the failure reason names the override so the operator fixes the
+ * configuration rather than reinstalling a tool that was never consulted.
+ */
+export const checkToolAvailability = async (): Promise<ToolAvailability> => {
+  const executable = resolveToolExecutable();
+  const source = resolveToolExecutableSource();
+  try {
+    await access(executable, fsConstants.X_OK);
+    return { ok: true, executable, source };
+  } catch {
+    return { ok: false, executable, source, reason: toolUnavailableMessage(executable, source) };
+  }
+};
 
 interface RuntimeConfigDocument {
   sovereignTools?: {
@@ -252,10 +318,19 @@ export class MailSentinelRuntime {
   }
 
   async runTool(command: readonly string[], args: readonly string[]): Promise<unknown> {
-    const executable = process.env.SOVEREIGN_TOOL_EXECUTABLE ?? DEFAULT_TOOL_EXECUTABLE;
+    const executable = resolveToolExecutable();
     const result = await execFileAsync(executable, [...command, ...args], {
       maxBuffer: 10 * 1024 * 1024,
     }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
+      // A missing or non-executable tool binary is NOT a tool failure: collapse
+      // it into the generic message below and "the install shipped without
+      // sovereign-tool" (#324) becomes indistinguishable from "the mailbox is
+      // broken". Inspect the spawn error code before the message is rewritten.
+      if (error.code === "ENOENT" || error.code === "EACCES") {
+        throw createToolUnavailableError(
+          toolUnavailableMessage(executable, resolveToolExecutableSource()),
+        );
+      }
       const stdout = typeof error.stdout === "string" ? error.stdout : "";
       const stderr = typeof error.stderr === "string" ? error.stderr : "";
       throw new Error(`${command.join(" ")} failed: ${stderr || stdout || error.message}`);

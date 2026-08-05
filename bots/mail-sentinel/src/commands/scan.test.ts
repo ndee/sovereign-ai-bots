@@ -8,9 +8,25 @@ import { getFakeRuntime, resetFakeRuntime } from "../__fixtures__/fake-runtime.j
 import { sampleRules } from "../__fixtures__/inputs.js";
 import type { LlmResult, StoredAlert } from "../types.js";
 
-vi.mock("../config/runtime.js", () => ({
-  resolveToolRuntime: async () => getFakeRuntime(),
+// Controllable tool-availability verdict (#324). Hoisted so the mock factory
+// below can close over it; reset to "available" in beforeEach.
+const toolAvailabilityRef = vi.hoisted(() => ({
+  current: {
+    ok: true,
+    executable: "/usr/local/bin/sovereign-tool",
+    source: "default",
+  } as unknown,
 }));
+
+vi.mock("../config/runtime.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../config/runtime.js")>("../config/runtime.js");
+  return {
+    ...actual,
+    resolveToolRuntime: async () => getFakeRuntime(),
+    checkToolAvailability: async () => toolAvailabilityRef.current,
+  };
+});
 
 vi.mock("../state/io.js", async () => {
   const actual = await vi.importActual<typeof import("../state/io.js")>("../state/io.js");
@@ -29,6 +45,20 @@ vi.mock("node:crypto", async () => {
 });
 
 const { flushDigestIfDue, scan } = await import("./scan.js");
+const { createToolUnavailableError } = await import("../config/runtime.js");
+
+const TOOL_UNAVAILABLE_REASON =
+  "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
+  "Mail scanning cannot proceed until the tool is installed or configured.";
+
+const makeToolUnavailable = () => {
+  toolAvailabilityRef.current = {
+    ok: false,
+    executable: "/usr/local/bin/sovereign-tool",
+    source: "default",
+    reason: TOOL_UNAVAILABLE_REASON,
+  };
+};
 
 const FIXED_NOW = new Date("2026-04-08T12:00:00.000Z");
 
@@ -76,6 +106,11 @@ const setupRuntimeForScan = () => {
 describe("commands/scan", () => {
   beforeEach(() => {
     resetFakeRuntime();
+    toolAvailabilityRef.current = {
+      ok: true,
+      executable: "/usr/local/bin/sovereign-tool",
+      source: "default",
+    };
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
   });
@@ -864,6 +899,138 @@ describe("commands/scan", () => {
       const result = await scan({ instance: "ms-core" });
       expect(result.warningCount).toBeUndefined();
       expect(runtime.state.lastScanWarnings).toBe(0);
+    });
+  });
+
+  // #324: Pro web installs can ship without /usr/local/bin/sovereign-tool. A
+  // scan without the tool can never succeed, so it must fail loudly on the
+  // FIRST tick, with its own error code — never as a quiet inbox, and never
+  // misnamed as a mailbox failure after three ticks.
+  describe("tool readiness (#324)", () => {
+    const useRealStatePath = async (runtime: ReturnType<typeof setupRuntimeForScan>) => {
+      const dir = await mkdtemp(join(tmpdir(), "ms-scan-tool-readiness-"));
+      runtime.statePath = join(dir, "mail-sentinel-state.json");
+      return runtime;
+    };
+
+    it("fails the scan with a distinct retryable error when the tool is missing", async () => {
+      const runtime = setupRuntimeForScan();
+      makeToolUnavailable();
+      const search = vi.spyOn(runtime, "searchMail");
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow(TOOL_UNAVAILABLE_REASON);
+      // No IMAP work was even attempted.
+      expect(search).not.toHaveBeenCalled();
+      expect(runtime.state.lastError).toEqual({
+        code: "MAIL_SENTINEL_TOOL_UNAVAILABLE",
+        message: TOOL_UNAVAILABLE_REASON,
+        retryable: true,
+      });
+      // A missing binary is not a mailbox failure: the scans-failing counter
+      // must not move toward its threshold.
+      expect(runtime.state.consecutiveFailures).toBe(0);
+      expect(runtime.state.degradationState).toBe("tool-unavailable");
+    });
+
+    it("degrades on the FIRST failed scan, not after the scans-failing threshold", async () => {
+      const runtime = setupRuntimeForScan();
+      makeToolUnavailable();
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+      expect(runtime.state.degradationState).toBe("tool-unavailable");
+      expect(runtime.state.degradationState).not.toBe("scans-failing");
+    });
+
+    it("keeps prior scan counters intact instead of mislabeling them", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.state.lastScanLlmFailures = 1;
+      runtime.state.lastScanCandidates = 2;
+      makeToolUnavailable();
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+      // tool-unavailable wins the derivation even though the counters would
+      // otherwise say classification-degraded.
+      expect(runtime.state.degradationState).toBe("tool-unavailable");
+      expect(runtime.state.lastScanLlmFailures).toBe(1);
+      expect(runtime.state.lastScanCandidates).toBe(2);
+    });
+
+    it("announces SAN-TOOL-001 to Matrix on the first missing-tool scan", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      makeToolUnavailable();
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+      const bodies = send.mock.calls.map(([message]) =>
+        typeof message === "string" ? message : message.body,
+      );
+      expect(bodies.some((body) => body.includes("SAN-TOOL-001"))).toBe(true);
+      expect(bodies.some((body) => body.includes("SAN-MAIL-001"))).toBe(false);
+    });
+
+    it("keeps today's behaviour when IMAP is unconfigured, even without the tool", async () => {
+      const runtime = getFakeRuntime();
+      runtime.imapConfigured = false;
+      makeToolUnavailable();
+      const result = await scan({ instance: "ms-core" });
+      expect(result.configured).toBe(false);
+      expect(result.note).toContain("IMAP is not configured");
+      expect(runtime.state.degradationState).toBe("healthy");
+    });
+
+    it("escalates a tool that disappears between search and read (no quiet inbox)", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.readMail = async () => {
+        throw createToolUnavailableError(TOOL_UNAVAILABLE_REASON);
+      };
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow(TOOL_UNAVAILABLE_REASON);
+      expect(runtime.state.lastError).toEqual({
+        code: "MAIL_SENTINEL_TOOL_UNAVAILABLE",
+        message: TOOL_UNAVAILABLE_REASON,
+        retryable: true,
+      });
+      expect(runtime.state.consecutiveFailures).toBe(0);
+      expect(runtime.state.degradationState).toBe("tool-unavailable");
+    });
+
+    it("maps a mid-scan disappearance during searchMail through the outer catch", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.state.consecutiveFailures = 2;
+      runtime.searchMail = async () => {
+        throw createToolUnavailableError(TOOL_UNAVAILABLE_REASON);
+      };
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow(TOOL_UNAVAILABLE_REASON);
+      // Not incremented to 3 — this must not tip a node into "scans-failing".
+      expect(runtime.state.consecutiveFailures).toBe(2);
+      expect(runtime.state.degradationState).toBe("tool-unavailable");
+      expect(runtime.state.lastError?.code).toBe("MAIL_SENTINEL_TOOL_UNAVAILABLE");
+      expect(runtime.state.lastError?.retryable).toBe(true);
+    });
+
+    it("recovers to healthy and announces once the tool is back", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      makeToolUnavailable();
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+
+      toolAvailabilityRef.current = {
+        ok: true,
+        executable: "/usr/local/bin/sovereign-tool",
+        source: "default",
+      };
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      const result = await scan({ instance: "ms-core" });
+      expect(result.configured).toBe(true);
+      expect(runtime.state.degradationState).toBe("healthy");
+      expect(runtime.state.lastError).toBeUndefined();
+      const bodies = send.mock.calls.map(([message]) =>
+        typeof message === "string" ? message : message.body,
+      );
+      expect(bodies.some((body) => body.includes("back to normal"))).toBe(true);
+    });
+
+    it("never leaks mailbox or credential material into the failure it records", async () => {
+      const runtime = setupRuntimeForScan();
+      makeToolUnavailable();
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+      // The exact message and nothing else: no config fields, no secrets.
+      expect(runtime.state.lastError?.message).toBe(TOOL_UNAVAILABLE_REASON);
+      expect(runtime.state.lastError?.message).not.toMatch(/password|token|secret/iu);
     });
   });
 });

@@ -63,10 +63,38 @@ describe("health/degradation > deriveDegradationState", () => {
       }),
     ).toBe("scans-failing");
   });
+
+  // #324: a missing tool binary can never self-heal, so it must not wait for
+  // the scans-failing threshold — it degrades on the FIRST failed scan.
+  it("reports tool-unavailable immediately, with zero consecutive failures", () => {
+    expect(derive({ toolUnavailable: true })).toBe("tool-unavailable");
+  });
+
+  it("gives tool-unavailable precedence over scans-failing", () => {
+    expect(
+      derive({ toolUnavailable: true, consecutiveFailures: SCANS_FAILING_THRESHOLD + 5 }),
+    ).toBe("tool-unavailable");
+  });
+
+  it("gives tool-unavailable precedence over classification-degraded", () => {
+    expect(derive({ toolUnavailable: true, lastScanCandidates: 2, lastScanLlmFailures: 2 })).toBe(
+      "tool-unavailable",
+    );
+  });
+
+  it("treats an omitted toolUnavailable flag as false", () => {
+    expect(derive({ lastScanCandidates: 5 })).toBe("healthy");
+    expect(derive({ toolUnavailable: false, lastScanCandidates: 5 })).toBe("healthy");
+  });
 });
 
 describe("health/degradation > shouldAnnounce", () => {
-  const states: DegradationState[] = ["healthy", "classification-degraded", "scans-failing"];
+  const states: DegradationState[] = [
+    "healthy",
+    "classification-degraded",
+    "scans-failing",
+    "tool-unavailable",
+  ];
 
   it("stays silent on a first observation that is healthy", () => {
     // A fresh install is not a recovery; announcing here would greet every new
@@ -93,9 +121,14 @@ describe("health/degradation > shouldAnnounce", () => {
     }
   });
 
-  it("announces recovery back to healthy from either failure state", () => {
+  it("announces recovery back to healthy from any failure state", () => {
     expect(shouldAnnounce("classification-degraded", "healthy")).toBe(true);
     expect(shouldAnnounce("scans-failing", "healthy")).toBe(true);
+    expect(shouldAnnounce("tool-unavailable", "healthy")).toBe(true);
+  });
+
+  it("announces a first observation of tool-unavailable", () => {
+    expect(shouldAnnounce(undefined, "tool-unavailable")).toBe(true);
   });
 
   it("announces an escalation from classification-degraded to scans-failing", () => {
