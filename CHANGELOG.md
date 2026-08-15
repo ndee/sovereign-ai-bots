@@ -15,6 +15,28 @@ version.
 
 ## [Unreleased]
 
+## [2.0.8] - 2026-08-15
+
+Mail Sentinel 2.0.8 — bounded IMAP search (bots#142).
+
+### Fixed
+
+- Every scan issued an unbounded `imap-search-mail --query ALL`. On a real,
+  long-lived mailbox the server then has to enumerate every UID it has ever
+  held, which exceeds the tool's 30 s IMAP socket timeout and fails every scan
+  ("IMAP socket timeout during mail search"); `--limit` could not help because
+  it is applied client-side after the server-side search. The configured
+  `lookbackWindow` is now pushed into the IMAP search as
+  `since:<YYYY-MM-DD>` (RFC 3501 `SINCE`, day granularity, computed in UTC as
+  now − lookbackWindow − one day of slack for timezone/midnight skew), so the
+  server only searches recent mail. An unparseable `lookbackWindow` falls back
+  to the default `1h` bound rather than to an unbounded search.
+
+### Added
+
+- `scan --json` reports `imapSearchQuery`, the effective query the scan issued,
+  so an operator or an e2e can prove the search was bounded.
+
 ## [2.0.7] - 2026-08-04
 
 Mail Sentinel 2.0.7 — tool-executable readiness (node-pro #324).
@@ -45,6 +67,7 @@ Bootstrap release formalizing the semantic versioning scheme for this project.
 See the [v2.0.0 GitHub Release](https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0)
 for details.
 
-[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.7...HEAD
+[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.8...HEAD
+[2.0.8]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.8
 [2.0.7]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.7
 [2.0.0]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0

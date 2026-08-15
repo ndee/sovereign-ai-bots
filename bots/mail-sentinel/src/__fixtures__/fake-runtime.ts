@@ -52,7 +52,12 @@ export class FakeMailSentinelRuntime {
   readRules = async (): Promise<RulesDocument> => this.rules;
 
   // IMAP tool surface
-  searchMail = async (_limit: number) => ({ messages: [] as unknown[] });
+  searchMail = async (
+    _limit: number,
+  ): Promise<{ messages: unknown[]; uidValidity?: string; query?: string }> => ({
+    messages: [],
+    query: "since:2026-08-14",
+  });
   readMail = async (_selector: string | number) => ({ message: { uid: 0 } });
   runTool = async (_command: readonly string[], _args: readonly string[]): Promise<unknown> => ({});
 
