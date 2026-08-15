@@ -612,7 +612,10 @@ describe("config/runtime", () => {
         );
 
         const runner = vi.fn().mockResolvedValue({
-          stdout: JSON.stringify({ ok: true, result: { messages: [{ uid: 7 }], uidValidity: "9" } }),
+          stdout: JSON.stringify({
+            ok: true,
+            result: { messages: [{ uid: 7 }], uidValidity: "9" },
+          }),
           stderr: "",
         });
         const previous = setExecFileAsync(runner);
