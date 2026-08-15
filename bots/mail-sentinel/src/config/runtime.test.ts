@@ -594,6 +594,45 @@ describe("config/runtime", () => {
         setExecFileAsync(previous);
       }
     });
+
+    it("bounds the IMAP search with a since: date derived from lookbackWindow (bots#142)", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-15T10:30:00.000Z"));
+      try {
+        const runtimeConfig = makeRuntimeConfig();
+        readFile
+          .mockResolvedValueOnce(JSON.stringify(runtimeConfig))
+          .mockRejectedValueOnce(new Error("no runtime"));
+        const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+        await runtime.load();
+        expect(runtime.lookbackWindow).toBe("2h");
+        expect(runtime.resolveImapSearchQuery()).toBe("since:2026-08-14");
+        expect(runtime.resolveImapSearchQuery(new Date("2026-08-20T00:10:00.000Z"))).toBe(
+          "since:2026-08-18",
+        );
+
+        const runner = vi.fn().mockResolvedValue({
+          stdout: JSON.stringify({ ok: true, result: { messages: [{ uid: 7 }], uidValidity: "9" } }),
+          stderr: "",
+        });
+        const previous = setExecFileAsync(runner);
+        try {
+          await expect(runtime.searchMail(5)).resolves.toEqual({
+            messages: [{ uid: 7 }],
+            uidValidity: "9",
+            query: "since:2026-08-14",
+          });
+          const args = runner.mock.calls[0]?.[1] as string[];
+          const queryIndex = args.indexOf("--query");
+          expect(args[queryIndex + 1]).toBe("since:2026-08-14");
+          expect(args).not.toContain("ALL");
+        } finally {
+          setExecFileAsync(previous);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("sendMatrixRoomMessage", () => {

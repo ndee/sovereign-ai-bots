@@ -82,6 +82,13 @@ export interface ScanCommandResult {
   instanceId: string;
   configured: boolean;
   lookbackWindow: string;
+  /**
+   * The IMAP query the scan actually issued (`since:<date>`, derived from
+   * `lookbackWindow`). Absent when IMAP is not configured. Lets an operator or
+   * an e2e prove the search was bounded rather than a mailbox-wide `ALL`
+   * (bots#142).
+   */
+  imapSearchQuery?: string;
   processedMessages: number;
   newMessages: number;
   redAlertsSent: number;
@@ -420,6 +427,7 @@ export const scan = async (
         instanceId: runtime.instanceId,
         configured: true,
         lookbackWindow: runtime.lookbackWindow,
+        imapSearchQuery: searchResult.query,
         processedMessages: searchMessages.length,
         newMessages: searchMessages.filter((message) => (previousLastSeenUid ?? 0) < message.uid)
           .length,

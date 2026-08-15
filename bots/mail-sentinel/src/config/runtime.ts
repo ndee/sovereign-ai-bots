@@ -40,6 +40,7 @@ import type {
   MailSentinelState,
   RulesDocument,
 } from "../types.js";
+import { buildLookbackImapSearchQuery } from "../util/imap-search-query.js";
 import { ensureTrailingSlash, stripSingleTrailingNewline } from "../util/normalize.js";
 import {
   parseJsonSafely,
@@ -345,6 +346,16 @@ export class MailSentinelRuntime {
     return payload;
   }
 
+  /**
+   * Builds the IMAP query for a scan. The lookback window is pushed into the
+   * server-side search (`SINCE <date>`) so a real, long-lived mailbox is never
+   * asked to enumerate every UID it has ever held (bots#142). `now` is
+   * injectable for tests.
+   */
+  resolveImapSearchQuery(now: Date = new Date()): string {
+    return buildLookbackImapSearchQuery(this.lookbackWindow, now);
+  }
+
   async searchMail(limit: number = DEFAULT_IMAP_SEARCH_LIMIT): Promise<{
     messages?: Array<{
       uid: number;
@@ -354,14 +365,17 @@ export class MailSentinelRuntime {
       subject?: unknown;
     }>;
     uidValidity?: string;
+    /** The effective `--query` handed to `imap-search-mail`, for reporting. */
+    query: string;
   }> {
-    return (await this.runTool(
+    const query = this.resolveImapSearchQuery();
+    const result = (await this.runTool(
       ["imap-search-mail"],
       [
         "--instance",
         this.imapInstanceId,
         "--query",
-        "ALL",
+        query,
         "--limit",
         String(limit),
         "--config-path",
@@ -378,6 +392,7 @@ export class MailSentinelRuntime {
       }>;
       uidValidity?: string;
     };
+    return { ...result, query };
   }
 
   async readMail(selector: string | number): Promise<{

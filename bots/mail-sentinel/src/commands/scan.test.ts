@@ -274,6 +274,14 @@ describe("commands/scan", () => {
     expect(result.note).toContain("llm down");
   });
 
+  it("reports the bounded IMAP query the search actually issued (bots#142)", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => ({ messages: [], query: "since:2026-04-07" });
+    const result = await scan({ instance: "ms-core" });
+    expect(result.imapSearchQuery).toBe("since:2026-04-07");
+    expect(result.processedMessages).toBe(0);
+  });
+
   it("sends reminder Matrix messages for red alerts whose reminder is due", async () => {
     const runtime = setupRuntimeForScan();
     runtime.searchMail = async () => ({ messages: [] });
