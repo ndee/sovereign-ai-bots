@@ -15,6 +15,33 @@ version.
 
 ## [Unreleased]
 
+## [2.0.9] - 2026-08-16
+
+Mail Sentinel 2.0.9 — semantic review survives a polluted stdout (bots#144).
+
+### Fixed
+
+- Every semantic review failed on the Raspberry Pi node with "lobster
+  classification returned invalid JSON output", while the classifier itself was
+  healthy. `lobster exec --shell` runs its command line through `/bin/sh -lc` —
+  a *login* shell — so anything `/etc/profile.d/*` prints lands on stdout ahead
+  of the pipeline payload. On Raspberry Pi OS `wifi-check.sh` emits "Wi-Fi is
+  currently blocked by rfkill." via `gettext -s`, which writes to stdout rather
+  than stderr, and the strict `JSON.parse` then rejected the whole stream.
+  Classification now tolerates a non-JSON preamble (and trailing noise, e.g. a
+  closing ``` fence) on both lobster's stdout and the model's own `output.text`.
+  Genuinely absent or malformed payloads still fail, so a dead classifier is not
+  masked. The failure was host-dependent, which is why CI and the amd64 nodes
+  never reproduced it.
+
+  Affected mail was not lost, but it was silently downgraded: a failed review is
+  a non-fatal warning, so scans still reported success while every candidate
+  fell back to amber with `confidence: unknown (0%)`.
+
+- The "no structured JSON payload" error now carries a bounded stdout excerpt.
+  Previously it gave no way to distinguish a dead classifier from a polluted
+  stream, which is what made this require a live reproduction to diagnose.
+
 ## [2.0.8] - 2026-08-15
 
 Mail Sentinel 2.0.8 — bounded IMAP search (bots#142).
@@ -67,7 +94,8 @@ Bootstrap release formalizing the semantic versioning scheme for this project.
 See the [v2.0.0 GitHub Release](https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0)
 for details.
 
-[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.8...HEAD
+[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.9...HEAD
+[2.0.9]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.9
 [2.0.8]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.8
 [2.0.7]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.7
 [2.0.0]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0
