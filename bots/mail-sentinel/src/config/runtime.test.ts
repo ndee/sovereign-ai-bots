@@ -784,6 +784,81 @@ describe("config/runtime", () => {
       }
     });
 
+    // Regression: `lobster exec --shell` runs via `/bin/sh -lc`, so on
+    // Raspberry Pi OS the /etc/profile.d/wifi-check.sh rfkill notice is
+    // printed to stdout ahead of the payload. That made every semantic review
+    // fail with "returned invalid JSON output" while the classifier was fine.
+    it("classifies despite a login-shell banner prepended to lobster stdout", async () => {
+      const runtime = await loadRuntime();
+      const payload = JSON.stringify([
+        {
+          details: {
+            json: {
+              decision_required: true,
+              financial_relevance: false,
+              risk_escalation: false,
+              confidence: 88,
+              urgency: "high",
+              reason: "ok",
+              deadline_detected: true,
+              amount_detected: false,
+              suggested_zone: "red",
+            },
+          },
+        },
+      ]);
+      const runner = vi.fn().mockResolvedValue({
+        stdout: `\nWi-Fi is currently blocked by rfkill.\nUse raspi-config to set the country before use.\n\n${payload}`,
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const result = await runtime.classifyCandidate(sampleCandidate);
+        expect(result.decisionRequired).toBe(true);
+        expect(result.confidence).toBe(88);
+        expect(result.suggestedZone).toBe("red");
+        // Must succeed on the first attempt — no retry/backoff burned.
+        expect(runner).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("includes a stdout excerpt when no structured payload is present", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: "Wi-Fi is currently blocked by rfkill.",
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          /stdout: Wi-Fi is currently blocked by rfkill\./u,
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("reports an empty stdout excerpt when lobster prints nothing", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({ stdout: "   ", stderr: "" });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          /stdout: <empty>/u,
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
     it("throws when lobster returns no JSON payload", async () => {
       const runtime = await loadRuntime();
       const runner = vi.fn().mockResolvedValue({ stdout: "null", stderr: "" });

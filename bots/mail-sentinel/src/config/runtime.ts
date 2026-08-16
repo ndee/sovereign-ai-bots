@@ -41,9 +41,9 @@ import type {
   RulesDocument,
 } from "../types.js";
 import { buildLookbackImapSearchQuery } from "../util/imap-search-query.js";
-import { ensureTrailingSlash, stripSingleTrailingNewline } from "../util/normalize.js";
+import { compactText, ensureTrailingSlash, stripSingleTrailingNewline } from "../util/normalize.js";
 import {
-  parseJsonSafely,
+  parseJsonAfterPreamble,
   parseRuntimeConfigDocument,
   resolveRelativeToBase,
 } from "../util/paths.js";
@@ -515,17 +515,29 @@ export class MailSentinelRuntime {
       const stderr = typeof error.stderr === "string" ? error.stderr : "";
       throw new Error(`lobster classification failed: ${stderr || stdout || error.message}`);
     });
-    const parsed = parseJsonSafely(String(result.stdout));
+    const parsed = parseJsonAfterPreamble(String(result.stdout));
     const first = Array.isArray(parsed)
       ? (parsed[0] as Record<string, unknown>)
       : (parsed as Record<string, unknown> | null);
     const output = first?.output as { text?: unknown; data?: unknown } | undefined;
-    const rawText = typeof output?.text === "string" ? parseJsonSafely(output.text) : null;
+    // `output.text` is the model's own answer, which can arrive wrapped in
+    // prose or a ```json fence. Tolerate a preamble here as well so a chatty
+    // model does not read as a hard classification failure.
+    const rawText = typeof output?.text === "string" ? parseJsonAfterPreamble(output.text) : null;
     const details = first?.details as { json?: unknown } | undefined;
     const raw =
       details?.json ?? rawText ?? output?.data ?? (first as { data?: unknown })?.data ?? first;
     if (raw === null || typeof raw !== "object") {
-      throw new Error("lobster classification returned no structured JSON payload");
+      // Include a bounded excerpt of what we actually got. Without it the
+      // operator-facing warning ("returned invalid JSON output") gives no way
+      // to tell a dead classifier apart from stdout polluted by a login-shell
+      // banner, which is what made this failure mode hard to diagnose.
+      const excerpt = compactText(String(result.stdout)).slice(0, 200);
+      throw new Error(
+        `lobster classification returned no structured JSON payload (stdout: ${
+          excerpt.length > 0 ? excerpt : "<empty>"
+        })`,
+      );
     }
     return normalizeLlmResult(raw as Parameters<typeof normalizeLlmResult>[0]);
   }
