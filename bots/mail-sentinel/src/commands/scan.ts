@@ -15,7 +15,11 @@ import {
   resolveToolRuntime,
   TOOL_UNAVAILABLE_ERROR_CODE,
 } from "../config/runtime.js";
-import { DEFAULT_IMAP_READ_MAX_BYTES, DEFAULT_IMAP_SEARCH_LIMIT } from "../constants.js";
+import {
+  DEFAULT_IMAP_READ_MAX_BYTES,
+  DEFAULT_IMAP_SEARCH_LIMIT,
+  DEFAULT_SCAN_BUDGET_MS,
+} from "../constants.js";
 import { deriveDegradationState } from "../health/degradation.js";
 import { announceDegradationIfChanged } from "../health/notice.js";
 import { parseMessage } from "../imap/parse.js";
@@ -78,6 +82,23 @@ export const flushDigestIfDue = async (
   };
 };
 
+/**
+ * `state.lastError.code` for a scan that was cut short by a termination signal
+ * (systemd's `TimeoutStartSec`, an operator's Ctrl-C) rather than by a fault
+ * of its own. It still counts as a failed scan — mail was not triaged — but
+ * the code lets an operator tell "the supervisor killed us" from "IMAP threw".
+ */
+export const SCAN_INTERRUPTED_ERROR_CODE = "MAIL_SENTINEL_SCAN_INTERRUPTED";
+
+/** Signals the scan turns into recorded failures instead of dying silently. */
+const INTERRUPT_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
+
+const describeInterruption = (signal: NodeJS.Signals): string =>
+  `Scan interrupted by ${signal} before it completed; mail was not triaged this run.`;
+
+const createInterruptedError = (signal: NodeJS.Signals): Error =>
+  Object.assign(new Error(describeInterruption(signal)), { code: SCAN_INTERRUPTED_ERROR_CODE });
+
 export interface ScanCommandResult {
   instanceId: string;
   configured: boolean;
@@ -95,6 +116,12 @@ export interface ScanCommandResult {
   amberQueued: number;
   digestsSent: number;
   remindersSent: number;
+  /**
+   * Messages the search returned above the watermark that this scan did NOT
+   * read because its time budget ran out first. They stay above the watermark
+   * and are picked up by the next timer tick. Present only when non-zero.
+   */
+  deferredMessages?: number;
   lastPollAt: string;
   note?: string;
   /**
@@ -112,6 +139,10 @@ export const scan = async (
   if (options.instance === undefined) {
     throw new Error("Expected --instance <id>");
   }
+  // The budget clock starts with the process, not with the mailbox work: the
+  // supervisor's TimeoutStartSec is already running through the build
+  // announcement and the state-lock wait below.
+  const scanDeadline = Date.now() + DEFAULT_SCAN_BUDGET_MS;
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   // Announce a changed build before the scan body, and outside the state lock
   // (it locks its own record). It runs even when IMAP is unconfigured, because
@@ -185,6 +216,74 @@ export const scan = async (
       throw createToolUnavailableError(availability.reason);
     }
 
+    // Failure bookkeeping is shared by the ordinary catch below and the
+    // termination-signal path, and it must run at most once per scan: the
+    // signal handler and the unwinding body would otherwise both bump
+    // `consecutiveFailures` for the same failed scan.
+    let failureRecorded = false;
+    let interruptSignal: NodeJS.Signals | undefined;
+    const recordScanFailure = async (error: unknown): Promise<void> => {
+      if (failureRecorded) {
+        return;
+      }
+      failureRecorded = true;
+      // A tool that vanished mid-scan (preflight passed, then searchMail or
+      // readMail hit ENOENT) gets the same honest treatment as the preflight:
+      // its own error code, retryable, no mailbox-failure counter increment.
+      const toolUnavailable = isToolUnavailableError(error);
+      const interrupted = interruptSignal !== undefined;
+      state.lastError = {
+        code: toolUnavailable
+          ? TOOL_UNAVAILABLE_ERROR_CODE
+          : interrupted
+            ? SCAN_INTERRUPTED_ERROR_CODE
+            : "MAIL_SENTINEL_SCAN_FAILED",
+        message: interrupted
+          ? describeInterruption(interruptSignal as NodeJS.Signals)
+          : error instanceof Error
+            ? error.message
+            : String(error),
+        retryable: toolUnavailable,
+      };
+      if (!toolUnavailable) {
+        state.consecutiveFailures += 1;
+      }
+      // The notice has to run here too, or `scans-failing` — the state that
+      // means no mail is being retrieved at all — could never be announced.
+      const degradation = deriveDegradationState({
+        consecutiveFailures: state.consecutiveFailures,
+        lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
+        lastScanCandidates: state.lastScanCandidates ?? 0,
+        toolUnavailable,
+      });
+      state.degradationState = degradation;
+      await runtime.writeState(state);
+      await announceDegradationIfChanged(runtime, degradation);
+    };
+    // Without a handler, SIGTERM (systemd's TimeoutStartSec,
+    // 90s ahead of its SIGKILL) ends the process before any of the above runs,
+    // so a scan that hangs long enough to be killed is exactly the one that
+    // never gets counted. Persist the failure the moment the signal lands —
+    // independently of whatever the body is stuck on — then let the body
+    // unwind (its children die with the same signal) so the lock is released
+    // and the CLI exits non-zero on its own.
+    const onInterrupt = (signal: NodeJS.Signals): void => {
+      interruptSignal = signal;
+      // Best effort by design: if even the state write fails now there is
+      // nothing left to fall back to, and an unhandled rejection would only
+      // replace one silent death with another.
+      recordScanFailure(createInterruptedError(signal)).catch(() => undefined);
+    };
+    const throwIfInterrupted = (): void => {
+      if (interruptSignal !== undefined) {
+        throw createInterruptedError(interruptSignal);
+      }
+    };
+    for (const signal of INTERRUPT_SIGNALS) {
+      process.once(signal, onInterrupt);
+    }
+
+    let scanResult: ScanCommandResult;
     try {
       const rules = await runtime.readRules();
       let previousLastSeenUid = state.mailbox.lastSeenUid;
@@ -205,6 +304,7 @@ export const scan = async (
       }
 
       const searchResult = await runtime.searchMail(DEFAULT_IMAP_SEARCH_LIMIT);
+      throwIfInterrupted();
       const searchMessages = Array.isArray(searchResult.messages)
         ? searchResult.messages.slice().sort((left, right) => left.uid - right.uid)
         : [];
@@ -236,8 +336,33 @@ export const scan = async (
       // forever (silent, permanent mail loss). Seeded from the prior watermark so
       // it never moves backward.
       let highestConsideredUid = state.mailbox.lastSeenUid ?? 0;
+      let deferredMessages = 0;
 
-      for (const summary of searchMessages) {
+      for (const [index, summary] of searchMessages.entries()) {
+        throwIfInterrupted();
+        // The search is bounded by a day-granular `SINCE`, so it
+        // returns the same 24–48h of mail on every 30-minute tick. Reading each
+        // of those messages again — a fresh IMAP connection and a full body
+        // download per message — is what ramped scan time past the supervisor's
+        // ceiling on a busy mailbox. Anything at or below the watermark was
+        // reckoned with by an earlier scan (`shouldConsider` below would ignore
+        // it anyway), so it is not worth a read. Ascending-UID order means every
+        // message from here on is new. The watermark is already `undefined`
+        // here when UIDVALIDITY changed, so a reset mailbox is re-read in full.
+        if (state.mailbox.lastSeenUid !== undefined && summary.uid <= state.mailbox.lastSeenUid) {
+          continue;
+        }
+        // Stop reading once the budget is spent and finish on our own terms.
+        // The watermark only advances past what was actually read, so the
+        // messages left here are simply the first ones the next tick reads —
+        // deferred, not dropped.
+        if (Date.now() >= scanDeadline) {
+          deferredMessages = searchMessages.length - index;
+          warnings.push(
+            `Scan time budget (${String(Math.round(DEFAULT_SCAN_BUDGET_MS / 1000))}s) exhausted; deferred ${String(deferredMessages)} unread message(s) to the next scan.`,
+          );
+          break;
+        }
         if (typeof summary.size === "number" && summary.size > DEFAULT_IMAP_READ_MAX_BYTES) {
           warnings.push(
             `Skipped UID ${String(summary.uid)} because it exceeds the IMAP read limit.`,
@@ -248,6 +373,9 @@ export const scan = async (
         try {
           readResult = await runtime.readMail(summary.uid);
         } catch (error) {
+          // A read that died because the whole unit is being terminated is not
+          // a per-message problem either: the scan is over.
+          throwIfInterrupted();
           // A tool that disappeared mid-scan (after the preflight and the
           // search succeeded) must not be downgraded to a per-message warning:
           // the scan would then finish "ok" with a quiet-inbox result while
@@ -394,6 +522,9 @@ export const scan = async (
         }
       }
 
+      // Last checkpoint before the success write: an interrupt that landed
+      // during the final read must not turn into a "healthy" scan record.
+      throwIfInterrupted();
       const digestResult = await flushDigestIfDue(runtime, state, scanAt);
       if (digestResult.sent) {
         state.lastAlertAt = scanAt;
@@ -423,7 +554,7 @@ export const scan = async (
       // Outside the send-bearing loop but still inside the state lock, matching
       // how the digest and alert sends already work. It never throws.
       await announceDegradationIfChanged(runtime, degradation);
-      return {
+      scanResult = {
         instanceId: runtime.instanceId,
         configured: true,
         lookbackWindow: runtime.lookbackWindow,
@@ -435,6 +566,7 @@ export const scan = async (
         amberQueued,
         digestsSent: digestResult.sent ? 1 : 0,
         remindersSent: reminderAlerts.length,
+        ...(deferredMessages === 0 ? {} : { deferredMessages }),
         lastPollAt: scanAt,
         ...(warnings.length === 0
           ? {}
@@ -442,30 +574,13 @@ export const scan = async (
         alerts,
       };
     } catch (error) {
-      // A tool that vanished mid-scan (preflight passed, then searchMail or
-      // readMail hit ENOENT) gets the same honest treatment as the preflight:
-      // its own error code, retryable, no mailbox-failure counter increment.
-      const toolUnavailable = isToolUnavailableError(error);
-      state.lastError = {
-        code: toolUnavailable ? TOOL_UNAVAILABLE_ERROR_CODE : "MAIL_SENTINEL_SCAN_FAILED",
-        message: error instanceof Error ? error.message : String(error),
-        retryable: toolUnavailable,
-      };
-      if (!toolUnavailable) {
-        state.consecutiveFailures += 1;
-      }
-      // The notice has to run here too, or `scans-failing` — the state that
-      // means no mail is being retrieved at all — could never be announced.
-      const degradation = deriveDegradationState({
-        consecutiveFailures: state.consecutiveFailures,
-        lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
-        lastScanCandidates: state.lastScanCandidates ?? 0,
-        toolUnavailable,
-      });
-      state.degradationState = degradation;
-      await runtime.writeState(state);
-      await announceDegradationIfChanged(runtime, degradation);
+      await recordScanFailure(error);
       throw error;
+    } finally {
+      for (const signal of INTERRUPT_SIGNALS) {
+        process.off(signal, onInterrupt);
+      }
     }
+    return scanResult;
   });
 };

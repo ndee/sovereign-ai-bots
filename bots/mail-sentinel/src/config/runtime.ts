@@ -22,6 +22,7 @@ import {
   DEFAULT_RULES_PATH,
   DEFAULT_STATE_PATH,
   DEFAULT_TOOL_EXECUTABLE,
+  DEFAULT_TOOL_TIMEOUT_MS,
 } from "../constants.js";
 import { execFileAsync, resolveSecretRefValue } from "../imap/exec.js";
 import { buildLlmPrompt, normalizeLlmResult, quoteLobsterArg } from "../scoring/llm.js";
@@ -322,20 +323,42 @@ export class MailSentinelRuntime {
     const executable = resolveToolExecutable();
     const result = await execFileAsync(executable, [...command, ...args], {
       maxBuffer: 10 * 1024 * 1024,
-    }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
-      // A missing or non-executable tool binary is NOT a tool failure: collapse
-      // it into the generic message below and "the install shipped without
-      // sovereign-tool" (#324) becomes indistinguishable from "the mailbox is
-      // broken". Inspect the spawn error code before the message is rewritten.
-      if (error.code === "ENOENT" || error.code === "EACCES") {
-        throw createToolUnavailableError(
-          toolUnavailableMessage(executable, resolveToolExecutableSource()),
-        );
-      }
-      const stdout = typeof error.stdout === "string" ? error.stdout : "";
-      const stderr = typeof error.stderr === "string" ? error.stderr : "";
-      throw new Error(`${command.join(" ")} failed: ${stderr || stdout || error.message}`);
-    });
+      // A wedged child must fail on the scan's own terms, well before systemd's
+      // TimeoutStartSec kills the unit. SIGKILL rather than the
+      // default SIGTERM: a stuck TLS socket does not honour SIGTERM promptly.
+      timeout: DEFAULT_TOOL_TIMEOUT_MS,
+      killSignal: "SIGKILL",
+    }).catch(
+      (
+        error: NodeJS.ErrnoException & {
+          stdout?: unknown;
+          stderr?: unknown;
+          killed?: unknown;
+          signal?: unknown;
+        },
+      ) => {
+        // A missing or non-executable tool binary is NOT a tool failure: collapse
+        // it into the generic message below and "the install shipped without
+        // sovereign-tool" (#324) becomes indistinguishable from "the mailbox is
+        // broken". Inspect the spawn error code before the message is rewritten.
+        if (error.code === "ENOENT" || error.code === "EACCES") {
+          throw createToolUnavailableError(
+            toolUnavailableMessage(executable, resolveToolExecutableSource()),
+          );
+        }
+        // execFile reports its own timeout as a killed child with no exit code
+        // and (usually) empty output — name it, or the operator sees a blank
+        // "failed:" and goes looking for a mailbox problem that is not there.
+        if (error.killed === true) {
+          throw new Error(
+            `${command.join(" ")} failed: killed by ${String(error.signal ?? "signal")} after ${String(DEFAULT_TOOL_TIMEOUT_MS)}ms without completing`,
+          );
+        }
+        const stdout = typeof error.stdout === "string" ? error.stdout : "";
+        const stderr = typeof error.stderr === "string" ? error.stderr : "";
+        throw new Error(`${command.join(" ")} failed: ${stderr || stdout || error.message}`);
+      },
+    );
     const payload = JSON.parse(stripSingleTrailingNewline(String(result.stdout))) as {
       ok?: boolean;
       result?: unknown;

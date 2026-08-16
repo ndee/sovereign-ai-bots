@@ -106,6 +106,7 @@ describe("commands/status", () => {
     runtime.state.degradationState = "tool-unavailable";
     runtime.state.consecutiveFailures = 2;
     runtime.state.lastPollAt = "2026-08-04T10:00:00.000Z";
+    runtime.state.lastImapSuccessAt = "2026-08-04T09:00:00.000Z";
     runtime.state.lastError = {
       code: "MAIL_SENTINEL_TOOL_UNAVAILABLE",
       message: "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found.",
@@ -115,6 +116,9 @@ describe("commands/status", () => {
     expect(result.degradationState).toBe("tool-unavailable");
     expect(result.consecutiveFailures).toBe(2);
     expect(result.lastPollAt).toBe("2026-08-04T10:00:00.000Z");
+    // The poll time keeps advancing through an outage; this is
+    // the timestamp that says how long mail has gone untriaged.
+    expect(result.lastImapSuccessAt).toBe("2026-08-04T09:00:00.000Z");
     expect(result.lastError).toEqual({
       code: "MAIL_SENTINEL_TOOL_UNAVAILABLE",
       message: "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found.",
@@ -128,6 +132,7 @@ describe("commands/status", () => {
     const result = await status({ instance: "ms-core" });
     expect(result.degradationState).toBe("healthy");
     expect(result.lastPollAt).toBeUndefined();
+    expect(result.lastImapSuccessAt).toBeUndefined();
     expect(result.lastError).toBeUndefined();
   });
 });
@@ -162,6 +167,7 @@ describe("commands/status > formatStatusResult", () => {
         degradationState: "tool-unavailable",
         consecutiveFailures: 1,
         lastPollAt: "2026-08-04T10:00:00.000Z",
+        lastImapSuccessAt: "2026-08-04T09:00:00.000Z",
         lastError: {
           code: "MAIL_SENTINEL_TOOL_UNAVAILABLE",
           message: "IMAP tool unavailable: /opt/custom/sovereign-tool not found.",
@@ -175,6 +181,7 @@ describe("commands/status > formatStatusResult", () => {
         "Degradation state: tool-unavailable",
         "Consecutive failures: 1",
         "Last poll: 2026-08-04T10:00:00.000Z",
+        "Last successful mail retrieval: 2026-08-04T09:00:00.000Z",
         "Last error: MAIL_SENTINEL_TOOL_UNAVAILABLE: " +
           "IMAP tool unavailable: /opt/custom/sovereign-tool not found.",
         OVERRIDE_REASON,
