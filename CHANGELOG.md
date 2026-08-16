@@ -15,6 +15,35 @@ version.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mail Sentinel scans on a busy mailbox grew slower with every 30-minute tick
+  until they ran into the scan unit's `TimeoutStartSec=300` and were SIGKILLed,
+  leaving the mailbox silently untriaged. The bounded `SINCE <date>` search
+  (bots#142) is day-granular, so it returns the same 24–48h of mail on every
+  tick — and the scan re-read every one of those messages (a fresh IMAP
+  connection plus a full body download each) before deciding it already knew
+  them. Reads are now bounded by the UID watermark: anything at or below
+  `lastSeenUid` is never re-fetched, so a steady-state scan reads only mail
+  that arrived since the last tick. A UIDVALIDITY change still re-reads the
+  mailbox in full.
+- A scan now finishes on its own terms instead of the supervisor's: every
+  sovereign-tool child is bounded by a 60s per-call timeout, and the
+  per-message loop stops reading once a 180s budget is spent, deferring the
+  remaining (higher-UID) messages to the next tick via the watermark. Deferrals
+  are reported as `deferredMessages` plus a warning.
+- A scan killed by `SIGTERM` (systemd's `TimeoutStartSec`, an operator's
+  Ctrl-C) used to die before it could persist anything, so exactly the scans
+  that hung long enough to be killed were never counted: `consecutiveFailures`
+  under-reported outages and the degradation notice fired late or not at all.
+  The scan now records the failure the moment the signal lands
+  (`lastError.code: MAIL_SENTINEL_SCAN_INTERRUPTED`), then unwinds normally so
+  the state lock is released and the CLI exits non-zero. The recording is
+  idempotent, so the dying tool child and the signal never double-count.
+- `status` now also reports `lastImapSuccessAt` ("Last successful mail
+  retrieval"): `lastPollAt` keeps advancing through an outage, whereas this is
+  the timestamp that says how long mail has actually gone untriaged.
+
 ## [2.0.9] - 2026-08-16
 
 Mail Sentinel 2.0.9 — semantic review survives a polluted stdout (bots#144).

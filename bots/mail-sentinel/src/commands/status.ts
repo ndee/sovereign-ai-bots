@@ -26,6 +26,13 @@ export interface StatusCommandResult {
   readonly degradationState: string;
   readonly consecutiveFailures: number;
   readonly lastPollAt?: string;
+  /**
+   * When mail was last actually retrieved. `lastPollAt` only says a scan
+   * *started*; during an outage it keeps advancing every tick while this one
+   * stands still — so this is the number that says how long mail has gone
+   * untriaged.
+   */
+  readonly lastImapSuccessAt?: string;
   readonly lastError?: StateErrorInfo;
 }
 
@@ -48,6 +55,9 @@ export const status = async (
     degradationState: state.degradationState ?? "healthy",
     consecutiveFailures: state.consecutiveFailures,
     ...(state.lastPollAt === undefined ? {} : { lastPollAt: state.lastPollAt }),
+    ...(state.lastImapSuccessAt === undefined
+      ? {}
+      : { lastImapSuccessAt: state.lastImapSuccessAt }),
     ...(state.lastError === undefined ? {} : { lastError: state.lastError }),
   };
 };
@@ -62,6 +72,9 @@ export const formatStatusResult = (result: StatusCommandResult): string => {
   ];
   if (result.lastPollAt !== undefined) {
     lines.push(`Last poll: ${result.lastPollAt}`);
+  }
+  if (result.lastImapSuccessAt !== undefined) {
+    lines.push(`Last successful mail retrieval: ${result.lastImapSuccessAt}`);
   }
   if (result.lastError !== undefined) {
     lines.push(`Last error: ${result.lastError.code}: ${result.lastError.message}`);

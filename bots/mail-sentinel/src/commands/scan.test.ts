@@ -1099,3 +1099,219 @@ describe("commands/scan > flushDigestIfDue", () => {
     expect(runtime.state.digest.pendingAmber).toEqual([]);
   });
 });
+
+describe("commands/scan > watermark reads, time budget, and interruption", () => {
+  const readMailFor = (runtime: ReturnType<typeof setupRuntimeForScan>) => {
+    const read = vi.fn(async (selector: unknown) => ({
+      message: {
+        uid: Number(selector),
+        messageId: `<m${String(selector)}@ex>`,
+        from: ["Alice <alice@example.com>"],
+        subject: `Invoice #${String(selector)}`,
+        text: "Please pay $500 for invoice.",
+        headers: [],
+      },
+    }));
+    runtime.readMail = read as unknown as typeof runtime.readMail;
+    return read;
+  };
+  const threeMessages = () => ({
+    messages: [10, 20, 30].map((uid) => ({
+      uid,
+      size: 1000,
+      messageId: `<m${String(uid)}@ex>`,
+      from: ["Alice <alice@example.com>"],
+      subject: `Invoice #${String(uid)}`,
+    })),
+  });
+
+  beforeEach(() => {
+    resetFakeRuntime();
+    toolAvailabilityRef.current = {
+      ok: true,
+      executable: "/usr/local/bin/sovereign-tool",
+      source: "default",
+    };
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not re-read messages at or below the watermark", async () => {
+    // The day-granular SINCE search returns the same 24–48h of
+    // mail every tick; re-reading all of it (one IMAP connection + full body
+    // each) is what ramped scan time into the supervisor's ceiling.
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 20;
+    runtime.searchMail = async () => threeMessages();
+    const read = readMailFor(runtime);
+    const result = await scan({ instance: "ms-core" });
+    expect(read.mock.calls.map(([selector]) => selector)).toEqual([30]);
+    expect(result.processedMessages).toBe(3);
+    expect(result.newMessages).toBe(1);
+    expect(runtime.state.mailbox.lastSeenUid).toBe(30);
+  });
+
+  it("re-reads everything after a UIDVALIDITY change even with a high stored watermark", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 999;
+    runtime.state.mailbox.uidValidity = "111";
+    runtime.searchMail = async () => ({ ...threeMessages(), uidValidity: "222" });
+    const read = readMailFor(runtime);
+    await scan({ instance: "ms-core" });
+    expect(read.mock.calls.map(([selector]) => selector)).toEqual([10, 20, 30]);
+    expect(runtime.state.mailbox.lastSeenUid).toBe(30);
+  });
+
+  it("stops reading once the scan budget is spent and defers the rest to the next scan", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.searchMail = async () => threeMessages();
+    const read = readMailFor(runtime);
+    read.mockImplementationOnce(async (selector: unknown) => {
+      // The first read is slow enough to burn the whole budget.
+      vi.setSystemTime(new Date(FIXED_NOW.getTime() + 181_000));
+      return {
+        message: {
+          uid: Number(selector),
+          messageId: `<m${String(selector)}@ex>`,
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #10",
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      };
+    });
+    const result = await scan({ instance: "ms-core" });
+    expect(read.mock.calls.map(([selector]) => selector)).toEqual([10]);
+    expect(result.deferredMessages).toBe(2);
+    expect(result.warningCount).toBe(1);
+    expect(result.note).toContain(
+      "Scan time budget (180s) exhausted; deferred 2 unread message(s)",
+    );
+    // The scan finished on its own terms: a success, watermark only past what
+    // was actually read, so UIDs 20 and 30 are the next scan's first reads.
+    expect(runtime.state.mailbox.lastSeenUid).toBe(10);
+    expect(runtime.state.consecutiveFailures).toBe(0);
+    expect(runtime.state.lastImapSuccessAt).toBeDefined();
+  });
+
+  it("omits deferredMessages when the whole search fit inside the budget", async () => {
+    const runtime = setupRuntimeForScan();
+    const result = await scan({ instance: "ms-core" });
+    expect(result).not.toHaveProperty("deferredMessages");
+  });
+
+  it("records a SIGTERM as exactly one interrupted failure, even though the body also fails", async () => {
+    // systemd's TimeoutStartSec SIGTERMs the whole cgroup, so
+    // the tool child dies (readMail rejects) at the same moment the parent gets
+    // the signal. Both paths must not each count a failure.
+    const runtime = setupRuntimeForScan();
+    const writes = vi.spyOn(runtime, "writeState");
+    runtime.readMail = async () => {
+      process.emit("SIGTERM", "SIGTERM");
+      await Promise.resolve();
+      throw new Error("imap-read-mail failed: killed");
+    };
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("interrupted by SIGTERM");
+    expect(runtime.state.consecutiveFailures).toBe(1);
+    expect(runtime.state.lastError).toEqual({
+      code: "MAIL_SENTINEL_SCAN_INTERRUPTED",
+      message: "Scan interrupted by SIGTERM before it completed; mail was not triaged this run.",
+      retryable: false,
+    });
+    expect(writes).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the message loop after an interrupt even when the current read survives", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.state.mailbox.lastSeenUid = 5;
+    runtime.searchMail = async () => threeMessages();
+    const read = readMailFor(runtime);
+    read.mockImplementationOnce(async (selector: unknown) => {
+      process.emit("SIGINT", "SIGINT");
+      return {
+        message: {
+          uid: Number(selector),
+          messageId: "<m10@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #10",
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      };
+    });
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("interrupted by SIGINT");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(runtime.state.consecutiveFailures).toBe(1);
+    expect(runtime.state.lastError?.code).toBe("MAIL_SENTINEL_SCAN_INTERRUPTED");
+  });
+
+  it("does not record a healthy scan when the interrupt lands during the final read", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.readMail = async () => {
+      process.emit("SIGTERM", "SIGTERM");
+      return {
+        message: {
+          uid: 10,
+          messageId: "<m1@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #1",
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      };
+    };
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("interrupted by SIGTERM");
+    expect(runtime.state.consecutiveFailures).toBe(1);
+    expect(runtime.state.lastImapSuccessAt).toBeUndefined();
+    expect(runtime.state.degradationState).toBe("healthy");
+  });
+
+  it("aborts right after the search when the interrupt lands during it", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => {
+      process.emit("SIGTERM", "SIGTERM");
+      return threeMessages();
+    };
+    const read = readMailFor(runtime);
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("interrupted by SIGTERM");
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("swallows a failing state write on the signal path and still unwinds the body", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.writeState = async () => {
+      throw new Error("disk full");
+    };
+    runtime.readMail = async () => {
+      process.emit("SIGTERM", "SIGTERM");
+      await Promise.resolve();
+      throw new Error("imap-read-mail failed: killed");
+    };
+    // The body's own failure path finds the failure already recorded and
+    // rethrows the interruption; the handler's rejected write never surfaces.
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("interrupted by SIGTERM");
+    expect(runtime.state.consecutiveFailures).toBe(1);
+  });
+
+  it("removes its signal listeners once the scan is over", async () => {
+    const before = process.listenerCount("SIGTERM") + process.listenerCount("SIGINT");
+    const runtime = setupRuntimeForScan();
+    await scan({ instance: "ms-core" });
+    expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
+    runtime.searchMail = async () => {
+      throw new Error("imap down");
+    };
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap down");
+    expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
+    // Even when recording the failure itself blows up.
+    runtime.writeState = async () => {
+      throw new Error("disk full");
+    };
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("disk full");
+    expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
+  });
+});

@@ -18,6 +18,21 @@ export const DEFAULT_STATE_LOCK_RETRY_DELAY_MS = 50;
 export const DEFAULT_STATE_LOCK_RETRY_ATTEMPTS = 600;
 export const DEFAULT_STATE_LOCK_STALE_MS = 5 * 60 * 1000;
 export const DEFAULT_TOOL_EXECUTABLE = "/usr/local/bin/sovereign-tool";
+// Per-invocation ceiling for a sovereign-tool child (imap-search-mail,
+// imap-read-mail). The tool has its own imapflow connect/greeting/socket
+// timeouts, but they are *idle* timeouts on one socket; a child that keeps
+// trickling bytes, or wedges outside imapflow entirely, would otherwise hold
+// the scan open until systemd's TimeoutStartSec kills the whole unit.
+// Sized so a 5 MB message still fits comfortably.
+export const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
+// Wall-clock budget for the per-message body of one scan (reads + semantic
+// review). The scan unit runs under `TimeoutStartSec=300` (sovereign-bot.json);
+// once the budget is spent the scan stops reading, defers the remaining
+// (higher-UID) messages to the next timer tick via the watermark, and finishes
+// on its own terms — instead of being SIGKILLed mid-write and losing both the
+// progress and the failure bookkeeping. Worst case after the last budget check
+// is one tool call (60s) plus one LLM review (30s), still under the ceiling.
+export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 export const DEFAULT_AGENT_ID = "mail-sentinel";
 export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
 export const DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b";

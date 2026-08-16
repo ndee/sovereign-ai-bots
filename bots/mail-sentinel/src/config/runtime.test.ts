@@ -390,6 +390,58 @@ describe("config/runtime", () => {
       }
     });
 
+    // A wedged child must fail on the scan's own terms, well
+    // before systemd's TimeoutStartSec kills the unit.
+    it("bounds every tool child with a per-call timeout and SIGKILL", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({ stdout: "{}", stderr: "" });
+      const previous = setExecFileAsync(runner);
+      try {
+        await runtime.runTool(["imap-search-mail"], []);
+      } finally {
+        setExecFileAsync(previous);
+      }
+      expect(runner.mock.calls[0]?.[2]).toMatchObject({
+        timeout: 60_000,
+        killSignal: "SIGKILL",
+      });
+    });
+
+    it("names a child killed by the per-call timeout instead of reporting a blank failure", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockRejectedValue(
+        Object.assign(new Error("Command failed"), {
+          killed: true,
+          signal: "SIGKILL",
+          stdout: "",
+          stderr: "",
+        }),
+      );
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.runTool(["imap-read-mail"], [])).rejects.toThrow(
+          "imap-read-mail failed: killed by SIGKILL after 60000ms without completing",
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("still names a killed child when the signal is not reported", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("Command failed"), { killed: true }));
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.runTool(["imap-read-mail"], [])).rejects.toThrow(
+          "imap-read-mail failed: killed by signal after 60000ms without completing",
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
     it("uses DEFAULT_TOOL_EXECUTABLE when SOVEREIGN_TOOL_EXECUTABLE is unset", async () => {
       delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
       const runtime = await loadRuntime();
