@@ -15,6 +15,11 @@ version.
 
 ## [Unreleased]
 
+## [2.0.10-test.1] - 2026-08-16
+
+Mail Sentinel 2.0.10-test.1 — test-channel canary for the scan ramp and the
+lost-SIGTERM failure record (pro#341, pro#342 / bots#146).
+
 ### Fixed
 
 - Mail Sentinel scans on a busy mailbox grew slower with every 30-minute tick
@@ -123,7 +128,8 @@ Bootstrap release formalizing the semantic versioning scheme for this project.
 See the [v2.0.0 GitHub Release](https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0)
 for details.
 
-[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.9...HEAD
+[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.10-test.1...HEAD
+[2.0.10-test.1]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.10-test.1
 [2.0.9]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.9
 [2.0.8]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.8
 [2.0.7]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.7
