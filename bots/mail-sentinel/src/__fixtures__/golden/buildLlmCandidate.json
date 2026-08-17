@@ -1,7 +1,7 @@
 {
-  "subject": "Invoice #123 for $500",
-  "from": "Alice <alice@example.com>",
-  "snippet": "Please pay this invoice. Amount: $500",
+  "subject": "<untrusted_email>Invoice #123 for $500</untrusted_email>",
+  "from": "<untrusted_email>Alice <alice@example.com></untrusted_email>",
+  "snippet": "<untrusted_email>Please pay this invoice. Amount: $500</untrusted_email>",
   "threadContext": [],
   "heuristicSignals": {
     "candidateScore": 5,
