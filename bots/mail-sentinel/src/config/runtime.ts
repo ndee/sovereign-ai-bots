@@ -48,6 +48,11 @@ import {
   parseRuntimeConfigDocument,
   resolveRelativeToBase,
 } from "../util/paths.js";
+import {
+  describeLobsterNotFound,
+  type LobsterResolution,
+  resolveLobsterExecutable,
+} from "./lobster.js";
 
 const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
 
@@ -523,8 +528,21 @@ export class MailSentinelRuntime {
     }
   }
 
+  /**
+   * Resolved once per process (#150): the candidates do not change between
+   * classifications, and a scan may review many messages with several retries
+   * each.
+   */
+  private lobsterResolution: Promise<LobsterResolution> | undefined;
+
+  private resolveLobster(): Promise<LobsterResolution> {
+    this.lobsterResolution ??= resolveLobsterExecutable();
+    return this.lobsterResolution;
+  }
+
   private async runClassifyPipeline(pipeline: string): Promise<LlmResult> {
-    const result = await execFileAsync("lobster", [pipeline], {
+    const lobster = await this.resolveLobster();
+    const result = await execFileAsync(lobster.executable, [pipeline], {
       cwd: this.workspaceDir,
       timeout: this.llmTimeoutMs,
       maxBuffer: 10 * 1024 * 1024,
@@ -534,6 +552,11 @@ export class MailSentinelRuntime {
         ...(this.openclawToken === undefined ? {} : { CLAWD_TOKEN: this.openclawToken }),
       },
     }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
+      // A missing binary is an install/PATH defect, not a classifier fault
+      // (#150): say where we looked, so SAN-LLM-001 points at the right thing.
+      if (error.code === "ENOENT") {
+        throw new Error(`lobster classification failed: ${describeLobsterNotFound(lobster)}`);
+      }
       const stdout = typeof error.stdout === "string" ? error.stdout : "";
       const stderr = typeof error.stderr === "string" ? error.stderr : "";
       throw new Error(`lobster classification failed: ${stderr || stdout || error.message}`);

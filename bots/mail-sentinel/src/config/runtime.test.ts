@@ -79,6 +79,7 @@ const makeRuntimeConfig = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("config/runtime", () => {
+  const originalPath = process.env.PATH;
   beforeEach(() => {
     readFile.mockReset();
     writeFile.mockReset();
@@ -86,10 +87,15 @@ describe("config/runtime", () => {
     access.mockReset();
     process.env.MAIL_SENTINEL_TEST_TOKEN = "test-token";
     process.env.SOVEREIGN_TOOL_EXECUTABLE = "/usr/bin/sovereign-tool";
+    // Pin the lobster executable (#150) so these tests stay independent of the
+    // runner's PATH / passwd home; resolution itself is covered in lobster.test.ts.
+    process.env.SOVEREIGN_LOBSTER_EXECUTABLE = "lobster";
   });
   afterEach(() => {
     delete process.env.MAIL_SENTINEL_TEST_TOKEN;
     delete process.env.SOVEREIGN_TOOL_EXECUTABLE;
+    delete process.env.SOVEREIGN_LOBSTER_EXECUTABLE;
+    process.env.PATH = originalPath;
   });
 
   describe("load", () => {
@@ -1054,6 +1060,84 @@ describe("config/runtime", () => {
         await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
           "lobster classification failed: crashed",
         );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    // #150: on web/Pi installs lobster lives only in the service user's npm
+    // prefix, which the scan unit's PATH does not include. The runtime must
+    // exec the resolved path and, when nothing resolves, say where it looked.
+    it("execs the resolved lobster path and resolves it once per runtime", async () => {
+      delete process.env.SOVEREIGN_LOBSTER_EXECUTABLE;
+      process.env.PATH = "/nonexistent/bin";
+      const resolvedPath = "/nonexistent/bin/lobster";
+      // Only the lobster probe succeeds; every other access() call rejects.
+      access.mockImplementation(async (path: string) => {
+        if (path !== resolvedPath) {
+          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        }
+      });
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify([
+          { details: { json: { confidence: 10, suggested_zone: "amber" } } },
+        ]),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await runtime.classifyCandidate(sampleCandidate);
+        await runtime.classifyCandidate(sampleCandidate);
+        expect(runner).toHaveBeenCalledTimes(2);
+        expect(runner.mock.calls[0]?.[0]).toBe(resolvedPath);
+        expect(runner.mock.calls[1]?.[0]).toBe(resolvedPath);
+        // Resolution is memoised: the probe ran for the first classification only.
+        const lobsterProbes = access.mock.calls.filter((call) => call[0] === resolvedPath);
+        expect(lobsterProbes).toHaveLength(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("explains a spawn ENOENT with the override it was given", async () => {
+      process.env.SOVEREIGN_LOBSTER_EXECUTABLE = "/opt/missing/lobster";
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("spawn /opt/missing/lobster ENOENT"), { code: "ENOENT" }),
+        );
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          "lobster classification failed: lobster CLI not found at /opt/missing/lobster (configured via SOVEREIGN_LOBSTER_EXECUTABLE)",
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("explains a spawn ENOENT with the locations it searched", async () => {
+      delete process.env.SOVEREIGN_LOBSTER_EXECUTABLE;
+      process.env.PATH = "/nonexistent/bin";
+      access.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("spawn lobster ENOENT"), { code: "ENOENT" }));
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+          /lobster classification failed: lobster CLI not found \(searched: \/nonexistent\/bin\/lobster, .*\/usr\/bin\/lobster\); install @clawdbot\/lobster/,
+        );
+        expect(runner.mock.calls[0]?.[0]).toBe("lobster");
       } finally {
         setExecFileAsync(previous);
       }
