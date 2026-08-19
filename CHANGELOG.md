@@ -15,6 +15,15 @@ version.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mail Sentinel announced "back to normal" while the semantic reviewer was
+  still broken: a scan with no candidate mail reset the degradation state to
+  healthy, so a permanently failing reviewer produced `⚠️ SAN-LLM-001` /
+  `✅ back to normal` on alternating ticks (bots#151). A quiet scan is no
+  evidence either way — `classification-degraded` now persists until a scan
+  actually classifies a candidate without failure.
+
 ## [2.0.10] - 2026-08-16
 
 Mail Sentinel 2.0.10 — scans stay bounded as the mailbox grows (bots#146,

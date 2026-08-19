@@ -764,6 +764,42 @@ describe("commands/scan", () => {
       expect(runtime.state.degradationState).toBe("healthy");
     });
 
+    // #151: the flapping seen on cathouse-pi — a degraded reviewer, then a
+    // quiet tick, then "back to normal" while the reviewer was still dead.
+    it("does not announce recovery on a quiet scan after a degraded one", async () => {
+      const runtime = await useRealStatePath(setupRuntimeForScan());
+      runtime.classifyCandidate = failingLlm();
+      const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.degradationState).toBe("classification-degraded");
+
+      // Next tick: nothing new in the mailbox, reviewer still broken.
+      runtime.searchMail = async () => ({ messages: [] });
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.lastScanCandidates).toBe(0);
+      expect(runtime.state.lastScanLlmFailures).toBe(0);
+      expect(runtime.state.degradationState).toBe("classification-degraded");
+      const bodies = send.mock.calls.map((call) => {
+        const message = call[0] as string | { body: string };
+        return typeof message === "string" ? message : message.body;
+      });
+      expect(bodies.filter((body) => body.includes("classification degraded"))).toHaveLength(1);
+      expect(bodies.some((body) => body.includes("back to normal"))).toBe(false);
+    });
+
+    it("keeps classification-degraded across a failed scan below the threshold", async () => {
+      const runtime = setupRuntimeForScan();
+      runtime.state.degradationState = "classification-degraded";
+      runtime.state.lastScanCandidates = 0;
+      runtime.state.lastScanLlmFailures = 0;
+      runtime.searchMail = async () => {
+        throw new Error("imap blip");
+      };
+      await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap blip");
+      expect(runtime.state.consecutiveFailures).toBe(1);
+      expect(runtime.state.degradationState).toBe("classification-degraded");
+    });
+
     it("clears the counters and reports healthy when IMAP is unconfigured", async () => {
       const runtime = getFakeRuntime();
       runtime.imapConfigured = false;

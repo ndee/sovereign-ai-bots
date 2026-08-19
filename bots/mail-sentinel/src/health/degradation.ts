@@ -54,6 +54,16 @@ export interface DegradationInput {
    * (#324). Defaults to false so existing call sites keep their behaviour.
    */
   toolUnavailable?: boolean;
+  /**
+   * The state recorded by the previous scan (`state.degradationState`). Used
+   * for hysteresis on the reviewer (#151): a scan that evaluated no candidate
+   * is not evidence that a degraded reviewer recovered — it is no evidence at
+   * all — so it must not flip `classification-degraded` back to `healthy`.
+   * Optional so callers without a previous observation keep today's behaviour.
+   * Typed as the persisted string (the state file carries it untyped); only an
+   * exact `classification-degraded` is acted on.
+   */
+  previousState?: string | undefined;
 }
 
 export const deriveDegradationState = (input: DegradationInput): DegradationState => {
@@ -71,6 +81,17 @@ export const deriveDegradationState = (input: DegradationInput): DegradationStat
     return "scans-failing";
   }
   if (input.lastScanLlmFailures >= 1 && input.lastScanCandidates >= 1) {
+    return "classification-degraded";
+  }
+  // The zero-candidate guard above keeps an idle mailbox from being *reported*
+  // as degraded. Symmetrically, an idle scan cannot *clear* a degraded
+  // reviewer: nothing was classified, so nothing is known. Without this, a
+  // permanently broken reviewer (e.g. the lobster CLI missing, #150) produced
+  // "classification degraded" / "back to normal" on alternating ticks — the
+  // recovery notice firing on every quiet scan while every real candidate
+  // still came back as "semantic reviewer unavailable". Recovery now needs a
+  // scan that actually classified a candidate without failure.
+  if (input.lastScanCandidates < 1 && input.previousState === "classification-degraded") {
     return "classification-degraded";
   }
   return "healthy";
