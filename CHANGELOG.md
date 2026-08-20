@@ -17,6 +17,16 @@ version.
 
 ### Fixed
 
+- Mail Sentinel's semantic reviewer was permanently unavailable on nodes where
+  the `lobster` CLI only lives in the service user's npm prefix
+  (`<passwd home>/.npm-global/bin`, where the node installer puts it — Pro web
+  installer, Pi image): the scan unit's fixed system `PATH` does not contain
+  that directory, so every classification failed with `spawn lobster ENOENT`
+  and every candidate was capped at amber with "semantic reviewer unavailable"
+  (bots#150). The runtime now resolves the executable — `SOVEREIGN_LOBSTER_EXECUTABLE`
+  override, `PATH`, the service user's npm prefix, `$HOME/.npm-global/bin`,
+  `/usr/local/bin`, `/usr/bin` — and a missing binary is reported with the
+  locations that were searched instead of the bare `ENOENT`.
 - Mail Sentinel gave the IMAP search that opens every scan exactly one shot.
   Against a remote provider (Gmail on cathouse-pi) the same small `SINCE`
   search answered anywhere between 3 s and well past the 60 s per-call
