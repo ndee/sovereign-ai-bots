@@ -45,7 +45,9 @@ vi.mock("node:crypto", async () => {
 });
 
 const { flushDigestIfDue, scan } = await import("./scan.js");
-const { createToolUnavailableError } = await import("../config/runtime.js");
+const { createToolUnavailableError, TOOL_UNAVAILABLE_ERROR_CODE } = await import(
+  "../config/runtime.js"
+);
 
 const TOOL_UNAVAILABLE_REASON =
   "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
@@ -305,11 +307,16 @@ describe("commands/scan", () => {
 
   it("rethrows an error from the IMAP pipeline after recording it on state.lastError", async () => {
     const runtime = setupRuntimeForScan();
-    runtime.searchMail = async () => {
+    const searchMail = vi.fn(async () => {
       throw new Error("imap down");
-    };
-    await expect(scan({ instance: "ms-core" })).rejects.toThrow("imap down");
-    expect(runtime.state.lastError?.message).toBe("imap down");
+    });
+    runtime.searchMail = searchMail;
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow(
+      "IMAP search failed after 2 attempts: imap down",
+    );
+    // bots#152: one retry on a fresh connection before the scan is failed.
+    expect(searchMail).toHaveBeenCalledTimes(2);
+    expect(runtime.state.lastError?.message).toBe("IMAP search failed after 2 attempts: imap down");
     expect(runtime.state.consecutiveFailures).toBe(1);
   });
 
@@ -318,8 +325,63 @@ describe("commands/scan", () => {
     runtime.searchMail = async () => {
       throw "string-imap-failure";
     };
-    await expect(scan({ instance: "ms-core" })).rejects.toBe("string-imap-failure");
-    expect(runtime.state.lastError?.message).toBe("string-imap-failure");
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow(
+      "IMAP search failed after 2 attempts: string-imap-failure",
+    );
+    expect(runtime.state.lastError?.message).toBe(
+      "IMAP search failed after 2 attempts: string-imap-failure",
+    );
+  });
+
+  it("stringifies a non-Error thrown elsewhere in the scan body", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.readRules = async () => {
+      throw "rules-exploded";
+    };
+    await expect(scan({ instance: "ms-core" })).rejects.toBe("rules-exploded");
+    expect(runtime.state.lastError?.message).toBe("rules-exploded");
+  });
+
+  // bots#152: a remote provider (Gmail) stalls roughly every other connection;
+  // the second attempt on a fresh connection must carry the scan, and the
+  // late answer must be visible as a warning — not as a failed scan.
+  it("recovers the scan when the IMAP search succeeds on the second attempt", async () => {
+    const runtime = setupRuntimeForScan();
+    const original = runtime.searchMail;
+    let calls = 0;
+    runtime.searchMail = async (limit) => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error(
+          "imap-search-mail failed: killed by SIGKILL after 60000ms without completing",
+        );
+      }
+      return original(limit);
+    };
+    const result = await scan({ instance: "ms-core" });
+    expect(calls).toBe(2);
+    expect(result.processedMessages).toBe(1);
+    expect(result.warningCount).toBe(1);
+    expect(result.note).toBe(
+      "IMAP search attempt 1/2 failed (imap-search-mail failed: killed by SIGKILL after 60000ms without completing); retrying on a fresh connection.",
+    );
+    expect(runtime.state.consecutiveFailures).toBe(0);
+    expect(runtime.state.lastError).toBeUndefined();
+  });
+
+  it("does not retry the IMAP search when the tool itself is unavailable", async () => {
+    const runtime = setupRuntimeForScan();
+    const searchMail = vi.fn(async () => {
+      throw createToolUnavailableError(
+        "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found.",
+      );
+    });
+    runtime.searchMail = searchMail;
+    await expect(scan({ instance: "ms-core" })).rejects.toThrow("IMAP tool unavailable");
+    expect(searchMail).toHaveBeenCalledTimes(1);
+    expect(runtime.state.lastError?.code).toBe(TOOL_UNAVAILABLE_ERROR_CODE);
+    // Not a mailbox failure: the counter must not move.
+    expect(runtime.state.consecutiveFailures).toBe(0);
   });
 
   it("handles a non-Error thrown during readMail", async () => {
