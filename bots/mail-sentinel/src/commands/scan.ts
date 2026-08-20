@@ -17,6 +17,7 @@ import {
 } from "../config/runtime.js";
 import {
   DEFAULT_IMAP_READ_MAX_BYTES,
+  DEFAULT_IMAP_SEARCH_ATTEMPTS,
   DEFAULT_IMAP_SEARCH_LIMIT,
   DEFAULT_SCAN_BUDGET_MS,
 } from "../constants.js";
@@ -98,6 +99,44 @@ const describeInterruption = (signal: NodeJS.Signals): string =>
 
 const createInterruptedError = (signal: NodeJS.Signals): Error =>
   Object.assign(new Error(describeInterruption(signal)), { code: SCAN_INTERRUPTED_ERROR_CODE });
+
+const describeError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * The search that opens every scan, with one retry on a fresh connection
+ * (bots#152). Only transient failures are retried: a tool that is missing
+ * (`isToolUnavailableError`) can never succeed on a second try and must reach
+ * the outer catch unchanged, and a scan that is being terminated stops here.
+ * Each failed attempt is recorded as a warning so the scan output (and the
+ * journal) shows that the mailbox answered late, not that it was never asked.
+ */
+const searchMailWithRetry = async (
+  runtime: MailSentinelRuntime,
+  warnings: string[],
+  throwIfInterrupted: () => void,
+): Promise<Awaited<ReturnType<MailSentinelRuntime["searchMail"]>>> => {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DEFAULT_IMAP_SEARCH_ATTEMPTS; attempt += 1) {
+    try {
+      return await runtime.searchMail(DEFAULT_IMAP_SEARCH_LIMIT);
+    } catch (error) {
+      throwIfInterrupted();
+      if (isToolUnavailableError(error)) {
+        throw error;
+      }
+      lastError = error;
+      if (attempt < DEFAULT_IMAP_SEARCH_ATTEMPTS) {
+        warnings.push(
+          `IMAP search attempt ${String(attempt)}/${String(DEFAULT_IMAP_SEARCH_ATTEMPTS)} failed (${describeError(error)}); retrying on a fresh connection.`,
+        );
+      }
+    }
+  }
+  throw new Error(
+    `IMAP search failed after ${String(DEFAULT_IMAP_SEARCH_ATTEMPTS)} attempts: ${describeError(lastError)}`,
+  );
+};
 
 export interface ScanCommandResult {
   instanceId: string;
@@ -305,12 +344,12 @@ export const scan = async (
         }
       }
 
-      const searchResult = await runtime.searchMail(DEFAULT_IMAP_SEARCH_LIMIT);
+      const warnings: string[] = [];
+      const searchResult = await searchMailWithRetry(runtime, warnings, throwIfInterrupted);
       throwIfInterrupted();
       const searchMessages = Array.isArray(searchResult.messages)
         ? searchResult.messages.slice().sort((left, right) => left.uid - right.uid)
         : [];
-      const warnings: string[] = [];
       const observedUidValidity = searchResult.uidValidity;
       if (observedUidValidity !== undefined) {
         const previousUidValidity = state.mailbox.uidValidity;
