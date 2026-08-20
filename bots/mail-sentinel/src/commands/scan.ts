@@ -245,6 +245,7 @@ export const scan = async (
         lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
         lastScanCandidates: state.lastScanCandidates ?? 0,
         toolUnavailable: true,
+        previousState: state.degradationState,
       });
       state.degradationState = degradation;
       await runtime.writeState(state);
@@ -294,6 +295,7 @@ export const scan = async (
         lastScanLlmFailures: state.lastScanLlmFailures ?? 0,
         lastScanCandidates: state.lastScanCandidates ?? 0,
         toolUnavailable,
+        previousState: state.degradationState,
       });
       state.degradationState = degradation;
       await runtime.writeState(state);
@@ -587,6 +589,9 @@ export const scan = async (
         consecutiveFailures: state.consecutiveFailures,
         lastScanLlmFailures: llmFailures,
         lastScanCandidates: llmCandidates,
+        // #151: a quiet scan must not clear a degraded reviewer; only a scan
+        // that classified something without failure does.
+        previousState: state.degradationState,
       });
       state.degradationState = degradation;
       await runtime.writeState(state);

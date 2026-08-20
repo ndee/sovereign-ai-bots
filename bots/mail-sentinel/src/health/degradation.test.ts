@@ -40,6 +40,62 @@ describe("health/degradation > deriveDegradationState", () => {
     expect(derive({ lastScanCandidates: 0, lastScanLlmFailures: 3 })).toBe("healthy");
   });
 
+  // #151: a quiet scan is no evidence either way. With a permanently broken
+  // reviewer this flapped "degraded" / "back to normal" on alternating ticks.
+  describe("reviewer hysteresis", () => {
+    it("keeps classification-degraded across a scan with no candidates", () => {
+      expect(
+        derive({
+          previousState: "classification-degraded",
+          lastScanCandidates: 0,
+          lastScanLlmFailures: 0,
+        }),
+      ).toBe("classification-degraded");
+    });
+
+    it("recovers once a candidate was classified without failure", () => {
+      expect(
+        derive({
+          previousState: "classification-degraded",
+          lastScanCandidates: 1,
+          lastScanLlmFailures: 0,
+        }),
+      ).toBe("healthy");
+    });
+
+    it("stays degraded when the next candidate fails again", () => {
+      expect(
+        derive({
+          previousState: "classification-degraded",
+          lastScanCandidates: 2,
+          lastScanLlmFailures: 1,
+        }),
+      ).toBe("classification-degraded");
+    });
+
+    it("does not stick from any other previous state", () => {
+      for (const previousState of ["healthy", "scans-failing", "tool-unavailable", undefined]) {
+        expect(derive({ previousState, lastScanCandidates: 0 })).toBe("healthy");
+      }
+    });
+
+    it("ignores an unknown persisted previous state", () => {
+      expect(derive({ previousState: "something-else", lastScanCandidates: 0 })).toBe("healthy");
+    });
+
+    it("still yields to scans-failing and tool-unavailable", () => {
+      expect(
+        derive({
+          previousState: "classification-degraded",
+          consecutiveFailures: SCANS_FAILING_THRESHOLD,
+        }),
+      ).toBe("scans-failing");
+      expect(derive({ previousState: "classification-degraded", toolUnavailable: true })).toBe(
+        "tool-unavailable",
+      );
+    });
+  });
+
   it("stays healthy below the scans-failing threshold with no LLM failures", () => {
     expect(derive({ consecutiveFailures: SCANS_FAILING_THRESHOLD - 1 })).toBe("healthy");
   });
