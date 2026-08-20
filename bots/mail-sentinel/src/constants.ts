@@ -33,6 +33,17 @@ export const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
 // progress and the failure bookkeeping. Worst case after the last budget check
 // is one tool call (60s) plus one LLM review (30s), still under the ceiling.
 export const DEFAULT_SCAN_BUDGET_MS = 180_000;
+// Attempts for the one search that opens every scan. A remote IMAP provider
+// (Gmail observed on cathouse-pi, bots#152) answers the same 3–12-message
+// `SINCE` search anywhere between 3 s and well past the per-call ceiling, on
+// a per-connection basis — and a scan had exactly one shot at it, so about
+// half of all scans failed outright and marched toward "scans-failing". A
+// second attempt on a fresh connection costs at most one more tool timeout;
+// the budget math still holds (2 × 60 s search, then reads until the 180 s
+// budget, plus one trailing read (60 s) and review (30 s) < TimeoutStartSec
+// 300 s). Reads are not retried here: a skipped read leaves the watermark
+// alone and is re-read on the next tick.
+export const DEFAULT_IMAP_SEARCH_ATTEMPTS = 2;
 export const DEFAULT_AGENT_ID = "mail-sentinel";
 export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
 export const DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b";

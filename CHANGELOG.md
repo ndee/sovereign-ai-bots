@@ -15,6 +15,17 @@ version.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mail Sentinel gave the IMAP search that opens every scan exactly one shot.
+  Against a remote provider (Gmail on cathouse-pi) the same small `SINCE`
+  search answered anywhere between 3 s and well past the 60 s per-call
+  ceiling on a per-connection basis, so roughly half of all scans failed with
+  SAN-MAIL-001 and no mail was triaged on those ticks (bots#152). The search
+  is now retried once on a fresh connection (transient failures only — a
+  missing tool is still surfaced immediately); a late first attempt shows up
+  as a scan warning, and an exhausted retry names the attempt count.
+
 ## [2.0.10] - 2026-08-16
 
 Mail Sentinel 2.0.10 — scans stay bounded as the mailbox grows (bots#146,
