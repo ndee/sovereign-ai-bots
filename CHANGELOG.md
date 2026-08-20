@@ -17,12 +17,6 @@ version.
 
 ### Fixed
 
-- Mail Sentinel announced "back to normal" while the semantic reviewer was
-  still broken: a scan with no candidate mail reset the degradation state to
-  healthy, so a permanently failing reviewer produced `⚠️ SAN-LLM-001` /
-  `✅ back to normal` on alternating ticks (bots#151). A quiet scan is no
-  evidence either way — `classification-degraded` now persists until a scan
-  actually classifies a candidate without failure.
 - Mail Sentinel gave the IMAP search that opens every scan exactly one shot.
   Against a remote provider (Gmail on cathouse-pi) the same small `SINCE`
   search answered anywhere between 3 s and well past the 60 s per-call
@@ -31,6 +25,12 @@ version.
   is now retried once on a fresh connection (transient failures only — a
   missing tool is still surfaced immediately); a late first attempt shows up
   as a scan warning, and an exhausted retry names the attempt count.
+- Mail Sentinel announced "back to normal" while the semantic reviewer was
+  still broken: a scan with no candidate mail reset the degradation state to
+  healthy, so a permanently failing reviewer produced `⚠️ SAN-LLM-001` /
+  `✅ back to normal` on alternating ticks (bots#151). A quiet scan is no
+  evidence either way — `classification-degraded` now persists until a scan
+  actually classifies a candidate without failure.
 
 ## [2.0.10] - 2026-08-16
 
