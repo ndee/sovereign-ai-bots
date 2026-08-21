@@ -15,6 +15,10 @@ version.
 
 ## [Unreleased]
 
+## [2.0.11] - 2026-08-20
+
+mail-sentinel scan reliability: lobster CLI resolution, bot-unit npm PATH, IMAP error surfacing and opening-search retry
+
 ### Fixed
 
 - Mail Sentinel's semantic reviewer was permanently unavailable on nodes where
@@ -155,7 +159,8 @@ Bootstrap release formalizing the semantic versioning scheme for this project.
 See the [v2.0.0 GitHub Release](https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0)
 for details.
 
-[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.10...HEAD
+[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.11...HEAD
+[2.0.11]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.11
 [2.0.10]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.10
 [2.0.9]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.9
 [2.0.8]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.8
