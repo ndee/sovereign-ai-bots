@@ -15,6 +15,10 @@ version.
 
 ## [Unreleased]
 
+### Added
+
+- mail-sentinel: `imapProtocol` config default (`imap`) and `protocol` tool binding so the node's read-only mail tool can serve the mailbox over POP3 as well as IMAP. Existing instances without the key keep using IMAP.
+
 ## [2.0.11] - 2026-08-20
 
 mail-sentinel scan reliability: lobster CLI resolution, bot-unit npm PATH, IMAP error surfacing and opening-search retry

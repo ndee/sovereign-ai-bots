@@ -95,7 +95,7 @@ Mail Sentinel does not train a model locally. It adapts by updating local policy
 
 Mail Sentinel requires:
 
-- an IMAP-accessible mailbox with credentials
+- a mailbox reachable over IMAP (recommended) or POP3, with its email address / username and password (usually your full email address, depending on your provider)
 - Sovereign AI Node installed on a dedicated Ubuntu host (VM, bare metal, or VPS)
 - provider credentials (OpenRouter API key) configured at the node level — see [`sovereign-ai-node`](https://github.com/ndee/sovereign-ai-node)
 
@@ -107,7 +107,7 @@ The current documented and tested path for Mail Sentinel is:
 
 - Sovereign AI Node on a dedicated Ubuntu host (VM, bare metal, or VPS)
 - Matrix as control plane (provisioned by the installer)
-- IMAP mailbox (any provider, or Proton Mail via Proton Bridge)
+- IMAP mailbox (any provider, or Proton Mail via Proton Bridge), or a POP3 mailbox (read-only; no folders — see the node's `OPERATIONS_ONBOARDING.md` for POP3 limitations)
 - provider-backed runtime path with an OpenRouter API key (configured at node level)
 
 ### Signal fields

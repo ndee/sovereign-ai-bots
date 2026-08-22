@@ -22,6 +22,7 @@
   },
   "configDefaults": {
     "imapConfigured": false,
+    "imapProtocol": "imap",
     "imapHost": "pending",
     "imapPort": 993,
     "imapTls": true,
@@ -108,6 +109,9 @@
         "equals": true
       },
       "config": {
+        "protocol": {
+          "from": "instance.config.imapProtocol"
+        },
         "host": {
           "from": "instance.config.imapHost"
         },
