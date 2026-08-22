@@ -15,6 +15,19 @@ version.
 
 ## [Unreleased]
 
+### Changed
+
+- Mail Sentinel sends the semantic reviewer only the minimum necessary payload
+  (ndee/sovereign-ai-node-pro#377, #373): thread context, policy hints, matched
+  rule ids, and the parsed amount are no longer sent; the sender is the bare
+  address (or, with `llmSenderDetail: "domain"`, the domain only); the body
+  snippet has quoted replies and signatures stripped and URLs, phone numbers,
+  and IBANs masked, capped at 300 characters. Bulk/newsletter detection and
+  sender mutes now run before the reviewer, so suppressed mail never leaves the
+  node. The candidate file is written 0600 inside a private temp directory. A
+  provider privacy-routing refusal ("No endpoints found …") is treated as a
+  classification degradation and is never retried.
+
 ## [2.0.11] - 2026-08-20
 
 mail-sentinel scan reliability: lobster CLI resolution, bot-unit npm PATH, IMAP error surfacing and opening-search retry

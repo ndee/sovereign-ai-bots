@@ -5,11 +5,12 @@ import type { LlmResult, PolicyEvaluationResult } from "../types.js";
 import {
   buildLlmCandidate,
   buildLlmPrompt,
-  buildLlmSchema,
+  buildLlmSender,
   buildUserFacingWhy,
   determineZone,
   normalizeLlmResult,
   quoteLobsterArg,
+  REVIEW_SKIPPED_BULK_REASON,
 } from "./llm.js";
 
 const llmResult = (reason: string, overrides: Partial<LlmResult> = {}): LlmResult => ({
@@ -45,10 +46,6 @@ describe("scoring/llm", () => {
 
   it("matches the buildLlmPrompt golden fixture", () => {
     expect(buildLlmPrompt()).toEqual(loadGolden("buildLlmPrompt"));
-  });
-
-  it("matches the buildLlmSchema golden fixture", () => {
-    expect(buildLlmSchema()).toEqual(loadGolden("buildLlmSchema"));
   });
 
   it("matches the normalizeLlmResult golden fixture", () => {
@@ -88,22 +85,16 @@ describe("scoring/llm", () => {
 
   it("matches the buildLlmCandidate golden fixture", () => {
     expect(
-      buildLlmCandidate(
-        sampleMessage,
-        {
-          score: 5,
-          category: "financial-relevance",
-          categoryScores: {
-            "decision-required": 0,
-            "financial-relevance": 5,
-            "risk-escalation": 0,
-          },
-          matchedRuleIds: ["rule-invoice"],
-          reasons: ["subject mentions an invoice"],
+      buildLlmCandidate(sampleMessage, {
+        score: 5,
+        category: "financial-relevance",
+        categoryScores: {
+          "decision-required": 0,
+          "financial-relevance": 5,
+          "risk-escalation": 0,
         },
-        { reasons: ["known-good"] },
-        sampleState,
-      ),
+        reasons: ["subject mentions an invoice"],
+      }),
     ).toEqual(loadGolden("buildLlmCandidate"));
   });
 
@@ -521,13 +512,86 @@ describe("scoring/llm", () => {
           "financial-relevance": 0,
           "risk-escalation": 0,
         },
-        matchedRuleIds: [],
         reasons: [],
       },
-      { reasons: [] },
-      sampleState,
     );
-    expect(result.extractedSignals.amount).toBeNull();
+    expect(result.extractedSignals.hasAmount).toBe(false);
+  });
+
+  describe("buildLlmSender / payload minimisation (pro#377)", () => {
+    const scored = {
+      score: 5,
+      category: "financial-relevance" as const,
+      categoryScores: { "financial-relevance": 5 },
+      reasons: ["subject mentions an invoice"],
+    };
+
+    it("sends the bare address by default, never the display name", () => {
+      const candidate = buildLlmCandidate(sampleMessage, scored);
+      expect(candidate.from).toBe("alice@example.com");
+      expect(JSON.stringify(candidate)).not.toContain("Alice");
+    });
+
+    it("sends only the domain when configured", () => {
+      expect(buildLlmCandidate(sampleMessage, scored, { senderDetail: "domain" }).from).toBe(
+        "example.com",
+      );
+    });
+
+    it("derives the domain from the address when the message has none", () => {
+      expect(buildLlmSender({ fromAddress: "bob@other.example" }, "domain")).toBe("other.example");
+      expect(buildLlmSender({}, "domain")).toBe("");
+      expect(buildLlmSender({}, "address")).toBe("");
+    });
+
+    it("sanitizes the line-structured body rather than the compacted snippet", () => {
+      const candidate = buildLlmCandidate(
+        {
+          ...sampleMessage,
+          bodyText: "Pay https://pay.example/x now.\n> quoted secret\n-- \nAlice +49 30 1234567",
+        },
+        scored,
+      );
+      expect(candidate.snippet).toBe("Pay <url:pay.example> now.");
+    });
+
+    it("carries no thread context, policy hints, rule ids, or amount", () => {
+      const candidate = buildLlmCandidate(sampleMessage, scored) as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(candidate).sort()).toEqual([
+        "extractedSignals",
+        "from",
+        "heuristicSignals",
+        "snippet",
+        "subject",
+      ]);
+      expect(Object.keys(candidate.heuristicSignals as object).sort()).toEqual([
+        "candidateScore",
+        "category",
+        "categoryScores",
+        "reasons",
+      ]);
+      expect(candidate.extractedSignals).toEqual({ deadlineDetected: false, hasAmount: true });
+    });
+  });
+
+  it("records the skip reason instead of 'reviewer unavailable' when the review was skipped", () => {
+    const decision = determineZone({
+      scored: {
+        score: 5,
+        categoryScores: { "financial-relevance": 5 },
+        category: "financial-relevance",
+      },
+      policyResult: neutralPolicy,
+      llmResult: null,
+      rules: sampleRules,
+      reviewSkippedReason: REVIEW_SKIPPED_BULK_REASON,
+    });
+    expect(decision.zone).toBe("amber");
+    expect(decision.reasons).toContain(REVIEW_SKIPPED_BULK_REASON);
+    expect(decision.reasons.join(" ")).not.toContain("unavailable");
   });
 
   it("handles a category with no score entry (categoryScores ?? 0)", () => {

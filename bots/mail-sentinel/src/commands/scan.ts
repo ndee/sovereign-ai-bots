@@ -11,6 +11,7 @@ import type { MailSentinelRuntime } from "../config/runtime.js";
 import {
   checkToolAvailability,
   createToolUnavailableError,
+  isLlmRoutingRefusedError,
   isToolUnavailableError,
   resolveToolRuntime,
   TOOL_UNAVAILABLE_ERROR_CODE,
@@ -27,7 +28,12 @@ import { parseMessage } from "../imap/parse.js";
 import { evaluatePolicy } from "../policy/engine.js";
 import { detectBulkSignals } from "../scoring/bulk.js";
 import { scoreMessage } from "../scoring/heuristics.js";
-import { buildLlmCandidate, buildUserFacingWhy, determineZone } from "../scoring/llm.js";
+import {
+  buildLlmCandidate,
+  buildUserFacingWhy,
+  determineZone,
+  REVIEW_SKIPPED_BULK_REASON,
+} from "../scoring/llm.js";
 import { withLockedState } from "../state/io.js";
 import { queueAmberAlert, resolvePendingAmberAlerts } from "../state/thread.js";
 import type {
@@ -369,6 +375,12 @@ export const scan = async (
       // These two counters are the only evidence that survives the loop.
       let llmFailures = 0;
       let llmCandidates = 0;
+      // pro#377: once the provider refused to route a review under the
+      // configured privacy constraints, no further candidate is sent this
+      // scan. The refusal is a policy outcome, not a transient fault, and
+      // re-sending other mail would not change it. Every candidate that would
+      // have been reviewed still counts as a failure so the scan degrades.
+      let llmRoutingRefused: string | undefined;
       const alerts: AlertSummary[] = [...reminderAlerts];
       // Watermark only ever advances past mail we actually reckoned with —
       // messages processed this scan or already seen in a prior one. Messages
@@ -476,19 +488,39 @@ export const scan = async (
           });
           continue;
         }
+        // pro#377: everything that can suppress a mail locally is evaluated
+        // BEFORE the semantic reviewer sees it. A muted sender or a detected
+        // newsletter never leaves the node.
+        const bulk = detectBulkSignals(parsed, rules.bulk);
         let llmResult: LlmResult | null = null;
-        llmCandidates += 1;
-        try {
-          llmResult = await runtime.classifyCandidate(
-            buildLlmCandidate(parsed, scored, policyResult, state),
-          );
-        } catch (error) {
+        let reviewSkippedReason: string | undefined;
+        if (policyResult.muted) {
+          // determineZone returns gray for a muted mail regardless of the
+          // reviewer, so nothing is lost by not asking.
+          reviewSkippedReason = "semantic review skipped: sender muted by policy";
+        } else if (bulk.isBulk) {
+          reviewSkippedReason = REVIEW_SKIPPED_BULK_REASON;
+        } else if (llmRoutingRefused !== undefined) {
+          llmCandidates += 1;
           llmFailures += 1;
-          warnings.push(
-            `Semantic review failed for UID ${String(parsed.uid)}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
+        } else {
+          llmCandidates += 1;
+          try {
+            llmResult = await runtime.classifyCandidate(
+              buildLlmCandidate(parsed, scored, { senderDetail: runtime.llmSenderDetail }),
+            );
+          } catch (error) {
+            llmFailures += 1;
+            const message = error instanceof Error ? error.message : String(error);
+            if (isLlmRoutingRefusedError(error)) {
+              llmRoutingRefused = message;
+              warnings.push(
+                `Semantic review refused by the model provider under the configured privacy routing; no further mail is sent to the reviewer this scan: ${message}`,
+              );
+            } else {
+              warnings.push(`Semantic review failed for UID ${String(parsed.uid)}: ${message}`);
+            }
+          }
         }
 
         const zoneDecision = determineZone({
@@ -496,7 +528,8 @@ export const scan = async (
           policyResult,
           llmResult,
           rules,
-          bulk: detectBulkSignals(parsed, rules.bulk),
+          bulk,
+          reviewSkippedReason,
         });
         // determineZone always populates at least one reason.
         state.zoneHistory.push({

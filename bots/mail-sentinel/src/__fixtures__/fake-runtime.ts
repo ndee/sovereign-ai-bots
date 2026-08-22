@@ -18,6 +18,7 @@ export class FakeMailSentinelRuntime {
   imapInstanceId = "ms-imap";
   openclawUrl = "http://localhost";
   llmModel = "test-model";
+  llmSenderDetail: "address" | "domain" = "address";
   llmTimeoutMs = 1000;
   openclawToken: string | undefined = undefined;
   matrix = { adminBaseUrl: "https://matrix.example", roomId: "!room:example", accessToken: "tok" };

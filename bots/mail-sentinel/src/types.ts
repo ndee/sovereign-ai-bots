@@ -50,6 +50,13 @@ export interface ParsedMessage {
   date?: string | undefined;
   text: string;
   snippet: string;
+  /**
+   * The body as delivered, before whitespace compaction: line structure is
+   * what lets `sanitizeSnippet` recognise quoted replies (`>` lines) and
+   * signature separators (`-- `). Never persisted; only the semantic-review
+   * payload is built from it.
+   */
+  bodyText?: string | undefined;
   headers: Record<string, string>;
   /**
    * Union of every recipient address (To + Cc fields and the to/cc/delivered-to
@@ -415,30 +422,34 @@ export interface ScoredSenderCandidate extends KnownSender {
   score: number;
 }
 
-export interface ThreadContextEntry {
-  subject: string;
-  from: string;
-  snippet: string;
-  date?: string;
-}
+/**
+ * How much of the sender the semantic reviewer is shown (pro#377).
+ * `address` sends the bare mailbox address (never the display name);
+ * `domain` sends only the part after the `@`.
+ */
+export type LlmSenderDetail = "address" | "domain";
 
+/**
+ * The minimum-necessary payload the semantic reviewer receives (pro#377).
+ * Deliberately absent: thread context (other people's mail), policy hints
+ * (the operator's own rules), matched rule ids (which embed sender
+ * addresses), and the parsed amount (a boolean is all the reviewer needs).
+ */
 export interface LlmCandidate {
   subject: string;
+  /** Bare address or bare domain, per {@link LlmSenderDetail}; never a display name. */
   from: string;
+  /** Output of `sanitizeSnippet`: quotes/signatures stripped, URLs/phones/IBANs masked, 300 chars. */
   snippet: string;
-  threadContext: ThreadContextEntry[];
   heuristicSignals: {
     candidateScore: number;
     category: string;
     categoryScores: Record<string, number>;
-    matchedRules: string[];
     reasons: string[];
   };
-  policyHints: string[];
   extractedSignals: {
     deadlineDetected: boolean;
-    amountDetected: boolean;
-    amount: number | null;
+    hasAmount: boolean;
   };
 }
 
