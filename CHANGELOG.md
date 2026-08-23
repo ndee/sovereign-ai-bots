@@ -15,6 +15,10 @@ version.
 
 ## [Unreleased]
 
+### Added
+
+- mail-sentinel: `imapProtocol` config default (`imap`) and `protocol` tool binding so the node's read-only mail tool can serve the mailbox over POP3 as well as IMAP. Existing instances without the key keep using IMAP.
+
 ### Changed
 
 - Mail Sentinel sends the semantic reviewer only the minimum necessary payload
