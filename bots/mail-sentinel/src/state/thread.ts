@@ -1,30 +1,8 @@
-import { MAX_THREAD_CONTEXT_ENTRIES } from "../constants.js";
-import type {
-  MailSentinelState,
-  ParsedMessage,
-  StoredAlert,
-  ThreadContextEntry,
-} from "../types.js";
+import type { MailSentinelState, StoredAlert } from "../types.js";
 
-export const buildThreadContext = (
-  state: MailSentinelState,
-  message: Pick<ParsedMessage, "key" | "normalizedThreadSubject">,
-): ThreadContextEntry[] =>
-  Object.values(state.messages)
-    .filter(
-      (entry) =>
-        entry.normalizedThreadSubject === message.normalizedThreadSubject &&
-        entry.key !== message.key &&
-        typeof entry.snippet === "string",
-    )
-    .sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt))
-    .slice(0, MAX_THREAD_CONTEXT_ENTRIES)
-    .map((entry) => ({
-      subject: entry.subject,
-      from: entry.from,
-      snippet: entry.snippet,
-      ...(entry.date === undefined ? {} : { date: entry.date }),
-    }));
+// `buildThreadContext` used to live here. It was removed with pro#377: the
+// semantic reviewer no longer receives snippets of other mails in the same
+// thread, so nothing builds thread context any more.
 
 export const queueAmberAlert = (state: MailSentinelState, alertId: string): void => {
   if (!state.digest.pendingAmber.includes(alertId)) {

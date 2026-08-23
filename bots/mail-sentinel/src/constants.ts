@@ -46,10 +46,16 @@ export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 export const DEFAULT_IMAP_SEARCH_ATTEMPTS = 2;
 export const DEFAULT_AGENT_ID = "mail-sentinel";
 export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
+// NOTE: `llmModel` is carried in the tool config for compatibility only. The
+// semantic review runs through `lobster … | clawd.invoke --tool llm-task` in
+// the agent's own OpenClaw session, so the model that actually classifies is
+// the agent's configured model (`agentTemplate.model` in sovereign-bot.json),
+// not this value — it is never sent to the gateway.
 export const DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b";
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
+/** Default for `llmSenderDetail` (pro#377): the bare address, never the display name. */
+export const DEFAULT_LLM_SENDER_DETAIL = "address";
 export const RULE_ADJUSTMENT_FLOOR = -1;
-export const MAX_THREAD_CONTEXT_ENTRIES = 2;
 export const MAX_PENDING_AMBER_ITEMS = 200;
 // Starting length of a minted short reference (a prefix of `alertId`). Chosen
 // for typeability in chat; the minter lengthens past this only when a shorter

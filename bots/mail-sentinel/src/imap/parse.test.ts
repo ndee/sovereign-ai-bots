@@ -109,6 +109,14 @@ describe("imap/parse", () => {
     expect(parsed.domain).toBeUndefined();
   });
 
+  it("keeps the raw body as bodyText and omits it when the body is not a string", () => {
+    const withBody = parseMessage({ uid: 6 }, { message: { uid: 6, text: "a\n> b\nc" } });
+    expect(withBody.bodyText).toBe("a\n> b\nc");
+    expect(withBody.text).toBe("a > b c");
+    const withoutBody = parseMessage({ uid: 7 }, { message: { uid: 7 } });
+    expect(withoutBody).not.toHaveProperty("bodyText");
+  });
+
   it("uses only the summary subject when the message omits one", () => {
     const parsed = parseMessage(
       { uid: 5, subject: "summary-only" },

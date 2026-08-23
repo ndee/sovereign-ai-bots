@@ -4,12 +4,14 @@ const readFile = vi.fn();
 const writeFile = vi.fn();
 const rm = vi.fn();
 const access = vi.fn();
+const mkdtemp = vi.fn();
 
 vi.mock("node:fs/promises", () => ({
   readFile,
   writeFile,
   rm,
   access,
+  mkdtemp,
   mkdir: vi.fn().mockResolvedValue(undefined),
   open: vi.fn(),
   rename: vi.fn().mockResolvedValue(undefined),
@@ -28,7 +30,10 @@ vi.mock("node:crypto", async () => {
 const {
   MailSentinelRuntime,
   checkToolAvailability,
+  createLlmRoutingRefusedError,
   createToolUnavailableError,
+  describesLlmRoutingRefusal,
+  isLlmRoutingRefusedError,
   isToolUnavailableError,
   resolveToolExecutable,
   resolveToolRuntime,
@@ -85,6 +90,8 @@ describe("config/runtime", () => {
     writeFile.mockReset();
     rm.mockReset();
     access.mockReset();
+    mkdtemp.mockReset();
+    mkdtemp.mockResolvedValue("/tmp/ms-workspace/.mail-sentinel-candidate-XXXXXX");
     process.env.MAIL_SENTINEL_TEST_TOKEN = "test-token";
     process.env.SOVEREIGN_TOOL_EXECUTABLE = "/usr/bin/sovereign-tool";
     // Pin the lobster executable (#150) so these tests stay independent of the
@@ -115,6 +122,7 @@ describe("config/runtime", () => {
       expect(runtime.imapInstanceId).toBe("ms-imap");
       expect(runtime.openclawUrl).toBe("http://localhost:9999");
       expect(runtime.llmModel).toBe("test-model");
+      expect(runtime.llmSenderDetail).toBe("address");
       expect(runtime.llmTimeoutMs).toBe(1000);
       expect(runtime.imapConfigured).toBe(true);
       expect(runtime.openclawToken).toBe("gw-token");
@@ -785,16 +793,13 @@ describe("config/runtime", () => {
       subject: "s",
       from: "f",
       snippet: "x",
-      threadContext: [],
       heuristicSignals: {
         candidateScore: 0,
         category: "decision-required",
         categoryScores: {},
-        matchedRules: [],
         reasons: [],
       },
-      policyHints: [],
-      extractedSignals: { deadlineDetected: false, amountDetected: false, amount: null },
+      extractedSignals: { deadlineDetected: false, hasAmount: false },
     };
 
     it("calls lobster and normalizes the JSON payload", async () => {
@@ -1183,6 +1188,99 @@ describe("config/runtime", () => {
       }
     });
 
+    // pro#377: the payload is mail content, so it must only ever exist inside
+    // a private directory, with owner-only permissions, for the duration of
+    // the call — and the whole directory goes away afterwards.
+    it("writes the candidate 0600 inside a private mkdtemp directory and removes it", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify([{ details: { json: { confidence: 1 } } }]),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await runtime.classifyCandidate(sampleCandidate);
+        expect(mkdtemp).toHaveBeenCalledWith("/tmp/ms-workspace/.mail-sentinel-candidate-");
+        const [file, , options] = writeFile.mock.calls[0] as [string, string, { mode?: number }];
+        expect(file).toBe(
+          "/tmp/ms-workspace/.mail-sentinel-candidate-XXXXXX/00000000-0000-0000-0000-000000000000.json",
+        );
+        expect(options.mode).toBe(0o600);
+        const [, lobsterArgs] = runner.mock.calls[0] as [string, readonly string[]];
+        expect(lobsterArgs[0]).toContain(`cat ${file}`);
+        expect(rm).toHaveBeenCalledWith("/tmp/ms-workspace/.mail-sentinel-candidate-XXXXXX", {
+          recursive: true,
+          force: true,
+        });
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("never retries a provider privacy-routing refusal (pro#377)", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockRejectedValue(
+        Object.assign(new Error("exit 1"), {
+          stdout: "",
+          stderr:
+            'llm-task failed: 404 {"error":{"message":"No endpoints found matching your data policy (Zero data retention)","code":404}}',
+        }),
+      );
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const failure = await runtime.classifyCandidate(sampleCandidate).catch((error) => error);
+        expect(isLlmRoutingRefusedError(failure)).toBe(true);
+        expect(String(failure.message)).toMatch(
+          /^lobster classification refused: .*No endpoints found matching your data policy/u,
+        );
+        expect(runner).toHaveBeenCalledTimes(1);
+        expect(rm).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("recognises a routing refusal carried in a successful lobster envelope", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify({ ok: false, error: "No endpoints found for qwen/qwen3.5-27b." }),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const failure = await runtime.classifyCandidate(sampleCandidate).catch((error) => error);
+        expect(isLlmRoutingRefusedError(failure)).toBe(true);
+        expect(runner).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("treats a non-refusal envelope error as an ordinary (retried) failure", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify([{ ok: false }]),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const failure = await runtime.classifyCandidate(sampleCandidate).catch((error) => error);
+        expect(isLlmRoutingRefusedError(failure)).toBe(false);
+        expect(String(failure.message)).toBe("lobster classification failed: unknown error");
+        expect(runner).toHaveBeenCalledTimes(3);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
     it("gives up after the retry budget is exhausted and surfaces the last error", async () => {
       const runtime = await loadRuntime();
       const runner = vi
@@ -1201,6 +1299,43 @@ describe("config/runtime", () => {
       } finally {
         setExecFileAsync(previous);
       }
+    });
+  });
+
+  describe("llmSenderDetail", () => {
+    it("accepts domain", async () => {
+      readFile
+        .mockResolvedValueOnce(JSON.stringify(makeRuntimeConfig({ llmSenderDetail: "domain" })))
+        .mockRejectedValueOnce(new Error("no runtime"));
+      const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+      await runtime.load();
+      expect(runtime.llmSenderDetail).toBe("domain");
+    });
+
+    it("falls back to address for an unknown value", async () => {
+      readFile
+        .mockResolvedValueOnce(JSON.stringify(makeRuntimeConfig({ llmSenderDetail: "full" })))
+        .mockRejectedValueOnce(new Error("no runtime"));
+      const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+      await runtime.load();
+      expect(runtime.llmSenderDetail).toBe("address");
+    });
+  });
+
+  describe("routing refusal helpers", () => {
+    it("matches only the conservative provider wording", () => {
+      expect(describesLlmRoutingRefusal("No endpoints found matching your data policy")).toBe(true);
+      expect(describesLlmRoutingRefusal("no endpoints available for this model")).toBe(true);
+      expect(describesLlmRoutingRefusal("Error: No Endpoints Found for model x")).toBe(true);
+      expect(describesLlmRoutingRefusal("upstream 502")).toBe(false);
+      expect(describesLlmRoutingRefusal("endpoint timed out")).toBe(false);
+    });
+
+    it("marks and detects refusal errors", () => {
+      const error = createLlmRoutingRefusedError("refused");
+      expect(isLlmRoutingRefusedError(error)).toBe(true);
+      expect(isLlmRoutingRefusedError(new Error("refused"))).toBe(false);
+      expect(isLlmRoutingRefusedError("refused")).toBe(false);
     });
   });
 
@@ -1291,16 +1426,13 @@ describe("config/runtime", () => {
       subject: "s",
       from: "f",
       snippet: "x",
-      threadContext: [],
       heuristicSignals: {
         candidateScore: 0,
         category: "decision-required",
         categoryScores: {},
-        matchedRules: [],
         reasons: [],
       },
-      policyHints: [],
-      extractedSignals: { deadlineDetected: false, amountDetected: false, amount: null },
+      extractedSignals: { deadlineDetected: false, hasAmount: false },
     };
 
     it("sets CLAWD_TOKEN in the environment when openclawToken is defined", async () => {

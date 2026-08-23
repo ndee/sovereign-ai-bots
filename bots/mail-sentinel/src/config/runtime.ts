@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { access, readFile, rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 import {
   DEFAULT_AGENT_ID,
@@ -14,6 +14,7 @@ import {
   DEFAULT_IMAP_INSTANCE_ID,
   DEFAULT_IMAP_SEARCH_LIMIT,
   DEFAULT_LLM_MODEL,
+  DEFAULT_LLM_SENDER_DETAIL,
   DEFAULT_LLM_TIMEOUT_MS,
   DEFAULT_LOOKBACK_WINDOW,
   DEFAULT_OPENCLAW_URL,
@@ -37,6 +38,7 @@ import {
 import type {
   LlmCandidate,
   LlmResult,
+  LlmSenderDetail,
   MailSentinelPolicy,
   MailSentinelState,
   RulesDocument,
@@ -55,6 +57,44 @@ import {
 } from "./lobster.js";
 
 const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
+
+/**
+ * Privacy-routing refusal (pro#377).
+ *
+ * When the gateway's provider (OpenRouter) is configured to route only to
+ * endpoints that satisfy a data policy (no training, no retention, specific
+ * providers), a model that has no compliant endpoint is refused with a 404
+ * whose message reads "No endpoints found matching your data policy" (or "No
+ * endpoints found for <model>"). That is a policy outcome, not a transient
+ * fault: retrying cannot help, and the one thing that would — relaxing the
+ * routing — must never happen automatically. The error is marked so the scan
+ * treats it as a classification degradation and stops sending mail.
+ *
+ * Matching is on message text because the refusal reaches us only as
+ * lobster's stderr/stdout, with OpenClaw's llm-task error wrapped around it.
+ * The patterns are deliberately narrow so an ordinary outage is still retried.
+ */
+export const LLM_ROUTING_REFUSED_ERROR_CODE = "MAIL_SENTINEL_LLM_ROUTING_REFUSED";
+
+const LLM_ROUTING_REFUSED_PATTERNS: readonly RegExp[] = [
+  /no endpoints found/iu,
+  /no endpoints (?:available|match)/iu,
+  /matching your data policy/iu,
+];
+
+/** True when the given text carries a provider routing refusal. */
+export const describesLlmRoutingRefusal = (text: string): boolean =>
+  LLM_ROUTING_REFUSED_PATTERNS.some((pattern) => pattern.test(text));
+
+export const createLlmRoutingRefusedError = (message: string): Error =>
+  Object.assign(new Error(message), { code: LLM_ROUTING_REFUSED_ERROR_CODE });
+
+export const isLlmRoutingRefusedError = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error as NodeJS.ErrnoException).code === LLM_ROUTING_REFUSED_ERROR_CODE;
+
+const normalizeSenderDetail = (value: unknown): LlmSenderDetail =>
+  value === "domain" ? "domain" : DEFAULT_LLM_SENDER_DETAIL;
 
 const MATRIX_TEXT_MSGTYPE = "m.text";
 const MATRIX_CUSTOM_HTML_FORMAT = "org.matrix.custom.html";
@@ -170,7 +210,14 @@ export class MailSentinelRuntime {
   digestInterval!: string;
   imapInstanceId!: string;
   openclawUrl!: string;
+  /**
+   * Compatibility only — never sent anywhere. The review runs in the agent's
+   * OpenClaw session, so the agent's configured model classifies (see
+   * `DEFAULT_LLM_MODEL`).
+   */
   llmModel!: string;
+  /** How much of the sender the reviewer sees (pro#377). */
+  llmSenderDetail!: LlmSenderDetail;
   llmTimeoutMs!: number;
   openclawToken: string | undefined;
   matrix!: {
@@ -227,6 +274,7 @@ export class MailSentinelRuntime {
       (toolConfig.imapInstanceId as string | undefined) ?? DEFAULT_IMAP_INSTANCE_ID;
     this.openclawUrl = (toolConfig.openclawUrl as string | undefined) ?? DEFAULT_OPENCLAW_URL;
     this.llmModel = (toolConfig.llmModel as string | undefined) ?? DEFAULT_LLM_MODEL;
+    this.llmSenderDetail = normalizeSenderDetail(toolConfig.llmSenderDetail);
     this.llmTimeoutMs = Number.parseInt(
       String(toolConfig.llmTimeoutMs ?? DEFAULT_LLM_TIMEOUT_MS),
       10,
@@ -497,11 +545,14 @@ export class MailSentinelRuntime {
     const args = {
       prompt: buildLlmPrompt(),
     };
-    const candidateFile = resolve(
-      this.workspaceDir,
-      `.mail-sentinel-candidate-${randomUUID()}.json`,
-    );
-    await writeFile(candidateFile, `${JSON.stringify(candidate)}\n`, "utf8");
+    // pro#377: the payload is mail content. It lives in a private 0700
+    // directory, as a 0600 file, only for the duration of the call.
+    const candidateDir = await mkdtemp(resolve(this.workspaceDir, ".mail-sentinel-candidate-"));
+    const candidateFile = join(candidateDir, `${randomUUID()}.json`);
+    await writeFile(candidateFile, `${JSON.stringify(candidate)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
     const sessionKey = `agent:${this.agent.id}:main`;
     const pipeline = [
       "exec",
@@ -518,13 +569,18 @@ export class MailSentinelRuntime {
       for (const backoffMs of CLASSIFY_RETRY_BACKOFF_MS) {
         try {
           return await this.runClassifyPipeline(pipeline);
-        } catch {
+        } catch (error) {
+          // A routing refusal is final: never retried, and never retried with
+          // different routing or privacy parameters (pro#377).
+          if (isLlmRoutingRefusedError(error)) {
+            throw error;
+          }
           await delay(backoffMs);
         }
       }
       return await this.runClassifyPipeline(pipeline);
     } finally {
-      await rm(candidateFile, { force: true });
+      await rm(candidateDir, { recursive: true, force: true });
     }
   }
 
@@ -559,12 +615,27 @@ export class MailSentinelRuntime {
       }
       const stdout = typeof error.stdout === "string" ? error.stdout : "";
       const stderr = typeof error.stderr === "string" ? error.stderr : "";
-      throw new Error(`lobster classification failed: ${stderr || stdout || error.message}`);
+      const detail = stderr || stdout || error.message;
+      if (describesLlmRoutingRefusal(`${stderr}\n${stdout}`)) {
+        throw createLlmRoutingRefusedError(`lobster classification refused: ${detail}`);
+      }
+      throw new Error(`lobster classification failed: ${detail}`);
     });
     const parsed = parseJsonAfterPreamble(String(result.stdout));
     const first = Array.isArray(parsed)
       ? (parsed[0] as Record<string, unknown>)
       : (parsed as Record<string, unknown> | null);
+    // A pipeline that exits 0 but reports `ok: false` carries the tool's error
+    // in its payload (lobster's JSON envelope). Without this check the envelope
+    // would be normalized into a confidence-0 verdict and a routing refusal
+    // would pass as a classification.
+    if (first?.ok === false) {
+      const envelopeError = compactText(String(first.error ?? "unknown error"));
+      if (describesLlmRoutingRefusal(envelopeError)) {
+        throw createLlmRoutingRefusedError(`lobster classification refused: ${envelopeError}`);
+      }
+      throw new Error(`lobster classification failed: ${envelopeError}`);
+    }
     const output = first?.output as { text?: unknown; data?: unknown } | undefined;
     // `output.text` is the model's own answer, which can arrive wrapped in
     // prose or a ```json fence. Tolerate a preamble here as well so a chatty

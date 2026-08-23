@@ -1,8 +1,7 @@
 {
   "subject": "Invoice #123 for $500",
-  "from": "Alice <alice@example.com>",
+  "from": "alice@example.com",
   "snippet": "Please pay this invoice. Amount: $500",
-  "threadContext": [],
   "heuristicSignals": {
     "candidateScore": 5,
     "category": "financial-relevance",
@@ -11,19 +10,12 @@
       "financial-relevance": 5,
       "risk-escalation": 0
     },
-    "matchedRules": [
-      "rule-invoice"
-    ],
     "reasons": [
       "subject mentions an invoice"
     ]
   },
-  "policyHints": [
-    "known-good"
-  ],
   "extractedSignals": {
     "deadlineDetected": false,
-    "amountDetected": true,
-    "amount": 500
+    "hasAmount": true
   }
 }

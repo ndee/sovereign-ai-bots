@@ -179,6 +179,7 @@ export const parseMessage = (summary: ImapSummary, readResult: ImapReadResult): 
     ...(typeof message.date === "string" ? { date: message.date } : {}),
     text,
     snippet: text.slice(0, 500),
+    ...(typeof message.text === "string" ? { bodyText: message.text } : {}),
     headers,
     toAddresses: buckets.toAddresses,
     ...(buckets.ccAddresses.length === 0 ? {} : { ccAddresses: buckets.ccAddresses }),

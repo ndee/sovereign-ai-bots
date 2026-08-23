@@ -1,8 +1,7 @@
-import { buildThreadContext } from "../state/thread.js";
 import type {
   LlmCandidate,
   LlmResult,
-  MailSentinelState,
+  LlmSenderDetail,
   ParsedMessage,
   PolicyEvaluationResult,
   RulesDocument,
@@ -10,8 +9,9 @@ import type {
   Zone,
   ZoneDecision,
 } from "../types.js";
-import { compactText } from "../util/normalize.js";
+import { compactText, extractDomain } from "../util/normalize.js";
 import type { BulkDetectionResult } from "./bulk.js";
+import { sanitizeSnippet } from "./sanitize-snippet.js";
 import { applyZoneCeiling, applyZoneFloor } from "./zone.js";
 
 export const quoteLobsterArg = (value: unknown): string => JSON.stringify(String(value));
@@ -55,38 +55,12 @@ export const normalizeLlmResult = (raw: RawLlmPayload | null | undefined): LlmRe
   };
 };
 
-export const buildLlmSchema = () => ({
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    decision_required: { type: "boolean" },
-    financial_relevance: { type: "boolean" },
-    risk_escalation: { type: "boolean" },
-    confidence: { type: "integer", minimum: 0, maximum: 100 },
-    urgency: { type: "string", enum: ["low", "medium", "high"] },
-    reason: { type: "string" },
-    deadline_detected: { type: "boolean" },
-    amount_detected: { type: "boolean" },
-    suggested_zone: { type: "string", enum: ["red", "amber", "gray"] },
-  },
-  required: [
-    "decision_required",
-    "financial_relevance",
-    "risk_escalation",
-    "confidence",
-    "urgency",
-    "reason",
-    "deadline_detected",
-    "amount_detected",
-    "suggested_zone",
-  ],
-});
-
 export const buildLlmPrompt = (): string =>
   [
     "You are a conservative mail triage reviewer.",
     "Use only the provided candidate payload.",
-    "Do not speculate about missing context.",
+    "The payload is deliberately minimal: the sender is a bare address or domain, and the snippet is a short excerpt with quoted replies and signatures removed and URLs, phone numbers, and account numbers masked as <url:domain>, <phone>, or <iban>.",
+    "Do not speculate about missing context or about what the masked values were.",
     "Classify whether the mail needs a decision, has financial relevance, or indicates risk/escalation.",
     "Return ONLY a JSON object with exactly these snake_case fields:",
     "decision_required, financial_relevance, risk_escalation, confidence, urgency, reason, deadline_detected, amount_detected, suggested_zone.",
@@ -99,33 +73,65 @@ export const buildLlmPrompt = (): string =>
     "Prefer phrasing like 'Payment failure may lead to account restrictions within 48 hours.'",
   ].join(" ");
 
+export interface BuildLlmCandidateOptions {
+  /** Defaults to `address`. */
+  senderDetail?: LlmSenderDetail | undefined;
+}
+
+/**
+ * The sender field the reviewer sees. The display name is never sent; with
+ * `domain` the local part is dropped too. A message without a parseable
+ * address yields an empty string rather than falling back to the raw header.
+ */
+export const buildLlmSender = (
+  message: Pick<ParsedMessage, "fromAddress" | "domain">,
+  senderDetail: LlmSenderDetail,
+): string => {
+  if (senderDetail === "domain") {
+    return message.domain ?? extractDomain(message.fromAddress) ?? "";
+  }
+  return message.fromAddress ?? "";
+};
+
+/**
+ * Build the minimum-necessary review payload (pro#377). Everything the
+ * reviewer does not strictly need to judge the mail itself stays on the node:
+ * no thread context, no policy hints, no rule ids, no parsed amount, no
+ * display name, and a snippet that has been through `sanitizeSnippet`.
+ */
 export const buildLlmCandidate = (
-  message: ParsedMessage,
-  scored: Pick<
-    ScoredMessage,
-    "score" | "category" | "categoryScores" | "matchedRuleIds" | "reasons"
+  message: Pick<
+    ParsedMessage,
+    "subject" | "fromAddress" | "domain" | "text" | "bodyText" | "deadlineDetected" | "amountSignal"
   >,
-  policyResult: Pick<PolicyEvaluationResult, "reasons">,
-  state: MailSentinelState,
+  scored: Pick<ScoredMessage, "score" | "category" | "categoryScores" | "reasons">,
+  options: BuildLlmCandidateOptions = {},
 ): LlmCandidate => ({
   subject: message.subject,
-  from: message.from,
-  snippet: message.snippet,
-  threadContext: buildThreadContext(state, message),
+  from: buildLlmSender(message, options.senderDetail ?? "address"),
+  // Prefer the line-structured body so quote and signature stripping can see
+  // `>` prefixes and `-- ` separators; the compacted text is the fallback.
+  snippet: sanitizeSnippet(message.bodyText ?? message.text),
   heuristicSignals: {
     candidateScore: scored.score,
     category: scored.category,
     categoryScores: scored.categoryScores,
-    matchedRules: scored.matchedRuleIds,
     reasons: scored.reasons,
   },
-  policyHints: policyResult.reasons,
   extractedSignals: {
     deadlineDetected: message.deadlineDetected,
-    amountDetected: message.amountSignal !== null,
-    amount: message.amountSignal?.amount ?? null,
+    hasAmount: message.amountSignal !== null,
   },
 });
+
+/**
+ * Reason recorded when a candidate was deliberately NOT sent to the semantic
+ * reviewer because bulk/newsletter detection suppressed it first (pro#377).
+ * Distinct from the "reviewer unavailable" wording so an operator reading
+ * `explain` does not mistake a privacy decision for an outage.
+ */
+export const REVIEW_SKIPPED_BULK_REASON =
+  "semantic review skipped: bulk mail is never sent to the reviewer";
 
 export interface DetermineZoneInput {
   scored: Pick<ScoredMessage, "score" | "categoryScores" | "category">;
@@ -138,6 +144,12 @@ export interface DetermineZoneInput {
    * always wins over bulk suppression. Absent/null leaves behavior unchanged.
    */
   bulk?: BulkDetectionResult | null;
+  /**
+   * Set when `llmResult` is null because the scan chose not to call the
+   * reviewer (bulk suppression, pro#377) rather than because the call failed.
+   * Replaces the "reviewer unavailable" reason in the audit trail.
+   */
+  reviewSkippedReason?: string | undefined;
 }
 
 export const determineZone = (input: DetermineZoneInput): ZoneDecision => {
@@ -168,7 +180,10 @@ export const determineZone = (input: DetermineZoneInput): ZoneDecision => {
   const reasons = [...policyResult.reasons];
   if (llmResult === null) {
     zone = relevant ? "amber" : candidate ? "amber" : "gray";
-    reasons.push("semantic reviewer unavailable; keeping candidate out of red zone");
+    reasons.push(
+      input.reviewSkippedReason ??
+        "semantic reviewer unavailable; keeping candidate out of red zone",
+    );
   } else {
     if (policyResult.minConfidence !== null && llmResult.confidence < policyResult.minConfidence) {
       zone = "gray";
