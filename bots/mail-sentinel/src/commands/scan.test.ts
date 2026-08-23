@@ -45,9 +45,8 @@ vi.mock("node:crypto", async () => {
 });
 
 const { flushDigestIfDue, scan } = await import("./scan.js");
-const { createToolUnavailableError, TOOL_UNAVAILABLE_ERROR_CODE } = await import(
-  "../config/runtime.js"
-);
+const { createLlmRoutingRefusedError, createToolUnavailableError, TOOL_UNAVAILABLE_ERROR_CODE } =
+  await import("../config/runtime.js");
 
 const TOOL_UNAVAILABLE_REASON =
   "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
@@ -177,10 +176,81 @@ describe("commands/scan", () => {
       },
     });
     const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
+    // pro#377: bulk detection runs BEFORE the reviewer, so a newsletter is
+    // never sent to the LLM at all — and not counted as a reviewer candidate.
+    const classify = vi.spyOn(runtime, "classifyCandidate");
     const result = await scan({ instance: "ms-core" });
     expect(result.redAlertsSent).toBe(0);
     expect(result.amberQueued).toBe(1);
     expect(send).not.toHaveBeenCalled();
+    expect(classify).not.toHaveBeenCalled();
+    expect(runtime.state.lastScanCandidates).toBe(0);
+    expect(runtime.state.zoneHistory.at(-1)?.reason).toBe(
+      "semantic review skipped: bulk mail is never sent to the reviewer",
+    );
+  });
+
+  it("never sends a muted sender's mail to the reviewer (pro#377)", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.policy.mutePolicies.push({
+      id: "mute-alice",
+      match: "alice@example.com",
+      reason: "test mute",
+    });
+    const classify = vi.spyOn(runtime, "classifyCandidate");
+    const result = await scan({ instance: "ms-core" });
+    expect(classify).not.toHaveBeenCalled();
+    expect(result.amberQueued).toBe(0);
+    expect(runtime.state.lastScanCandidates).toBe(0);
+    expect(runtime.state.degradationState).toBe("healthy");
+  });
+
+  it("passes the configured sender detail to the payload builder", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.llmSenderDetail = "domain";
+    const classify = vi.spyOn(runtime, "classifyCandidate");
+    await scan({ instance: "ms-core" });
+    expect(classify).toHaveBeenCalledTimes(1);
+    expect(classify.mock.calls[0]?.[0].from).toBe("example.com");
+  });
+
+  it("stops sending mail to the reviewer after a privacy-routing refusal (pro#377)", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => ({
+      messages: [
+        { uid: 10, size: 1000, messageId: "<m1@ex>", from: ["Alice <alice@example.com>"] },
+        { uid: 11, size: 1000, messageId: "<m2@ex>", from: ["Alice <alice@example.com>"] },
+      ],
+    });
+    runtime.readMail = async (selector: unknown) => ({
+      message: {
+        uid: Number(selector),
+        messageId: `<m${String(Number(selector) - 9)}@ex>`,
+        from: ["Alice <alice@example.com>"],
+        subject: "Invoice #1",
+        text: "Please pay $500 for invoice.",
+        headers: [],
+      },
+    });
+    const classify = vi.fn(async () => {
+      throw createLlmRoutingRefusedError(
+        "lobster classification refused: No endpoints found matching your data policy",
+      );
+    });
+    runtime.classifyCandidate = classify;
+    const result = await scan({ instance: "ms-core" });
+    // Exactly one attempt; the second candidate is not sent.
+    expect(classify).toHaveBeenCalledTimes(1);
+    expect(result.warningCount).toBe(1);
+    expect(result.note).toContain("no further mail is sent to the reviewer this scan");
+    expect(result.note).toContain("No endpoints found matching your data policy");
+    // Both candidates count as failed reviews, so the scan degrades and
+    // nothing reaches red.
+    expect(runtime.state.lastScanCandidates).toBe(2);
+    expect(runtime.state.lastScanLlmFailures).toBe(2);
+    expect(runtime.state.degradationState).toBe("classification-degraded");
+    expect(result.redAlertsSent).toBe(0);
+    expect(result.amberQueued).toBe(2);
   });
 
   it("copies a capped excerpt from the local snippet onto the alert at scan time", async () => {

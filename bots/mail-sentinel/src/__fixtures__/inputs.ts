@@ -118,8 +118,7 @@ export const sampleState: MailSentinelState = migrateState({
   },
 });
 
-// NOTE: these messages intentionally lack normalizedThreadSubject to match
-// the capture script's inputs, so buildThreadContext matches empty.
+// Sender-resolution fixture state (policy/sender tests).
 export const senderState: MailSentinelState = migrateState({
   messages: {
     "msg:1": {

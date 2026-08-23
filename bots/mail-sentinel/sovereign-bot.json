@@ -37,6 +37,7 @@
     "policyPath": "config/user-policy.json",
     "openclawUrl": "http://127.0.0.1:18789",
     "llmModel": "qwen/qwen3.5-9b",
+    "llmSenderDetail": "address",
     "llmTimeoutMs": 30000
   },
   "toolTemplates": [
@@ -169,6 +170,9 @@
         },
         "llmModel": {
           "from": "instance.config.llmModel"
+        },
+        "llmSenderDetail": {
+          "from": "instance.config.llmSenderDetail"
         },
         "llmTimeoutMs": {
           "from": "instance.config.llmTimeoutMs",
