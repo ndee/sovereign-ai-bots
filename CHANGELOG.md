@@ -15,6 +15,10 @@ version.
 
 ## [Unreleased]
 
+## [2.0.12] - 2026-08-24
+
+POP3 support and real mail reconfiguration with post-install Settings UI, OpenRouter privacy routing, and security hardening (LAN-bound Pro API, secret-free install job records, per-node relay enrollment secret)
+
 ### Added
 
 - mail-sentinel: `imapProtocol` config default (`imap`) and `protocol` tool binding so the node's read-only mail tool can serve the mailbox over POP3 as well as IMAP. Existing instances without the key keep using IMAP.
@@ -176,7 +180,8 @@ Bootstrap release formalizing the semantic versioning scheme for this project.
 See the [v2.0.0 GitHub Release](https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.0)
 for details.
 
-[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.11...HEAD
+[Unreleased]: https://github.com/ndee/sovereign-ai-bots/compare/v2.0.12...HEAD
+[2.0.12]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.12
 [2.0.11]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.11
 [2.0.10]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.10
 [2.0.9]: https://github.com/ndee/sovereign-ai-bots/releases/tag/v2.0.9

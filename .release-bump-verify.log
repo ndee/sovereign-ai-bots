@@ -1,5 +1,5 @@
 
-> sovereign-ai-bots@2.0.11 build /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11
+> sovereign-ai-bots@2.0.12 build /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12
 > tsup
 
 CLI Building entry: {"mail-sentinel":"bots/mail-sentinel/src/cli.ts"}
@@ -9,15 +9,15 @@ CLI Using tsconfig: tsconfig.json
 CLI Building entry: {"reality-alignment":"bots/reality-alignment/src/cli.ts"}
 CLI Using tsconfig: tsconfig.json
 CLI tsup v8.5.1
-CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11/tsup.config.ts
+CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12/tsup.config.ts
 CLI tsup v8.5.1
-CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11/tsup.config.ts
+CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12/tsup.config.ts
 CLI tsup v8.5.1
-CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11/tsup.config.ts
+CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12/tsup.config.ts
 CLI Building entry: src/bin/probe-mail-sentinel-chat-model.ts, src/bin/validate-catalog.ts
 CLI Using tsconfig: tsconfig.json
 CLI tsup v8.5.1
-CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11/tsup.config.ts
+CLI Using tsup config: /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12/tsup.config.ts
 CLI Target: node22
 CLI Target: node22
 CLI Target: node22
@@ -32,120 +32,122 @@ CLI Cleaning output folder
 ESM Build start
 ESM dist/probe-mail-sentinel-chat-model.js 3.34 KB
 ESM dist/validate-catalog.js               19.61 KB
-ESM ⚡️ Build success in 100ms
-ESM bots/reality-alignment/workspace/bin/dist/reality-alignment.js     44.34 KB
-ESM bots/reality-alignment/workspace/bin/dist/reality-alignment.js.map 93.38 KB
-ESM ⚡️ Build success in 127ms
+ESM ⚡️ Build success in 35ms
 ESM bots/project-sentinel/workspace/bin/dist/project-sentinel.js     58.41 KB
 ESM bots/project-sentinel/workspace/bin/dist/project-sentinel.js.map 116.45 KB
-ESM ⚡️ Build success in 155ms
-ESM bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js     141.46 KB
-ESM bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js.map 352.84 KB
-ESM ⚡️ Build success in 203ms
+ESM ⚡️ Build success in 58ms
+ESM bots/reality-alignment/workspace/bin/dist/reality-alignment.js     44.34 KB
+ESM bots/reality-alignment/workspace/bin/dist/reality-alignment.js.map 93.38 KB
+ESM ⚡️ Build success in 56ms
+ESM bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js     147.67 KB
+ESM bots/mail-sentinel/workspace/bin/dist/mail-sentinel.js.map 369.46 KB
+ESM ⚡️ Build success in 72ms
 DTS Build start
-DTS ⚡️ Build success in 2175ms
+DTS ⚡️ Build success in 1205ms
 DTS dist/probe-mail-sentinel-chat-model.d.ts 20.00 B
 DTS dist/validate-catalog.d.ts               20.00 B
 
-> sovereign-ai-bots@2.0.11 catalog:test /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11
+> sovereign-ai-bots@2.0.12 catalog:test /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12
 > tsx src/bin/validate-catalog.ts test
 
 Catalog tests passed for 5 bot packages.
 
-> sovereign-ai-bots@2.0.11 catalog:smoke /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11
+> sovereign-ai-bots@2.0.12 catalog:smoke /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12
 > tsx src/bin/validate-catalog.ts smoke
 
 Smoked bitcoin-skill-match@2.0.0 with 9 source-backed host resources.
-Smoked mail-sentinel@2.0.11 with 8 source-backed host resources.
+Smoked mail-sentinel@2.0.12 with 8 source-backed host resources.
 Smoked node-operator@2.0.0 with 4 source-backed host resources.
 Smoked project-sentinel@2.0.0 with 9 source-backed host resources.
 Smoked reality-alignment@0.1.5 with 10 source-backed host resources.
 
-> sovereign-ai-bots@2.0.11 test /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11
+> sovereign-ai-bots@2.0.12 test /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12
 > vitest run
 
 
- RUN  v3.2.4 /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.11
+ RUN  v3.2.4 /home/ndee/sovereign-ai/sovereign-ai-bots/.worktrees/release-2.0.12
 
- ✓ bots/mail-sentinel/src/scoring/llm.test.ts (37 tests) 18ms
- ✓ bots/mail-sentinel/src/policy/engine.test.ts (42 tests) 39ms
- ✓ bots/mail-sentinel/src/alerts/output.test.ts (40 tests) 45ms
- ✓ bots/mail-sentinel/src/commands/feedback.test.ts (54 tests) 88ms
- ✓ src/catalog/validate.test.ts (5 tests) 241ms
- ✓ bots/mail-sentinel/src/commands/scan.test.ts (77 tests) 288ms
- ✓ bots/mail-sentinel/src/alerts/format.test.ts (36 tests) 68ms
- ✓ bots/mail-sentinel/src/commands/policy.test.ts (39 tests) 26ms
- ✓ bots/mail-sentinel/src/policy/sender.test.ts (28 tests) 30ms
- ✓ bots/project-sentinel/src/commands.test.ts (8 tests) 136ms
- ✓ bots/mail-sentinel/src/health/notice.test.ts (38 tests) 139ms
- ✓ bots/project-sentinel/src/policy.test.ts (5 tests) 27ms
+ ✓ bots/mail-sentinel/src/scoring/llm.test.ts (42 tests) 21ms
+ ✓ bots/mail-sentinel/src/policy/engine.test.ts (42 tests) 28ms
+ ✓ bots/mail-sentinel/src/commands/feedback.test.ts (54 tests) 48ms
+ ✓ bots/mail-sentinel/src/alerts/output.test.ts (40 tests) 19ms
+ ✓ src/catalog/validate.test.ts (5 tests) 213ms
+ ✓ bots/mail-sentinel/src/commands/scan.test.ts (80 tests) 263ms
+ ✓ bots/mail-sentinel/src/alerts/format.test.ts (36 tests) 42ms
+ ✓ bots/mail-sentinel/src/commands/policy.test.ts (39 tests) 58ms
+ ✓ bots/mail-sentinel/src/policy/sender.test.ts (28 tests) 32ms
+ ✓ bots/project-sentinel/src/commands.test.ts (8 tests) 94ms
+ ✓ bots/mail-sentinel/src/health/notice.test.ts (38 tests) 125ms
+ ✓ bots/project-sentinel/src/sources.test.ts (5 tests) 39ms
+ ✓ bots/project-sentinel/src/policy.test.ts (5 tests) 16ms
  ✓ bots/mail-sentinel/src/policy/actions.test.ts (31 tests) 23ms
- ✓ bots/project-sentinel/src/sources.test.ts (5 tests) 38ms
- ✓ bots/mail-sentinel/src/imap/parse.test.ts (25 tests) 11ms
- ✓ bots/project-sentinel/src/config/runtime.test.ts (4 tests) 92ms
- ✓ bots/mail-sentinel/src/cli.test.ts (35 tests) 67ms
- ✓ bots/mail-sentinel/src/scoring/heuristics.test.ts (17 tests) 67ms
- ✓ bots/mail-sentinel/src/commands/announce-build.test.ts (16 tests) 75ms
- ✓ bots/mail-sentinel/src/commands/resolve.test.ts (15 tests) 25ms
- ✓ bots/mail-sentinel/src/config/lobster.test.ts (15 tests) 40ms
- ✓ bots/mail-sentinel/src/state/schema.test.ts (17 tests) 98ms
- ✓ bots/reality-alignment/src/cli.test.ts (3 tests) 9ms
- ✓ bots/reality-alignment/src/commands.test.ts (13 tests) 138ms
- ✓ bots/mail-sentinel/src/policy/summary.test.ts (22 tests) 26ms
- ✓ bots/reality-alignment/src/format.test.ts (9 tests) 40ms
- ✓ bots/mail-sentinel/src/commands/status.test.ts (9 tests) 7ms
- ✓ bots/mail-sentinel/src/commands/explain.test.ts (9 tests) 30ms
- ✓ bots/mail-sentinel/src/health/degradation.test.ts (29 tests) 31ms
- ✓ bots/mail-sentinel/src/scoring/bulk.test.ts (10 tests) 10ms
- ✓ bots/mail-sentinel/src/state/io.test.ts (12 tests) 103ms
- ✓ src/probe/mail-sentinel-chat-model.test.ts (6 tests) 73ms
- ✓ bots/mail-sentinel/src/scoring/default-rules.test.ts (7 tests) 33ms
- ✓ bots/reality-alignment/src/steps.test.ts (11 tests) 47ms
- ✓ bots/mail-sentinel/src/util/normalize.test.ts (14 tests) 10ms
- ✓ bots/project-sentinel/src/alerts.test.ts (3 tests) 6ms
- ✓ bots/mail-sentinel/src/util/time.test.ts (11 tests) 20ms
- ✓ bots/project-sentinel/src/cli.test.ts (3 tests) 17ms
- ✓ bots/mail-sentinel/src/config/args.test.ts (11 tests) 16ms
- ✓ bots/reality-alignment/src/techniques.test.ts (9 tests) 31ms
- ✓ bots/reality-alignment/src/config/args.test.ts (8 tests) 8ms
- ✓ bots/mail-sentinel/src/policy/feedback-vocab.test.ts (31 tests) 29ms
- ✓ bots/mail-sentinel/src/build-info.test.ts (20 tests) 25ms
- ✓ bots/reality-alignment/src/config/runtime.test.ts (3 tests) 41ms
+ ✓ bots/mail-sentinel/src/imap/parse.test.ts (26 tests) 12ms
+ ✓ bots/project-sentinel/src/config/runtime.test.ts (4 tests) 34ms
+ ✓ bots/mail-sentinel/src/cli.test.ts (35 tests) 35ms
+ ✓ bots/mail-sentinel/src/scoring/heuristics.test.ts (17 tests) 35ms
+ ✓ bots/mail-sentinel/src/commands/resolve.test.ts (15 tests) 10ms
+ ✓ bots/mail-sentinel/src/commands/announce-build.test.ts (16 tests) 87ms
+ ✓ bots/mail-sentinel/src/config/lobster.test.ts (15 tests) 32ms
+ ✓ bots/mail-sentinel/src/state/schema.test.ts (17 tests) 46ms
+ ✓ bots/reality-alignment/src/format.test.ts (9 tests) 6ms
+ ✓ bots/mail-sentinel/src/policy/summary.test.ts (22 tests) 19ms
+ ✓ bots/reality-alignment/src/cli.test.ts (3 tests) 27ms
+ ✓ bots/reality-alignment/src/commands.test.ts (13 tests) 94ms
+ ✓ bots/mail-sentinel/src/commands/status.test.ts (9 tests) 14ms
+ ✓ bots/mail-sentinel/src/commands/explain.test.ts (9 tests) 28ms
+ ✓ bots/mail-sentinel/src/health/degradation.test.ts (29 tests) 12ms
+ ✓ bots/mail-sentinel/src/scoring/bulk.test.ts (10 tests) 8ms
+ ✓ bots/mail-sentinel/src/state/io.test.ts (12 tests) 29ms
+ ✓ bots/mail-sentinel/src/scoring/sanitize-snippet.test.ts (22 tests) 8ms
+ ✓ bots/mail-sentinel/src/scoring/default-rules.test.ts (7 tests) 7ms
+ ✓ src/probe/mail-sentinel-chat-model.test.ts (6 tests) 48ms
+ ✓ bots/reality-alignment/src/steps.test.ts (11 tests) 28ms
+ ✓ bots/mail-sentinel/src/util/normalize.test.ts (14 tests) 13ms
+ ✓ bots/mail-sentinel/src/util/time.test.ts (11 tests) 17ms
+ ✓ bots/project-sentinel/src/alerts.test.ts (3 tests) 8ms
+ ✓ bots/reality-alignment/src/techniques.test.ts (9 tests) 16ms
+ ✓ bots/project-sentinel/src/cli.test.ts (3 tests) 15ms
+ ✓ bots/mail-sentinel/src/config/args.test.ts (11 tests) 7ms
+ ✓ bots/mail-sentinel/src/policy/feedback-vocab.test.ts (31 tests) 24ms
+ ✓ bots/reality-alignment/src/config/args.test.ts (8 tests) 5ms
+ ✓ bots/mail-sentinel/src/build-info.test.ts (20 tests) 6ms
+ ✓ bots/reality-alignment/src/config/runtime.test.ts (3 tests) 26ms
  ✓ bots/mail-sentinel/src/alerts/evidence.test.ts (16 tests) 6ms
- ✓ bots/project-sentinel/src/util.test.ts (5 tests) 14ms
- ✓ bots/reality-alignment/src/checkins.test.ts (6 tests) 12ms
- ✓ bots/mail-sentinel/src/commands/version.test.ts (9 tests) 12ms
- ✓ bots/reality-alignment/src/wishes.test.ts (8 tests) 25ms
- ✓ bots/reality-alignment/src/resistance.test.ts (5 tests) 16ms
- ✓ bots/mail-sentinel/src/commands/list-alerts.test.ts (5 tests) 30ms
- ✓ bots/reality-alignment/src/state.test.ts (4 tests) 84ms
- ✓ bots/reality-alignment/src/review.test.ts (6 tests) 13ms
- ✓ bots/mail-sentinel/src/util/paths.test.ts (12 tests) 11ms
- ✓ bots/mail-sentinel/src/state/thread.test.ts (5 tests) 25ms
- ✓ bots/mail-sentinel/src/imap/exec.test.ts (7 tests) 16ms
- ✓ bots/mail-sentinel/src/commands/digest.test.ts (4 tests) 31ms
- ✓ bots/reality-alignment/src/util.test.ts (8 tests) 29ms
- ✓ bots/reality-alignment/src/levels.test.ts (4 tests) 12ms
- ✓ bots/project-sentinel/src/config/args.test.ts (3 tests) 8ms
- ✓ bots/mail-sentinel/src/alerts/short-ref.test.ts (12 tests) 17ms
- ✓ bots/mail-sentinel/src/util/imap-search-query.test.ts (6 tests) 10ms
- ✓ bots/mail-sentinel/src/scoring/zone.test.ts (4 tests) 8ms
- ✓ bots/mail-sentinel/src/config/runtime.test.ts (65 tests) 10427ms
-   ✓ config/runtime > classifyCandidate > includes a stdout excerpt when no structured payload is present  1009ms
-   ✓ config/runtime > classifyCandidate > reports an empty stdout excerpt when lobster prints nothing  1013ms
-   ✓ config/runtime > classifyCandidate > throws when lobster returns no JSON payload  1012ms
-   ✓ config/runtime > classifyCandidate > handles classifyCandidate errors with stdout-only content  1008ms
-   ✓ config/runtime > classifyCandidate > handles classifyCandidate errors with neither stdout nor stderr as strings  1011ms
-   ✓ config/runtime > classifyCandidate > surfaces lobster execFile errors with context  1007ms
-   ✓ config/runtime > classifyCandidate > explains a spawn ENOENT with the override it was given  1002ms
+ ✓ bots/project-sentinel/src/util.test.ts (5 tests) 16ms
+ ✓ bots/reality-alignment/src/checkins.test.ts (6 tests) 5ms
+ ✓ bots/mail-sentinel/src/commands/version.test.ts (9 tests) 7ms
+ ✓ bots/reality-alignment/src/resistance.test.ts (5 tests) 6ms
+ ✓ bots/reality-alignment/src/wishes.test.ts (8 tests) 21ms
+ ✓ bots/mail-sentinel/src/commands/list-alerts.test.ts (5 tests) 12ms
+ ✓ bots/reality-alignment/src/state.test.ts (4 tests) 38ms
+ ✓ bots/reality-alignment/src/review.test.ts (6 tests) 5ms
+ ✓ bots/mail-sentinel/src/util/paths.test.ts (12 tests) 8ms
+ ✓ bots/mail-sentinel/src/imap/exec.test.ts (7 tests) 7ms
+ ✓ bots/mail-sentinel/src/commands/digest.test.ts (4 tests) 22ms
+ ✓ bots/reality-alignment/src/util.test.ts (8 tests) 5ms
+ ✓ bots/reality-alignment/src/levels.test.ts (4 tests) 4ms
+ ✓ bots/mail-sentinel/src/alerts/short-ref.test.ts (12 tests) 5ms
+ ✓ bots/project-sentinel/src/config/args.test.ts (3 tests) 4ms
+ ✓ bots/mail-sentinel/src/scoring/zone.test.ts (4 tests) 3ms
+ ✓ bots/mail-sentinel/src/util/imap-search-query.test.ts (6 tests) 4ms
+ ✓ bots/mail-sentinel/src/state/thread.test.ts (2 tests) 3ms
+ ✓ bots/mail-sentinel/src/config/runtime.test.ts (73 tests) 11371ms
+   ✓ config/runtime > classifyCandidate > includes a stdout excerpt when no structured payload is present  1006ms
+   ✓ config/runtime > classifyCandidate > reports an empty stdout excerpt when lobster prints nothing  1003ms
+   ✓ config/runtime > classifyCandidate > throws when lobster returns no JSON payload  1005ms
+   ✓ config/runtime > classifyCandidate > handles classifyCandidate errors with stdout-only content  1009ms
+   ✓ config/runtime > classifyCandidate > handles classifyCandidate errors with neither stdout nor stderr as strings  1003ms
+   ✓ config/runtime > classifyCandidate > surfaces lobster execFile errors with context  1004ms
+   ✓ config/runtime > classifyCandidate > explains a spawn ENOENT with the override it was given  1004ms
    ✓ config/runtime > classifyCandidate > explains a spawn ENOENT with the locations it searched  1004ms
+   ✓ config/runtime > classifyCandidate > treats a non-refusal envelope error as an ordinary (retried) failure  1003ms
    ✓ config/runtime > classifyCandidate > gives up after the retry budget is exhausted and surfaces the last error  1003ms
    ✓ config/runtime > classifyCandidate additional shapes > handles lobster errors that surface only via stdout  1003ms
- ✓ bots/project-sentinel/src/state.test.ts (4 tests) 10480ms
-   ✓ project-sentinel/state > times out when a fresh lock never clears  10336ms
+ ✓ bots/project-sentinel/src/state.test.ts (4 tests) 10269ms
+   ✓ project-sentinel/state > times out when a fresh lock never clears  10196ms
 
- Test Files  65 passed (65)
-      Tests  1040 passed (1040)
-   Start at  19:48:15
-   Duration  15.53s (transform 4.75s, setup 0ms, collect 12.10s, tests 23.72s, environment 33ms, prepare 10.58s)
+ Test Files  66 passed (66)
+      Tests  1076 passed (1076)
+   Start at  10:34:52
+   Duration  13.06s (transform 2.74s, setup 0ms, collect 6.69s, tests 23.60s, environment 21ms, prepare 5.54s)
 
