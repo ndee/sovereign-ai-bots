@@ -55,7 +55,7 @@ export class FakeMailSentinelRuntime {
   // IMAP tool surface
   searchMail = async (
     _limit: number,
-  ): Promise<{ messages: unknown[]; uidValidity?: string; query?: string }> => ({
+  ): Promise<{ messages: unknown[]; uidValidity?: string; note?: string; query?: string }> => ({
     messages: [],
     query: "since:2026-08-14",
   });
