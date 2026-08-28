@@ -441,6 +441,11 @@ export class MailSentinelRuntime {
       subject?: unknown;
     }>;
     uidValidity?: string;
+    /**
+     * Diagnostic from the mail tool about the mailbox view itself (e.g. a
+     * POP3 window that excludes recent mail). Surfaced as a scan warning.
+     */
+    note?: string;
     /** The effective `--query` handed to `imap-search-mail`, for reporting. */
     query: string;
   }> {
@@ -467,6 +472,7 @@ export class MailSentinelRuntime {
         subject?: unknown;
       }>;
       uidValidity?: string;
+      note?: string;
     };
     return { ...result, query };
   }

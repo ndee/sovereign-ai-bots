@@ -353,6 +353,13 @@ export const scan = async (
       const warnings: string[] = [];
       const searchResult = await searchMailWithRetry(runtime, warnings, throwIfInterrupted);
       throwIfInterrupted();
+      // The mail tool can annotate a structurally impaired mailbox view (e.g.
+      // a POP3 window stuck in the past that hides recent mail). Without
+      // surfacing it, such a scan is indistinguishable from a healthy quiet
+      // mailbox — the silent-mail-loss shape this bot must never present.
+      if (typeof searchResult.note === "string" && searchResult.note.length > 0) {
+        warnings.push(searchResult.note);
+      }
       const searchMessages = Array.isArray(searchResult.messages)
         ? searchResult.messages.slice().sort((left, right) => left.uid - right.uid)
         : [];

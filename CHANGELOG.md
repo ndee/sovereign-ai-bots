@@ -15,6 +15,14 @@ version.
 
 ## [Unreleased]
 
+### Added
+
+- mail-sentinel: a `note` returned by the node's read-only mail tool search
+  (e.g. a POP3 window stuck in the past that hides recent mail, as Gmail's
+  "all mail" POP mode produces) is surfaced as a scan warning, so a
+  structurally blind mailbox view no longer reads as a healthy quiet scan
+  (ndee/sovereign-ai-node#243).
+
 ## [2.0.12] - 2026-08-24
 
 POP3 support and real mail reconfiguration with post-install Settings UI, OpenRouter privacy routing, and security hardening (LAN-bound Pro API, secret-free install job records, per-node relay enrollment secret)

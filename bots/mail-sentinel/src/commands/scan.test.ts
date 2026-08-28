@@ -509,6 +509,26 @@ describe("commands/scan", () => {
     expect(runtime.state.mailbox.lastSeenUid).toBe(10);
   });
 
+  it("surfaces a mail-tool note (e.g. stuck POP3 window) as a scan warning", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => ({
+      messages: [],
+      note: "POP3 shows 269 message(s) but the newest dated one is from 2008-02-02, far older than the search window — the server's POP3 view appears to exclude recent mail.",
+    });
+    const result = await scan({ instance: "ms-core" });
+    expect(result.newMessages).toBe(0);
+    expect(result.warningCount).toBe(1);
+    expect(result.note).toContain("appears to exclude recent mail");
+  });
+
+  it("ignores an empty mail-tool note", async () => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => ({ messages: [], note: "" });
+    const result = await scan({ instance: "ms-core" });
+    expect(result.warningCount).toBeUndefined();
+    expect(result.note).toBeUndefined();
+  });
+
   it("records uidValidity on first sighting without resetting lastSeenUid", async () => {
     const runtime = setupRuntimeForScan();
     runtime.state.mailbox.lastSeenUid = 5;
