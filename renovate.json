@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "dependencyDashboard": true,
+  "dependencyDashboardApproval": true,
+  "timezone": "Europe/Berlin",
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Group every third-party npm dependency into a single non-major PR to minimize CI runs on this repo, excluding the vitest coverage-tooling family which is grouped and gated separately below.",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "matchPackageNames": ["!vitest", "!@vitest/coverage-v8"],
+      "groupName": "third-party dependencies (non-major)",
+      "groupSlug": "third-party-deps-non-major"
+    },
+    {
+      "description": "Group major updates separately so a single breaking major cannot block routine patch/minor bumps.",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "matchPackageNames": ["!vitest", "!@vitest/coverage-v8"],
+      "groupName": "third-party dependencies (major)",
+      "groupSlug": "third-party-deps-major"
+    },
+    {
+      "description": "vitest + @vitest/coverage-v8 move together and stay isolated from unrelated bumps: this repo enforces a 100% unit coverage CI gate, and a coverage-tooling break must never be masked by or block other dependency updates.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["vitest", "@vitest/coverage-v8"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "groupName": "vitest coverage tooling (non-major)",
+      "groupSlug": "vitest-coverage-tooling-non-major"
+    },
+    {
+      "description": "Major bumps of vitest/@vitest/coverage-v8 are the highest-risk change in this repo (can silently break the 100% coverage gate), so they are isolated into their own group and always require explicit Dependency Dashboard approval.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["vitest", "@vitest/coverage-v8"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "vitest coverage tooling (major)",
+      "groupSlug": "vitest-coverage-tooling-major",
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
