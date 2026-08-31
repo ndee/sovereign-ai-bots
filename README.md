@@ -127,13 +127,18 @@ Visible Matrix alerts and digests stay compact on purpose: internal alert IDs an
 
 ## node-operator
 
-The operational bot for interacting with the local node.
+The conversational operator surface for the local node — the daily Matrix
+entry point for design partners.
 
 It:
 
-- inspects node state
-- assists with operator-facing tasks
-- exposes controlled operational functionality
+- answers `status` and `health` with a product-safe component summary
+- explains SAN error codes in plain language (`explain <code>`)
+- guides operators to the local Node Status page for diagnostics and
+  support packages (`support`)
+- reports its immutable build identity (`version`)
+
+All of its tools are read-only; see `bots/node-operator/README.md`.
 
 ---
 
