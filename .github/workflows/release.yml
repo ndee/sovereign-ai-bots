@@ -28,6 +28,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Recovery may check out an older release commit. Keep the current
+      # control-plane lookup and verifier available across that checkout.
+      - name: Stage current release control tooling
+        run: |
+          install -d -m 0755 "$RUNNER_TEMP/release-control"
+          install -m 0755 \
+            scripts/find-github-release.sh \
+            scripts/verify-github-assets.sh \
+            "$RUNNER_TEMP/release-control/"
+
       - name: Require release automation token
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
@@ -73,18 +83,34 @@ jobs:
             exit 1
           fi
 
-          if ! RELEASE_JSON="$(gh api \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2026-03-10' \
-            "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" 2>/dev/null)"; then
-            if [[ "$RELEASE_CREATED" == "true" || "$EVENT_NAME" == "workflow_dispatch" ]]; then
-              echo "::error::Release $TAG does not exist."
-              exit 1
+          set +e
+          RELEASE_JSON="$(
+            bash "$RUNNER_TEMP/release-control/find-github-release.sh" "$TAG"
+          )"
+          LOOKUP_STATUS=$?
+          set -e
+          if [[ "$LOOKUP_STATUS" != "0" ]]; then
+            if [[ "$LOOKUP_STATUS" == "4" && "$RELEASE_CREATED" != "true" && "$EVENT_NAME" == "push" ]]; then
+              echo 'process=false' >> "$GITHUB_OUTPUT"
+              exit 0
             fi
-            echo 'process=false' >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Could not resolve exactly one GitHub Release for $TAG (status $LOOKUP_STATUS)."
+            exit 1
           fi
 
+          if ! jq -e --arg tag "$TAG" '
+            type == "object" and
+            (.id | (type == "number") and (floor == .) and (. > 0)) and
+            (.tag_name | (type == "string") and (. == $tag)) and
+            (.target_commitish | (type == "string") and test("^[0-9a-f]{40}$")) and
+            (.draft | type == "boolean")
+          ' <<<"$RELEASE_JSON" >/dev/null; then
+            echo "::error::Release $TAG has invalid GitHub metadata."
+            exit 1
+          fi
+
+          RELEASE_ID="$(jq -r '.id' <<<"$RELEASE_JSON")"
+          TARGET_COMMITISH="$(jq -r '.target_commitish' <<<"$RELEASE_JSON")"
           IS_DRAFT="$(jq -r '.draft' <<<"$RELEASE_JSON")"
           if [[ "$RELEASE_CREATED" == "true" && "$IS_DRAFT" != "true" ]]; then
             echo "::error::Release Please did not create $TAG as a draft."
@@ -105,8 +131,12 @@ jobs:
             echo "::error::Release Please reported $RELEASE_SHA but $TAG resolves to $TAG_SHA."
             exit 1
           fi
-          printf 'process=true\ndraft=%s\ntag=%s\nsha=%s\n' \
-            "$IS_DRAFT" "$TAG" "$TAG_SHA" >> "$GITHUB_OUTPUT"
+          if [[ "$TARGET_COMMITISH" != "$TAG_SHA" ]]; then
+            echo "::error::Release $TAG targets $TARGET_COMMITISH, expected $TAG_SHA."
+            exit 1
+          fi
+          printf 'process=true\ndraft=%s\ntag=%s\nsha=%s\nrelease_id=%s\n' \
+            "$IS_DRAFT" "$TAG" "$TAG_SHA" "$RELEASE_ID" >> "$GITHUB_OUTPUT"
 
       - name: Check out the release commit
         if: steps.resolve.outputs.process == 'true'
@@ -208,10 +238,11 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
           RELEASE_SHA: ${{ steps.resolve.outputs.sha }}
+          RELEASE_ID: ${{ steps.resolve.outputs.release_id }}
         run: |
           TARBALL="release-assets/sovereign-ai-bots-${RELEASE_TAG#v}.tgz"
-          bash scripts/verify-github-assets.sh \
-            draft "$RELEASE_TAG" "$RELEASE_SHA" \
+          bash "$RUNNER_TEMP/release-control/verify-github-assets.sh" \
+            draft "$RELEASE_TAG" "$RELEASE_SHA" "$RELEASE_ID" \
             release-assets/component-release.json \
             "$TARBALL"
 
@@ -233,10 +264,11 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
           RELEASE_SHA: ${{ steps.resolve.outputs.sha }}
+          RELEASE_ID: ${{ steps.resolve.outputs.release_id }}
         run: |
           TARBALL="release-assets/sovereign-ai-bots-${RELEASE_TAG#v}.tgz"
-          bash scripts/verify-github-assets.sh \
-            published "$RELEASE_TAG" "$RELEASE_SHA" \
+          bash "$RUNNER_TEMP/release-control/verify-github-assets.sh" \
+            published "$RELEASE_TAG" "$RELEASE_SHA" "$RELEASE_ID" \
             release-assets/component-release.json \
             "$TARBALL"
 

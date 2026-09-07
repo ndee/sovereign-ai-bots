@@ -25,6 +25,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:artifact": "node scripts/release-artifact.mjs test",
+    "test:release-control": "bash scripts/test-release-control.sh",
     "test:coverage:unit": "vitest run --config vitest.unit.config.ts",
     "test:watch": "vitest",
     "catalog:lint": "tsx src/bin/validate-catalog.ts lint",

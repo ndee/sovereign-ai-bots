@@ -40,6 +40,7 @@ jobs:
             project-sentinel
             reality-alignment
             catalog
+            release
             tooling
             deps
           requireScope: false
@@ -127,6 +128,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:artifact
+      - run: pnpm test:release-control
 
   smoke:
     name: Smoke Tests
