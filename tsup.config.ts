@@ -16,9 +16,11 @@ import { defineConfig } from "tsup";
  */
 const UNKNOWN = "unknown";
 
-const readPackageVersion = (): string => {
+const readMailSentinelVersion = (): string => {
   try {
-    const parsed: unknown = JSON.parse(readFileSync("package.json", "utf8"));
+    const parsed: unknown = JSON.parse(
+      readFileSync("bots/mail-sentinel/sovereign-bot.json", "utf8"),
+    );
     if (typeof parsed === "object" && parsed !== null) {
       const version = (parsed as { version?: unknown }).version;
       if (typeof version === "string" && version.length > 0) {
@@ -50,12 +52,14 @@ const readGitCommit = (): string => {
 };
 
 const readReleaseId = (): string => {
+  // The independent upstream release owns this identity: it is the immutable
+  // Bots component tag (vX.Y.Z), not a downstream Pro release tuple.
   const supplied = process.env.SOVEREIGN_RELEASE_ID?.trim();
   return supplied !== undefined && supplied.length > 0 ? supplied : UNKNOWN;
 };
 
 const BUILD_DEFINES = {
-  __MAIL_SENTINEL_VERSION__: JSON.stringify(readPackageVersion()),
+  __MAIL_SENTINEL_VERSION__: JSON.stringify(readMailSentinelVersion()),
   __MAIL_SENTINEL_COMMIT__: JSON.stringify(readGitCommit()),
   __SOVEREIGN_RELEASE_ID__: JSON.stringify(readReleaseId()),
   __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
@@ -63,10 +67,7 @@ const BUILD_DEFINES = {
 
 export default defineConfig([
   {
-    entry: [
-      "src/bin/validate-catalog.ts",
-      "src/bin/probe-mail-sentinel-chat-model.ts",
-    ],
+    entry: ["src/bin/validate-catalog.ts", "src/bin/probe-mail-sentinel-chat-model.ts"],
     format: "esm",
     dts: true,
     outDir: "dist",
@@ -74,6 +75,9 @@ export default defineConfig([
     clean: true,
     splitting: false,
     sourcemap: false,
+    // Release artifacts are installed without an on-device dependency install.
+    // Bundle the catalog's sole runtime dependency into both root entrypoints.
+    noExternal: ["zod"],
   },
   {
     entry: { "mail-sentinel": "bots/mail-sentinel/src/cli.ts" },
@@ -83,7 +87,7 @@ export default defineConfig([
     target: "node22",
     clean: true,
     splitting: false,
-    sourcemap: true,
+    sourcemap: false,
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
     define: BUILD_DEFINES,
@@ -96,7 +100,7 @@ export default defineConfig([
     target: "node22",
     clean: true,
     splitting: false,
-    sourcemap: true,
+    sourcemap: false,
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
   },
@@ -108,7 +112,7 @@ export default defineConfig([
     target: "node22",
     clean: true,
     splitting: false,
-    sourcemap: true,
+    sourcemap: false,
     shims: false,
     banner: { js: "#!/usr/bin/env node" },
   },

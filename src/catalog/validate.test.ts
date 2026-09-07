@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -541,10 +541,14 @@ describe("catalog validator", () => {
     ).resolves.toBe(0);
     expect(commandLines).toContain("Typecheck passed for 5 bot packages.");
     expect(commandLines).toContain("Catalog tests passed for 5 bot packages.");
-    expect(commandLines.some((line) => line.startsWith("Smoked mail-sentinel@2.0.12"))).toBe(true);
-    expect(commandLines.some((line) => line.startsWith("Smoked project-sentinel@2.0.0"))).toBe(
-      true,
-    );
+    for (const botId of ["mail-sentinel", "project-sentinel"]) {
+      const manifest = JSON.parse(
+        await readFile(join(repoRoot, "bots", botId, "sovereign-bot.json"), "utf8"),
+      ) as { id: string; version: string };
+      expect(
+        commandLines.some((line) => line.startsWith(`Smoked ${manifest.id}@${manifest.version}`)),
+      ).toBe(true);
+    }
     expect(commandErrors).toEqual([]);
 
     const failingRoot = await createCatalogRoot();

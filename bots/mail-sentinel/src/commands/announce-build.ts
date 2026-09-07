@@ -15,9 +15,9 @@ import { readJsonFile, writeJsonFile } from "../state/io.js";
  * — the notice is posted through the same authenticated room-send the alert
  * path uses, so a delivered notice proves the room is reachable.
  *
- * The identity compared is version+commit+releaseId, not version alone: a
- * rebuild at the same version but a different commit is a different build and
- * an operator verifying an update needs to see it.
+ * The identity compared is version+commit+releaseId, not version alone: a rebuild
+ * at the same version but a different commit or immutable Bots tag is a different
+ * build, and an operator verifying an update needs to see it.
  *
  * Persistence happens ONLY after Matrix confirms delivery. A failed send leaves
  * the record untouched so the next scan retries, and a send failure never
@@ -28,7 +28,7 @@ import { readJsonFile, writeJsonFile } from "../state/io.js";
 export const BUILD_IDENTITY_FILENAME = "mail-sentinel-build-identity.json";
 
 interface AnnouncedIdentityRecord {
-  /** version+commit+releaseId of the last SUCCESSFULLY announced build. */
+  /** version+commit+immutable Bots tag of the last SUCCESSFULLY announced build. */
   announcedIdentity?: unknown;
   announcedAt?: unknown;
 }

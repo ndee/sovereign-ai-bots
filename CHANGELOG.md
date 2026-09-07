@@ -6,8 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
-From this point forward, GitHub Release notes are auto-generated from commit history
-by the `.github/workflows/release.yml` workflow.
+From this point forward, Release Please maintains the catalog version, changelog,
+tag, and draft GitHub Release. The release workflow publishes only after its packed
+artifact passes the same contract exercised in pull-request CI.
 
 Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
