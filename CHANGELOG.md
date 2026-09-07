@@ -14,6 +14,14 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.1.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.0.12...v2.1.0) (2026-09-07)
+
+
+### Features
+
+* **mail-sentinel:** surface mail-tool search notes as scan warnings ([#160](https://github.com/ndee/sovereign-ai-bots/issues/160)) ([37ac581](https://github.com/ndee/sovereign-ai-bots/commit/37ac581b009b8628cbd083db03b4fdeeb9dcfd66))
+* **tooling:** add immutable release artifact pipeline ([#162](https://github.com/ndee/sovereign-ai-bots/issues/162)) ([c2b9deb](https://github.com/ndee/sovereign-ai-bots/commit/c2b9deb9adabce81e86a38f7b9552f4734198c83))
+
 ## [Unreleased]
 
 ### Added
