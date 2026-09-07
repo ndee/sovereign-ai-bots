@@ -21,6 +21,7 @@ export interface VersionCommandResult {
   readonly version: string;
   /** Full commit SHA; chat rendering shortens it. */
   readonly commit: string;
+  /** Immutable Bots component release tag, for example `v2.0.13`. */
   readonly releaseId: string;
   readonly buildTimestamp: string;
   /** Wall-clock UTC at which this invocation reported. */

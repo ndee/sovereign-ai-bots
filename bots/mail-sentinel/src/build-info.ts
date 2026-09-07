@@ -6,9 +6,9 @@
  * running process reports what was actually built — not what a mutable checkout,
  * a branch name, or a JSON file on disk happens to say right now.
  *
- * This matters because the release bundle deliberately strips `.git`
- * (scripts/release/build-release-bundle.sh), so `git describe` at runtime is
- * impossible by design, and because the updater must not accept
+ * This matters because the immutable Bots release artifact deliberately strips
+ * `.git`, so `git describe` at runtime is impossible by design, and because the
+ * updater must not accept
  * `sovereign-bot.json` as proof that the installed code actually runs.
  *
  * When a value could not be determined at build time it is reported as
@@ -32,7 +32,7 @@ export interface BuildInfo {
   readonly version: string;
   /** Full lowercase source commit SHA, or `unknown`. */
   readonly commit: string;
-  /** Supported release tuple this bundle was built for, or `unknown`. */
+  /** Immutable Bots component release tag this bundle came from, or `unknown`. */
   readonly releaseId: string;
   /** ISO-8601 UTC build timestamp, or `unknown`. */
   readonly buildTimestamp: string;
@@ -93,7 +93,7 @@ export const isBuildIdentityComplete = (info: BuildInfo): boolean =>
 /**
  * Stable identity string used to decide whether this build was already
  * announced. Deliberately stronger than version alone: a rebuild at the same
- * version but a different commit or release tuple is a different build.
+ * version but a different commit or component release tag is a different build.
  */
 export const buildIdentityKey = (info: BuildInfo): string =>
   `${info.version}+${info.commit}+${info.releaseId}`;

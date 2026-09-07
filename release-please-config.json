@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "sovereign-ai-bots",
+      "include-component-in-tag": false,
+      "include-v-in-tag": true,
+      "pull-request-title-pattern": "chore: release ${version}",
+      "pull-request-footer": "## Validation\n\nCI-only: automated version/changelog update; release workflow rebuilds and tests the exact commit before publishing.",
+      "draft": true,
+      "force-tag-creation": true
+    }
+  }
+}

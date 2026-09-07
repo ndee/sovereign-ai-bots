@@ -11,19 +11,28 @@
     "validate-catalog": "./dist/validate-catalog.js",
     "probe-mail-sentinel-chat-model": "./dist/probe-mail-sentinel-chat-model.js"
   },
+  "files": [
+    "dist/validate-catalog.js",
+    "dist/probe-mail-sentinel-chat-model.js",
+    "bots/*/sovereign-bot.json",
+    "bots/*/avatar.png",
+    "bots/*/workspace/**"
+  ],
   "scripts": {
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "typecheck": "tsc --noEmit",
     "build": "tsup",
     "test": "vitest run",
+    "test:artifact": "node scripts/release-artifact.mjs test",
     "test:coverage:unit": "vitest run --config vitest.unit.config.ts",
     "test:watch": "vitest",
     "catalog:lint": "tsx src/bin/validate-catalog.ts lint",
     "catalog:typecheck": "tsx src/bin/validate-catalog.ts typecheck",
     "catalog:test": "tsx src/bin/validate-catalog.ts test",
     "catalog:smoke": "tsx src/bin/validate-catalog.ts smoke",
-    "probe:mail-sentinel-model": "tsx src/bin/probe-mail-sentinel-chat-model.ts"
+    "probe:mail-sentinel-model": "tsx src/bin/probe-mail-sentinel-chat-model.ts",
+    "release:artifact": "node scripts/release-artifact.mjs build"
   },
   "dependencies": {
     "zod": "^4.1.5"
@@ -36,10 +45,5 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
-  },
-  "packages": {
-    "": {
-      "version": "2.0.12"
-    }
   }
 }
