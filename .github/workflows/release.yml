@@ -31,6 +31,7 @@ jobs:
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.path == '.github/workflows/ci.yml' &&
        github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
@@ -56,6 +57,7 @@ jobs:
           CI_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CI_RUN_ID: ${{ github.event.workflow_run.id }}
           CI_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          CI_WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
           RECOVERY_CI_RUN_ID: ${{ inputs.ci_run_id }}
         run: |
           set -euo pipefail
@@ -63,7 +65,8 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
             APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh \
               workflow-run "$CI_HEAD_SHA" "$CI_RUN_ID" "$CI_WORKFLOW_NAME" \
-              "$CI_CONCLUSION" "$CI_EVENT" "$CI_HEAD_BRANCH" "$CI_HEAD_REPOSITORY")"
+              "$CI_CONCLUSION" "$CI_EVENT" "$CI_HEAD_BRANCH" \
+              "$CI_HEAD_REPOSITORY" "$CI_WORKFLOW_PATH")"
           else
             APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh \
               workflow-dispatch "$RECOVERY_CI_RUN_ID")"
@@ -302,14 +305,16 @@ jobs:
             --jq 'select(.enabled == true) | .enabled' |
             grep -qx true
 
-      - name: Revalidate current main before draft asset upload
-        id: asset_gate
+      - name: Attach all assets to the draft
+        id: asset_upload
         if: steps.resolve.outputs.process == 'true' && steps.resolve.outputs.draft == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
         run: |
           set -euo pipefail
+          TARBALL="release-assets/sovereign-ai-bots-${RELEASE_TAG#v}.tgz"
           set +e
           bash "$RUNNER_TEMP/release-control/check-release-ci-gate.sh" \
             revalidate "$APPROVED_SHA"
@@ -324,28 +329,17 @@ jobs:
             echo "::error::Pre-upload CI gate failed with status $GATE_STATUS."
             exit "$GATE_STATUS"
           fi
-          echo 'upload=true' >> "$GITHUB_OUTPUT"
-
-      - name: Attach all assets to the draft
-        if: >-
-          steps.resolve.outputs.process == 'true' &&
-          steps.resolve.outputs.draft == 'true' &&
-          steps.asset_gate.outputs.upload == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
-        run: |
-          TARBALL="release-assets/sovereign-ai-bots-${RELEASE_TAG#v}.tgz"
           gh release upload "$RELEASE_TAG" \
             release-assets/component-release.json \
             "$TARBALL" \
             --clobber
+          echo 'upload=true' >> "$GITHUB_OUTPUT"
 
       - name: Verify complete draft on GitHub
         if: >-
           steps.resolve.outputs.process == 'true' &&
           steps.resolve.outputs.draft == 'true' &&
-          steps.asset_gate.outputs.upload == 'true'
+          steps.asset_upload.outputs.upload == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -358,17 +352,23 @@ jobs:
             release-assets/component-release.json \
             "$TARBALL"
 
-      - name: Revalidate current main immediately before publication
-        id: publish_gate
+      - name: Publish the immutable release
+        id: publish_release
         if: >-
           steps.resolve.outputs.process == 'true' &&
           steps.resolve.outputs.draft == 'true' &&
-          steps.asset_gate.outputs.upload == 'true'
+          steps.asset_upload.outputs.upload == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
         run: |
           set -euo pipefail
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            PUBLISH_MODE=--prerelease
+          else
+            PUBLISH_MODE=--latest
+          fi
           set +e
           bash "$RUNNER_TEMP/release-control/check-release-ci-gate.sh" \
             revalidate "$APPROVED_SHA"
@@ -376,35 +376,21 @@ jobs:
           set -e
           if [[ "$GATE_STATUS" == "5" ]]; then
             echo "::notice::Release remains a draft because main advanced after CI approval."
-            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo 'published=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ "$GATE_STATUS" != "0" ]]; then
             echo "::error::Pre-publication CI gate failed with status $GATE_STATUS."
             exit "$GATE_STATUS"
           fi
-          echo 'publish=true' >> "$GITHUB_OUTPUT"
-
-      - name: Publish the immutable release
-        if: >-
-          steps.resolve.outputs.process == 'true' &&
-          steps.resolve.outputs.draft == 'true' &&
-          steps.publish_gate.outputs.publish == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
-        run: |
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease
-          else
-            gh release edit "$RELEASE_TAG" --draft=false --latest
-          fi
+          gh release edit "$RELEASE_TAG" --draft=false "$PUBLISH_MODE"
+          echo 'published=true' >> "$GITHUB_OUTPUT"
 
       - name: Verify published release metadata and assets
         if: >-
           steps.resolve.outputs.process == 'true' &&
           (steps.resolve.outputs.draft != 'true' ||
-           steps.publish_gate.outputs.publish == 'true')
+           steps.publish_release.outputs.published == 'true')
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -421,7 +407,7 @@ jobs:
         if: >-
           steps.resolve.outputs.process == 'true' &&
           (steps.resolve.outputs.draft != 'true' ||
-           steps.publish_gate.outputs.publish == 'true')
+           steps.publish_release.outputs.published == 'true')
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}

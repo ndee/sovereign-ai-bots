@@ -62,9 +62,11 @@ case "$MODE" in
     CI_EVENT="${6:-}"
     CI_HEAD_BRANCH="${7:-}"
     CI_HEAD_REPOSITORY="${8:-}"
+    CI_WORKFLOW_PATH="${9:-}"
     if [[ "$CI_WORKFLOW_NAME" != "CI" || "$CI_CONCLUSION" != "success" || \
       "$CI_EVENT" != "push" || "$CI_HEAD_BRANCH" != "main" || \
       "$CI_HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" || \
+      "$CI_WORKFLOW_PATH" != ".github/workflows/ci.yml" || \
       ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
       echo 'The workflow_run payload is not an approved successful main CI run.' >&2
       exit 4
@@ -85,7 +87,8 @@ case "$MODE" in
     fi
     if ! jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$EXPECTED_SHA" '
       type == "object" and
-      .name == "CI" and .event == "push" and .head_branch == "main" and
+      .name == "CI" and .path == ".github/workflows/ci.yml" and
+      .event == "push" and .head_branch == "main" and
       .head_repository.full_name == $repo and .head_sha == $sha and
       .status == "completed" and .conclusion == "success"
     ' <<<"$run_json" >/dev/null; then
@@ -106,7 +109,7 @@ case "$MODE" in
     fi
     ;;
   *)
-    echo 'usage: check-release-ci-gate.sh workflow-run <sha> <run-id> <name> <conclusion> <event> <branch> <head-repo>' >&2
+    echo 'usage: check-release-ci-gate.sh workflow-run <sha> <run-id> <name> <conclusion> <event> <branch> <head-repo> <path>' >&2
     echo '       check-release-ci-gate.sh workflow-dispatch <ci-run-id>' >&2
     echo '       check-release-ci-gate.sh revalidate <sha>' >&2
     exit 64

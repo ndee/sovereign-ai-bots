@@ -230,16 +230,16 @@ cat >"$WORK_DIR/ci-jobs.json" <<'EOF'
 EOF
 export MOCK_CI_JOBS="$WORK_DIR/ci-jobs.json"
 cat >"$WORK_DIR/ci-run.json" <<EOF
-{"id":101,"name":"CI","event":"push","head_branch":"main","head_sha":"$approved_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
+{"id":101,"name":"CI","path":".github/workflows/ci.yml","event":"push","head_branch":"main","head_sha":"$approved_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
 EOF
 export MOCK_CI_RUN="$WORK_DIR/ci-run.json"
 
-[[ "$(bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project)" == "$approved_sha" ]]
+[[ "$(bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project .github/workflows/ci.yml)" == "$approved_sha" ]]
 [[ "$(bash "$CI_GATE" workflow-dispatch 101)" == "$approved_sha" ]]
 [[ "$(bash "$CI_GATE" revalidate "$approved_sha")" == "$approved_sha" ]]
 
 set +e
-bash "$CI_GATE" workflow-run "$approved_sha" 101 CI failure push main example/project \
+bash "$CI_GATE" workflow-run "$approved_sha" 101 CI failure push main example/project .github/workflows/ci.yml \
   >"$WORK_DIR/failed-ci.out" 2>"$WORK_DIR/failed-ci.err"
 failed_ci_status=$?
 set -e
@@ -253,16 +253,23 @@ for unsafe_args in \
   'CI success push main attacker/fork'; do
   set +e
   # shellcheck disable=SC2086 -- intentional argument fixture expansion
-  bash "$CI_GATE" workflow-run "$approved_sha" 101 $unsafe_args \
+  bash "$CI_GATE" workflow-run "$approved_sha" 101 $unsafe_args .github/workflows/ci.yml \
     >"$WORK_DIR/unsafe-event.out" 2>"$WORK_DIR/unsafe-event.err"
   unsafe_event_status=$?
   set -e
   [[ "$unsafe_event_status" == "4" ]]
 done
 
+set +e
+bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project .github/workflows/other.yml \
+  >"$WORK_DIR/wrong-workflow.out" 2>"$WORK_DIR/wrong-workflow.err"
+wrong_workflow_status=$?
+set -e
+[[ "$wrong_workflow_status" == "4" ]]
+
 export MOCK_MAIN_SHA="$newer_sha"
 set +e
-bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project \
+bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project .github/workflows/ci.yml \
   >"$WORK_DIR/stale.out" 2>"$WORK_DIR/stale.err"
 stale_status=$?
 set -e
@@ -275,7 +282,7 @@ cat >"$WORK_DIR/failed-gate-jobs.json" <<'EOF'
 EOF
 export MOCK_CI_JOBS="$WORK_DIR/failed-gate-jobs.json"
 set +e
-bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project \
+bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project .github/workflows/ci.yml \
   >"$WORK_DIR/failed-gate.out" 2>"$WORK_DIR/failed-gate.err"
 failed_gate_status=$?
 set -e
@@ -284,7 +291,7 @@ grep -q 'exactly one successful Release Gate job' "$WORK_DIR/failed-gate.err"
 
 export MOCK_CI_JOBS="$WORK_DIR/ci-jobs.json"
 cat >"$WORK_DIR/no-matching-run.json" <<EOF
-{"id":102,"name":"CI","event":"push","head_branch":"main","head_sha":"$newer_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
+{"id":102,"name":"CI","path":".github/workflows/ci.yml","event":"push","head_branch":"main","head_sha":"$newer_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
 EOF
 export MOCK_CI_RUN="$WORK_DIR/no-matching-run.json"
 set +e
@@ -297,7 +304,7 @@ grep -q 'not a successful push CI run for current main' "$WORK_DIR/manual-ungate
 
 export MOCK_GATE_FAILURE=jobs
 set +e
-bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project \
+bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project .github/workflows/ci.yml \
   >"$WORK_DIR/gate-api.out" 2>"$WORK_DIR/gate-api.err"
 gate_api_status=$?
 set -e
@@ -333,20 +340,30 @@ mutation_gate_line="$(grep -n 'Revalidate current main before release mutation' 
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 release_action_line="$(grep -n 'Open or advance the release PR' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
-publish_gate_line="$(grep -n 'Revalidate current main immediately before publication' \
-  "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
-asset_gate_line="$(grep -n 'Revalidate current main before draft asset upload' \
-  "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 asset_upload_line="$(grep -n 'Attach all assets to the draft' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 publish_line="$(grep -n 'Publish the immutable release' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 [[ "$mutation_gate_line" -lt "$release_action_line" ]]
-[[ "$asset_gate_line" -lt "$asset_upload_line" ]]
-[[ "$publish_gate_line" -lt "$publish_line" ]]
-grep -Fq "steps.asset_gate.outputs.upload == 'true'" \
+[[ "$asset_upload_line" -lt "$publish_line" ]]
+grep -Fq "steps.asset_upload.outputs.upload == 'true'" \
   "$REPO_ROOT/.github/workflows/release.yml"
-grep -Fq "steps.publish_gate.outputs.publish == 'true'" \
+grep -Fq "steps.publish_release.outputs.published == 'true'" \
   "$REPO_ROOT/.github/workflows/release.yml"
+
+asset_step="$(sed -n '/      - name: Attach all assets to the draft/,/      - name: Verify complete draft on GitHub/p' \
+  "$REPO_ROOT/.github/workflows/release.yml")"
+grep -Fq 'check-release-ci-gate.sh" \' <<<"$asset_step"
+grep -Fq 'gh release upload' <<<"$asset_step"
+asset_step_gate_line="$(grep -n 'check-release-ci-gate.sh' <<<"$asset_step" | cut -d: -f1)"
+asset_step_mutation_line="$(grep -n 'gh release upload' <<<"$asset_step" | cut -d: -f1)"
+[[ "$asset_step_gate_line" -lt "$asset_step_mutation_line" ]]
+publish_step="$(sed -n '/      - name: Publish the immutable release/,/      - name: Verify published release metadata and assets/p' \
+  "$REPO_ROOT/.github/workflows/release.yml")"
+grep -Fq 'check-release-ci-gate.sh" \' <<<"$publish_step"
+grep -Fq 'gh release edit' <<<"$publish_step"
+publish_step_gate_line="$(grep -n 'check-release-ci-gate.sh' <<<"$publish_step" | cut -d: -f1)"
+publish_step_mutation_line="$(grep -n 'gh release edit' <<<"$publish_step" | cut -d: -f1)"
+[[ "$publish_step_gate_line" -lt "$publish_step_mutation_line" ]]
 
 printf 'GitHub release control contract passed.\n'
