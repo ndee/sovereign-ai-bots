@@ -72,30 +72,29 @@ case "$MODE" in
     require_release_gate_job "$CI_RUN_ID" || exit $?
     ;;
   workflow-dispatch)
-    EXPECTED_SHA="$(current_main_sha)" || exit $?
-    runs_json=''
-    if ! runs_json="$(api --paginate --slurp \
-      "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=100")"; then
-      echo 'GitHub CI runs lookup failed.' >&2
-      exit 3
-    fi
-    if ! jq -e '
-      type == "array" and all(.[]; type == "object" and (.workflow_runs | type == "array"))
-    ' <<<"$runs_json" >/dev/null; then
-      echo 'GitHub CI runs lookup returned an invalid response.' >&2
-      exit 3
-    fi
-    CI_RUN_ID="$(jq -r --arg sha "$EXPECTED_SHA" '
-      [.[] | .workflow_runs[] |
-        select(
-          .name == "CI" and .event == "push" and .head_branch == "main" and
-          .head_sha == $sha and .status == "completed" and .conclusion == "success"
-        )] |
-      sort_by(.run_attempt, .id) | last | .id // empty
-    ' <<<"$runs_json")"
-    if [[ -z "$CI_RUN_ID" ]]; then
-      echo 'Current main has no successful push CI run.' >&2
+    CI_RUN_ID="${2:-}"
+    if [[ ! "$CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+      echo 'Manual recovery requires a valid CI run id.' >&2
       exit 4
+    fi
+    EXPECTED_SHA="$(current_main_sha)" || exit $?
+    run_json=''
+    if ! run_json="$(api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID")"; then
+      echo 'GitHub CI run lookup failed.' >&2
+      exit 3
+    fi
+    if ! jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$EXPECTED_SHA" '
+      type == "object" and
+      .name == "CI" and .event == "push" and .head_branch == "main" and
+      .head_repository.full_name == $repo and .head_sha == $sha and
+      .status == "completed" and .conclusion == "success"
+    ' <<<"$run_json" >/dev/null; then
+      echo 'The requested CI run is not a successful push CI run for current main.' >&2
+      exit 4
+    fi
+    if [[ "$(jq -r '.id' <<<"$run_json")" != "$CI_RUN_ID" ]]; then
+      echo 'GitHub returned a different CI run id.' >&2
+      exit 3
     fi
     require_release_gate_job "$CI_RUN_ID" || exit $?
     ;;
@@ -108,7 +107,7 @@ case "$MODE" in
     ;;
   *)
     echo 'usage: check-release-ci-gate.sh workflow-run <sha> <run-id> <name> <conclusion> <event> <branch> <head-repo>' >&2
-    echo '       check-release-ci-gate.sh workflow-dispatch' >&2
+    echo '       check-release-ci-gate.sh workflow-dispatch <ci-run-id>' >&2
     echo '       check-release-ci-gate.sh revalidate <sha>' >&2
     exit 64
     ;;

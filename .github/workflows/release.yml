@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      ci_run_id:
+        description: Successful main push CI run ID authorizing recovery/verification
+        required: true
+        type: string
       tag:
         description: Existing draft or published tag to recover/verify (defaults to package version)
         required: false
@@ -22,7 +26,7 @@ jobs:
   ci_gate:
     name: Authorize successful main CI
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.name == 'CI' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
@@ -52,6 +56,7 @@ jobs:
           CI_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CI_RUN_ID: ${{ github.event.workflow_run.id }}
           CI_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RECOVERY_CI_RUN_ID: ${{ inputs.ci_run_id }}
         run: |
           set -euo pipefail
           set +e
@@ -60,7 +65,8 @@ jobs:
               workflow-run "$CI_HEAD_SHA" "$CI_RUN_ID" "$CI_WORKFLOW_NAME" \
               "$CI_CONCLUSION" "$CI_EVENT" "$CI_HEAD_BRANCH" "$CI_HEAD_REPOSITORY")"
           else
-            APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh workflow-dispatch)"
+            APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh \
+              workflow-dispatch "$RECOVERY_CI_RUN_ID")"
           fi
           GATE_STATUS=$?
           set -e
@@ -296,8 +302,35 @@ jobs:
             --jq 'select(.enabled == true) | .enabled' |
             grep -qx true
 
-      - name: Attach all assets to the draft
+      - name: Revalidate current main before draft asset upload
+        id: asset_gate
         if: steps.resolve.outputs.process == 'true' && steps.resolve.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          set +e
+          bash "$RUNNER_TEMP/release-control/check-release-ci-gate.sh" \
+            revalidate "$APPROVED_SHA"
+          GATE_STATUS=$?
+          set -e
+          if [[ "$GATE_STATUS" == "5" ]]; then
+            echo "::notice::Draft assets remain unchanged because main advanced after CI approval."
+            echo 'upload=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GATE_STATUS" != "0" ]]; then
+            echo "::error::Pre-upload CI gate failed with status $GATE_STATUS."
+            exit "$GATE_STATUS"
+          fi
+          echo 'upload=true' >> "$GITHUB_OUTPUT"
+
+      - name: Attach all assets to the draft
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          steps.resolve.outputs.draft == 'true' &&
+          steps.asset_gate.outputs.upload == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -309,7 +342,10 @@ jobs:
             --clobber
 
       - name: Verify complete draft on GitHub
-        if: steps.resolve.outputs.process == 'true' && steps.resolve.outputs.draft == 'true'
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          steps.resolve.outputs.draft == 'true' &&
+          steps.asset_gate.outputs.upload == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -324,7 +360,10 @@ jobs:
 
       - name: Revalidate current main immediately before publication
         id: publish_gate
-        if: steps.resolve.outputs.process == 'true' && steps.resolve.outputs.draft == 'true'
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          steps.resolve.outputs.draft == 'true' &&
+          steps.asset_gate.outputs.upload == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}

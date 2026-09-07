@@ -205,13 +205,13 @@ case "$request" in
     [[ "${MOCK_GATE_FAILURE:-}" != "main" ]] || exit 17
     printf '%s\n' "$MOCK_MAIN_SHA"
     ;;
-  *actions/workflows/ci.yml/runs*)
-    [[ "${MOCK_GATE_FAILURE:-}" != "runs" ]] || exit 17
-    cat "$MOCK_CI_RUNS"
-    ;;
   *actions/runs/*/jobs*)
     [[ "${MOCK_GATE_FAILURE:-}" != "jobs" ]] || exit 17
     cat "$MOCK_CI_JOBS"
+    ;;
+  *actions/runs/*)
+    [[ "${MOCK_GATE_FAILURE:-}" != "runs" ]] || exit 17
+    cat "$MOCK_CI_RUN"
     ;;
   *)
     printf 'unexpected gate gh invocation: %s\n' "$request" >&2
@@ -229,15 +229,13 @@ cat >"$WORK_DIR/ci-jobs.json" <<'EOF'
 [{"jobs":[{"id":201,"name":"Release Gate","conclusion":"success"}]}]
 EOF
 export MOCK_CI_JOBS="$WORK_DIR/ci-jobs.json"
-cat >"$WORK_DIR/ci-runs.json" <<EOF
-[{"workflow_runs":[
-  {"id":101,"name":"CI","event":"push","head_branch":"main","head_sha":"$approved_sha","status":"completed","conclusion":"success","run_attempt":1}
-]}]
+cat >"$WORK_DIR/ci-run.json" <<EOF
+{"id":101,"name":"CI","event":"push","head_branch":"main","head_sha":"$approved_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
 EOF
-export MOCK_CI_RUNS="$WORK_DIR/ci-runs.json"
+export MOCK_CI_RUN="$WORK_DIR/ci-run.json"
 
 [[ "$(bash "$CI_GATE" workflow-run "$approved_sha" 101 CI success push main example/project)" == "$approved_sha" ]]
-[[ "$(bash "$CI_GATE" workflow-dispatch)" == "$approved_sha" ]]
+[[ "$(bash "$CI_GATE" workflow-dispatch 101)" == "$approved_sha" ]]
 [[ "$(bash "$CI_GATE" revalidate "$approved_sha")" == "$approved_sha" ]]
 
 set +e
@@ -247,6 +245,20 @@ failed_ci_status=$?
 set -e
 [[ "$failed_ci_status" == "4" ]]
 grep -q 'not an approved successful main CI run' "$WORK_DIR/failed-ci.err"
+
+for unsafe_args in \
+  'CI cancelled push main example/project' \
+  'CI success pull_request main example/project' \
+  'CI success push feature example/project' \
+  'CI success push main attacker/fork'; do
+  set +e
+  # shellcheck disable=SC2086 -- intentional argument fixture expansion
+  bash "$CI_GATE" workflow-run "$approved_sha" 101 $unsafe_args \
+    >"$WORK_DIR/unsafe-event.out" 2>"$WORK_DIR/unsafe-event.err"
+  unsafe_event_status=$?
+  set -e
+  [[ "$unsafe_event_status" == "4" ]]
+done
 
 export MOCK_MAIN_SHA="$newer_sha"
 set +e
@@ -272,18 +284,16 @@ grep -q 'exactly one successful Release Gate job' "$WORK_DIR/failed-gate.err"
 
 export MOCK_CI_JOBS="$WORK_DIR/ci-jobs.json"
 cat >"$WORK_DIR/no-matching-run.json" <<EOF
-[{"workflow_runs":[
-  {"id":102,"name":"CI","event":"push","head_branch":"main","head_sha":"$newer_sha","status":"completed","conclusion":"success","run_attempt":1}
-]}]
+{"id":102,"name":"CI","event":"push","head_branch":"main","head_sha":"$newer_sha","head_repository":{"full_name":"example/project"},"status":"completed","conclusion":"success","run_attempt":1}
 EOF
-export MOCK_CI_RUNS="$WORK_DIR/no-matching-run.json"
+export MOCK_CI_RUN="$WORK_DIR/no-matching-run.json"
 set +e
-bash "$CI_GATE" workflow-dispatch \
+bash "$CI_GATE" workflow-dispatch 102 \
   >"$WORK_DIR/manual-ungated.out" 2>"$WORK_DIR/manual-ungated.err"
 manual_ungated_status=$?
 set -e
 [[ "$manual_ungated_status" == "4" ]]
-grep -q 'no successful push CI run' "$WORK_DIR/manual-ungated.err"
+grep -q 'not a successful push CI run for current main' "$WORK_DIR/manual-ungated.err"
 
 export MOCK_GATE_FAILURE=jobs
 set +e
@@ -325,10 +335,17 @@ release_action_line="$(grep -n 'Open or advance the release PR' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 publish_gate_line="$(grep -n 'Revalidate current main immediately before publication' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
+asset_gate_line="$(grep -n 'Revalidate current main before draft asset upload' \
+  "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
+asset_upload_line="$(grep -n 'Attach all assets to the draft' \
+  "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 publish_line="$(grep -n 'Publish the immutable release' \
   "$REPO_ROOT/.github/workflows/release.yml" | cut -d: -f1)"
 [[ "$mutation_gate_line" -lt "$release_action_line" ]]
+[[ "$asset_gate_line" -lt "$asset_upload_line" ]]
 [[ "$publish_gate_line" -lt "$publish_line" ]]
+grep -Fq "steps.asset_gate.outputs.upload == 'true'" \
+  "$REPO_ROOT/.github/workflows/release.yml"
 grep -Fq "steps.publish_gate.outputs.publish == 'true'" \
   "$REPO_ROOT/.github/workflows/release.yml"
 
