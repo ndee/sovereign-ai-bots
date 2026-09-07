@@ -1,7 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
   "files": {
-    "includes": ["src/**", "bots/*/src/**", "!bots/*/src/__fixtures__", "scripts/**", "tsup.config.ts"]
+    "includes": [
+      "src/**",
+      "bots/*/src/**",
+      "!bots/*/src/__fixtures__",
+      "scripts/**",
+      "tsup.config.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
