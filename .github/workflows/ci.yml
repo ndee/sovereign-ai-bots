@@ -143,3 +143,41 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm catalog:smoke
+
+  release_gate:
+    name: Release Gate
+    if: always() && github.event_name == 'push'
+    needs:
+      - lint
+      - typecheck
+      - catalog_test
+      - unit_test
+      - build
+      - artifact_contract
+      - smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every release-blocking job to succeed
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          CATALOG_TEST_RESULT: ${{ needs.catalog_test.result }}
+          UNIT_TEST_RESULT: ${{ needs.unit_test.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          ARTIFACT_CONTRACT_RESULT: ${{ needs.artifact_contract.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          set -euo pipefail
+          for result in \
+            "$LINT_RESULT" \
+            "$TYPECHECK_RESULT" \
+            "$CATALOG_TEST_RESULT" \
+            "$UNIT_TEST_RESULT" \
+            "$BUILD_RESULT" \
+            "$ARTIFACT_CONTRACT_RESULT" \
+            "$SMOKE_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "::error::A release-blocking CI job finished with: $result"
+              exit 1
+            fi
+          done

@@ -1,7 +1,9 @@
 name: Release Please
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -10,31 +12,93 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Prepare and publish release
+  ci_gate:
+    name: Authorize successful main CI
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.name == 'CI' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      process: ${{ steps.gate.outputs.process }}
+      sha: ${{ steps.gate.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          persist-credentials: false
+
+      - name: Resolve exact CI-approved main SHA
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          CI_EVENT: ${{ github.event.workflow_run.event }}
+          CI_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          CI_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          CI_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CI_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+          set +e
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh \
+              workflow-run "$CI_HEAD_SHA" "$CI_RUN_ID" "$CI_WORKFLOW_NAME" \
+              "$CI_CONCLUSION" "$CI_EVENT" "$CI_HEAD_BRANCH" "$CI_HEAD_REPOSITORY")"
+          else
+            APPROVED_SHA="$(bash scripts/check-release-ci-gate.sh workflow-dispatch)"
+          fi
+          GATE_STATUS=$?
+          set -e
+          if [[ "$GATE_STATUS" == "4" || "$GATE_STATUS" == "5" ]]; then
+            echo "::notice::Release skipped because the CI gate did not authorize current main."
+            echo 'process=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GATE_STATUS" != "0" ]]; then
+            echo "::error::Release CI gate failed with status $GATE_STATUS."
+            exit "$GATE_STATUS"
+          fi
+          printf 'process=true\nsha=%s\n' "$APPROVED_SHA" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Prepare and publish release
+    needs: ci_gate
+    if: needs.ci_gate.outputs.process == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.ci_gate.outputs.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       # Recovery may check out an older release commit. Keep the current
-      # control-plane lookup and verifier available across that checkout.
+      # control-plane gate, lookup, and verifier available across that checkout.
       - name: Stage current release control tooling
         run: |
           install -d -m 0755 "$RUNNER_TEMP/release-control"
           install -m 0755 \
             scripts/find-github-release.sh \
+            scripts/check-release-ci-gate.sh \
             scripts/verify-github-assets.sh \
             "$RUNNER_TEMP/release-control/"
 
@@ -47,17 +111,24 @@ jobs:
             exit 1
           fi
 
+      - name: Revalidate current main before release mutation
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}
+        run: bash scripts/check-release-ci-gate.sh revalidate "$APPROVED_SHA"
+
       - name: Open or advance the release PR
         id: release
-        if: github.event_name == 'push'
+        if: github.event_name == 'workflow_run'
         uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      # A failed build leaves a draft. Later main pushes may repair that draft,
-      # while workflow_dispatch can also re-verify an already-published release.
+      # A failed build leaves a draft. A later successful main CI run may repair
+      # that draft, while a CI-gated dispatch can recover or re-verify it.
       - name: Resolve release state and immutable tag
         id: resolve
         env:
@@ -67,6 +138,7 @@ jobs:
           RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
           RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          APPROVED_MAIN_SHA: ${{ needs.ci_gate.outputs.sha }}
         run: |
           set -euo pipefail
           if [[ "$RELEASE_CREATED" == "true" ]]; then
@@ -90,7 +162,7 @@ jobs:
           LOOKUP_STATUS=$?
           set -e
           if [[ "$LOOKUP_STATUS" != "0" ]]; then
-            if [[ "$LOOKUP_STATUS" == "4" && "$RELEASE_CREATED" != "true" && "$EVENT_NAME" == "push" ]]; then
+            if [[ "$LOOKUP_STATUS" == "4" && "$RELEASE_CREATED" != "true" && "$EVENT_NAME" == "workflow_run" ]]; then
               echo 'process=false' >> "$GITHUB_OUTPUT"
               exit 0
             fi
@@ -116,7 +188,7 @@ jobs:
             echo "::error::Release Please did not create $TAG as a draft."
             exit 1
           fi
-          if [[ "$EVENT_NAME" == "push" && "$RELEASE_CREATED" != "true" && "$IS_DRAFT" != "true" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_run" && "$RELEASE_CREATED" != "true" && "$IS_DRAFT" != "true" ]]; then
             echo 'process=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -129,6 +201,10 @@ jobs:
           fi
           if [[ "$RELEASE_CREATED" == "true" && "$TAG_SHA" != "$RELEASE_SHA" ]]; then
             echo "::error::Release Please reported $RELEASE_SHA but $TAG resolves to $TAG_SHA."
+            exit 1
+          fi
+          if [[ "$RELEASE_CREATED" == "true" && "$RELEASE_SHA" != "$APPROVED_MAIN_SHA" ]]; then
+            echo "::error::Release Please created $TAG at $RELEASE_SHA, but CI approved $APPROVED_MAIN_SHA."
             exit 1
           fi
           if [[ "$TARGET_COMMITISH" != "$TAG_SHA" ]]; then
@@ -246,8 +322,35 @@ jobs:
             release-assets/component-release.json \
             "$TARBALL"
 
-      - name: Publish the immutable release
+      - name: Revalidate current main immediately before publication
+        id: publish_gate
         if: steps.resolve.outputs.process == 'true' && steps.resolve.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          APPROVED_SHA: ${{ needs.ci_gate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          set +e
+          bash "$RUNNER_TEMP/release-control/check-release-ci-gate.sh" \
+            revalidate "$APPROVED_SHA"
+          GATE_STATUS=$?
+          set -e
+          if [[ "$GATE_STATUS" == "5" ]]; then
+            echo "::notice::Release remains a draft because main advanced after CI approval."
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GATE_STATUS" != "0" ]]; then
+            echo "::error::Pre-publication CI gate failed with status $GATE_STATUS."
+            exit "$GATE_STATUS"
+          fi
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+
+      - name: Publish the immutable release
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          steps.resolve.outputs.draft == 'true' &&
+          steps.publish_gate.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -259,7 +362,10 @@ jobs:
           fi
 
       - name: Verify published release metadata and assets
-        if: steps.resolve.outputs.process == 'true'
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          (steps.resolve.outputs.draft != 'true' ||
+           steps.publish_gate.outputs.publish == 'true')
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
@@ -273,7 +379,10 @@ jobs:
             "$TARBALL"
 
       - name: Verify release attestation and assets
-        if: steps.resolve.outputs.process == 'true'
+        if: >-
+          steps.resolve.outputs.process == 'true' &&
+          (steps.resolve.outputs.draft != 'true' ||
+           steps.publish_gate.outputs.publish == 'true')
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
