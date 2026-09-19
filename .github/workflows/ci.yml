@@ -115,6 +115,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Hosted in a REQUIRED check on purpose: "Build" is one of the contexts
+      # the ruleset enforces, so a change that breaks the auto-merge guard
+      # cannot itself be auto-merged.
+      - run: bash scripts/test-auto-merge-release-pr.sh
 
   artifact_contract:
     name: Release Artifact Contract
