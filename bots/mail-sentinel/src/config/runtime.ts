@@ -562,7 +562,11 @@ export class MailSentinelRuntime {
     const sessionKey = `agent:${this.agent.id}:main`;
     const pipeline = [
       "exec",
-      `--json --shell ${quoteLobsterArg(`cat ${candidateFile}`)}`,
+      // Plain argv, never `--shell`: lobster runs a shell line via `/bin/sh -lc`,
+      // a login shell, so host profile scripts (e.g. a Raspberry Pi OS
+      // /etc/profile.d rfkill banner) would print into the `--json` stage's
+      // stdout and abort the pipeline before llm-task runs (#169).
+      `--json cat ${quoteLobsterArg(candidateFile)}`,
       "| clawd.invoke",
       "--tool llm-task",
       "--action json",
