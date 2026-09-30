@@ -842,6 +842,8 @@ describe("config/runtime", () => {
         expect(pipeline).toContain('--session-key "agent:mail-sentinel:main"');
         expect(pipeline).toContain("--tool llm-task");
         expect(pipeline).toContain("--action json");
+        expect(pipeline).toMatch(/^exec --json cat "[^"]+\.json" \| clawd\.invoke/);
+        expect(pipeline).not.toContain("--shell");
       } finally {
         setExecFileAsync(previous);
       }
@@ -883,6 +885,61 @@ describe("config/runtime", () => {
         expect(result.confidence).toBe(88);
         expect(result.suggestedZone).toBe("red");
         // Must succeed on the first attempt — no retry/backoff burned.
+        expect(runner).toHaveBeenCalledTimes(1);
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    // Regression (#169): `lobster exec --shell` runs the line via `/bin/sh -lc`,
+    // a login shell, so a profile.d banner ("Wi-Fi is currently blocked by
+    // rfkill.") lands on the exec stage's stdout and lobster's own `--json`
+    // parser aborts the pipeline before llm-task runs. This stub lobster
+    // reproduces that: a `--shell` exec stage gets the banner prepended and
+    // fails like the real parser; a plain argv exec stage never sees a profile.
+    it("never routes the candidate read through a login shell", async () => {
+      const runtime = await loadRuntime();
+      const verdict = JSON.stringify([
+        {
+          details: {
+            json: {
+              decision_required: true,
+              financial_relevance: false,
+              risk_escalation: false,
+              confidence: 91,
+              urgency: "high",
+              reason: "ok",
+              deadline_detected: false,
+              amount_detected: false,
+              suggested_zone: "red",
+            },
+          },
+        },
+      ]);
+      const banner = "Wi-Fi is currently blocked by rfkill.\n";
+      const runner = vi.fn().mockImplementation(async (_exe: string, args: readonly string[]) => {
+        const pipeline = String(args[0]);
+        const execStage = pipeline.split(" | ")[0] ?? "";
+        if (execStage.includes("--shell")) {
+          const stdout = `${banner}{"subject":"s"}\n`;
+          try {
+            JSON.parse(stdout.trim());
+          } catch (error) {
+            throw Object.assign(
+              new Error(`exec --json could not parse stdout as JSON: ${(error as Error).message}`),
+              { stdout: "", stderr: "exec --json could not parse stdout as JSON" },
+            );
+          }
+        }
+        return { stdout: verdict, stderr: "" };
+      });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        const result = await runtime.classifyCandidate(sampleCandidate);
+        expect(result.suggestedZone).toBe("red");
+        expect(result.confidence).toBe(91);
         expect(runner).toHaveBeenCalledTimes(1);
       } finally {
         setExecFileAsync(previous);
@@ -1209,7 +1266,7 @@ describe("config/runtime", () => {
         );
         expect(options.mode).toBe(0o600);
         const [, lobsterArgs] = runner.mock.calls[0] as [string, readonly string[]];
-        expect(lobsterArgs[0]).toContain(`cat ${file}`);
+        expect(lobsterArgs[0]).toContain(`cat "${file}"`);
         expect(rm).toHaveBeenCalledWith("/tmp/ms-workspace/.mail-sentinel-candidate-XXXXXX", {
           recursive: true,
           force: true,
