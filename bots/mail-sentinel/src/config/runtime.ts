@@ -566,7 +566,9 @@ export class MailSentinelRuntime {
       // a login shell, so host profile scripts (e.g. a Raspberry Pi OS
       // /etc/profile.d rfkill banner) would print into the `--json` stage's
       // stdout and abort the pipeline before llm-task runs (#169).
-      `--json cat ${quoteLobsterArg(candidateFile)}`,
+      // `--json=true`, not `--json`: lobster's parser binds the next token as the
+      // flag value, so a bare `--json=true cat` swallows `cat` (#173).
+      `--json=true cat ${quoteLobsterArg(candidateFile)}`,
       "| clawd.invoke",
       "--tool llm-task",
       "--action json",

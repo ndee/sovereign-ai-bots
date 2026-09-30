@@ -1,3 +1,11 @@
+import { execFileSync } from "node:child_process";
+import {
+  mkdtempSync as realMkdtempSync,
+  rmSync as realRmSync,
+  writeFileSync as realWriteFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const readFile = vi.fn();
@@ -842,12 +850,40 @@ describe("config/runtime", () => {
         expect(pipeline).toContain('--session-key "agent:mail-sentinel:main"');
         expect(pipeline).toContain("--tool llm-task");
         expect(pipeline).toContain("--action json");
-        expect(pipeline).toMatch(/^exec --json cat "[^"]+\.json" \| clawd\.invoke/);
+        expect(pipeline).toMatch(/^exec --json=true cat "[^"]+\.json" \| clawd\.invoke/);
         expect(pipeline).not.toContain("--shell");
       } finally {
         setExecFileAsync(previous);
       }
     });
+
+    // Regression (#173): the REAL lobster parser (installed @clawdbot/lobster,
+    // not a mock) binds the token after a bare `--json` as its value, so
+    // `exec --json cat <file>` tried to spawn the JSON file (EACCES).
+    it("builds an exec stage the real lobster parser runs to valid JSON", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({ stdout: "[]", stderr: "" });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      const dir = realMkdtempSync(join(tmpdir(), "lobster-real-"));
+      try {
+        await runtime.classifyCandidate(sampleCandidate).catch(() => undefined);
+        const pipeline = (runner.mock.calls[0] as [string, readonly string[]])[1][0] as string;
+        const execStage = pipeline.split(" | ")[0] as string;
+        const file = /"([^"]+\.json)"/.exec(execStage)?.[1] as string;
+        const real = join(dir, "candidate.json");
+        realWriteFileSync(real, `${JSON.stringify(sampleCandidate)}\n`);
+        const stage = execStage.replace(file, real);
+        const lobsterBin = resolve(process.cwd(), "node_modules/@clawdbot/lobster/bin/lobster.js");
+        const stdout = execFileSync("node", [lobsterBin, stage], { encoding: "utf8" });
+        const items = JSON.parse(stdout) as unknown[];
+        expect(items).toEqual([sampleCandidate]);
+      } finally {
+        setExecFileAsync(previous);
+        realRmSync(dir, { recursive: true, force: true });
+      }
+    }, 30_000);
 
     // Regression: `lobster exec --shell` runs via `/bin/sh -lc`, so on
     // Raspberry Pi OS the /etc/profile.d/wifi-check.sh rfkill notice is
