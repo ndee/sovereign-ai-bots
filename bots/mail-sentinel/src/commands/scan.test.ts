@@ -176,7 +176,7 @@ describe("commands/scan", () => {
       },
     });
     const send = vi.spyOn(runtime, "sendMatrixRoomMessage");
-    // pro#377: bulk detection runs BEFORE the reviewer, so a newsletter is
+    // bulk detection runs BEFORE the reviewer, so a newsletter is
     // never sent to the LLM at all — and not counted as a reviewer candidate.
     const classify = vi.spyOn(runtime, "classifyCandidate");
     const result = await scan({ instance: "ms-core" });
@@ -190,7 +190,7 @@ describe("commands/scan", () => {
     );
   });
 
-  it("never sends a muted sender's mail to the reviewer (pro#377)", async () => {
+  it("never sends a muted sender's mail to the reviewer", async () => {
     const runtime = setupRuntimeForScan();
     runtime.policy.mutePolicies.push({
       id: "mute-alice",
@@ -214,7 +214,7 @@ describe("commands/scan", () => {
     expect(classify.mock.calls[0]?.[0].from).toBe("example.com");
   });
 
-  it("stops sending mail to the reviewer after a privacy-routing refusal (pro#377)", async () => {
+  it("stops sending mail to the reviewer after a privacy-routing refusal", async () => {
     const runtime = setupRuntimeForScan();
     runtime.searchMail = async () => ({
       messages: [
@@ -916,7 +916,7 @@ describe("commands/scan", () => {
       expect(runtime.state.degradationState).toBe("healthy");
     });
 
-    // #151: the flapping seen on cathouse-pi — a degraded reviewer, then a
+    // #151: the flapping seen on example-node — a degraded reviewer, then a
     // quiet tick, then "back to normal" while the reviewer was still dead.
     it("does not announce recovery on a quiet scan after a degraded one", async () => {
       const runtime = await useRealStatePath(setupRuntimeForScan());

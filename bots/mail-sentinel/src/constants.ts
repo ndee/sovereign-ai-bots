@@ -34,7 +34,7 @@ export const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
 // is one tool call (60s) plus one LLM review (30s), still under the ceiling.
 export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 // Attempts for the one search that opens every scan. A remote IMAP provider
-// (Gmail observed on cathouse-pi, bots#152) answers the same 3–12-message
+// (Gmail observed on example-node, bots#152) answers the same 3–12-message
 // `SINCE` search anywhere between 3 s and well past the per-call ceiling, on
 // a per-connection basis — and a scan had exactly one shot at it, so about
 // half of all scans failed outright and marched toward "scans-failing". A
@@ -53,7 +53,7 @@ export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
 // not this value — it is never sent to the gateway.
 export const DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b";
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
-/** Default for `llmSenderDetail` (pro#377): the bare address, never the display name. */
+/** Default for `llmSenderDetail`: the bare address, never the display name. */
 export const DEFAULT_LLM_SENDER_DETAIL = "address";
 export const RULE_ADJUSTMENT_FLOOR = -1;
 export const MAX_PENDING_AMBER_ITEMS = 200;

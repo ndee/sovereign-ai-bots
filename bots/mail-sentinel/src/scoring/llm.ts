@@ -94,7 +94,7 @@ export const buildLlmSender = (
 };
 
 /**
- * Build the minimum-necessary review payload (pro#377). Everything the
+ * Build the minimum-necessary review payload. Everything the
  * reviewer does not strictly need to judge the mail itself stays on the node:
  * no thread context, no policy hints, no rule ids, no parsed amount, no
  * display name, and a snippet that has been through `sanitizeSnippet`.
@@ -126,7 +126,7 @@ export const buildLlmCandidate = (
 
 /**
  * Reason recorded when a candidate was deliberately NOT sent to the semantic
- * reviewer because bulk/newsletter detection suppressed it first (pro#377).
+ * reviewer because bulk/newsletter detection suppressed it first.
  * Distinct from the "reviewer unavailable" wording so an operator reading
  * `explain` does not mistake a privacy decision for an outage.
  */
@@ -146,7 +146,7 @@ export interface DetermineZoneInput {
   bulk?: BulkDetectionResult | null;
   /**
    * Set when `llmResult` is null because the scan chose not to call the
-   * reviewer (bulk suppression, pro#377) rather than because the call failed.
+   * reviewer (bulk suppression) rather than because the call failed.
    * Replaces the "reviewer unavailable" reason in the audit trail.
    */
   reviewSkippedReason?: string | undefined;

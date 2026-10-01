@@ -382,7 +382,7 @@ export const scan = async (
       // These two counters are the only evidence that survives the loop.
       let llmFailures = 0;
       let llmCandidates = 0;
-      // pro#377: once the provider refused to route a review under the
+      // once the provider refused to route a review under the
       // configured privacy constraints, no further candidate is sent this
       // scan. The refusal is a policy outcome, not a transient fault, and
       // re-sending other mail would not change it. Every candidate that would
@@ -495,7 +495,7 @@ export const scan = async (
           });
           continue;
         }
-        // pro#377: everything that can suppress a mail locally is evaluated
+        // everything that can suppress a mail locally is evaluated
         // BEFORE the semantic reviewer sees it. A muted sender or a detected
         // newsletter never leaves the node.
         const bulk = detectBulkSignals(parsed, rules.bulk);

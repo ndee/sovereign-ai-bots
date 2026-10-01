@@ -423,14 +423,14 @@ export interface ScoredSenderCandidate extends KnownSender {
 }
 
 /**
- * How much of the sender the semantic reviewer is shown (pro#377).
+ * How much of the sender the semantic reviewer is shown.
  * `address` sends the bare mailbox address (never the display name);
  * `domain` sends only the part after the `@`.
  */
 export type LlmSenderDetail = "address" | "domain";
 
 /**
- * The minimum-necessary payload the semantic reviewer receives (pro#377).
+ * The minimum-necessary payload the semantic reviewer receives.
  * Deliberately absent: thread context (other people's mail), policy hints
  * (the operator's own rules), matched rule ids (which embed sender
  * addresses), and the parsed amount (a boolean is all the reviewer needs).

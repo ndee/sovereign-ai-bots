@@ -1,6 +1,6 @@
 import type { MailSentinelState, StoredAlert } from "../types.js";
 
-// `buildThreadContext` used to live here. It was removed with pro#377: the
+// `buildThreadContext` used to live here. It was removed: the
 // semantic reviewer no longer receives snippets of other mails in the same
 // thread, so nothing builds thread context any more.
 

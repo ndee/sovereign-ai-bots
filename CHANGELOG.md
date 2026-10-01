@@ -56,8 +56,8 @@ POP3 support and real mail reconfiguration with post-install Settings UI, OpenRo
 
 ### Changed
 
-- Mail Sentinel sends the semantic reviewer only the minimum necessary payload
-  (ndee/sovereign-ai-node-pro#377, #373): thread context, policy hints, matched
+- Mail Sentinel sends the semantic reviewer only the minimum necessary payload:
+  thread context, policy hints, matched
   rule ids, and the parsed amount are no longer sent; the sender is the bare
   address (or, with `llmSenderDetail: "domain"`, the domain only); the body
   snippet has quoted replies and signatures stripped and URLs, phone numbers,
@@ -84,7 +84,7 @@ mail-sentinel scan reliability: lobster CLI resolution, bot-unit npm PATH, IMAP 
   `/usr/local/bin`, `/usr/bin` — and a missing binary is reported with the
   locations that were searched instead of the bare `ENOENT`.
 - Mail Sentinel gave the IMAP search that opens every scan exactly one shot.
-  Against a remote provider (Gmail on cathouse-pi) the same small `SINCE`
+  Against a remote provider (Gmail on example-node) the same small `SINCE`
   search answered anywhere between 3 s and well past the 60 s per-call
   ceiling on a per-connection basis, so roughly half of all scans failed with
   SAN-MAIL-001 and no mail was triaged on those ticks (bots#152). The search
@@ -100,8 +100,7 @@ mail-sentinel scan reliability: lobster CLI resolution, bot-unit npm PATH, IMAP 
 
 ## [2.0.10] - 2026-08-16
 
-Mail Sentinel 2.0.10 — scans stay bounded as the mailbox grows (bots#146,
-pro#341, pro#342).
+Mail Sentinel 2.0.10 — scans stay bounded as the mailbox grows (bots#146).
 
 ### Fixed
 
@@ -183,7 +182,7 @@ Mail Sentinel 2.0.8 — bounded IMAP search (bots#142).
 
 ## [2.0.7] - 2026-08-04
 
-Mail Sentinel 2.0.7 — tool-executable readiness (node-pro #324).
+Mail Sentinel 2.0.7 — tool-executable readiness.
 
 ### Added
 

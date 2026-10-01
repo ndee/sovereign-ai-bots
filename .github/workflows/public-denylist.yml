@@ -1,0 +1,49 @@
+name: Public text denylist
+
+# Fails a pull request whose added lines, title, body or commit messages match
+# the pattern in .github/public-denylist.pattern. The pattern lives in its own
+# file, which is excluded from the diff scan, so this workflow does not trip
+# on itself.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  denylist:
+    name: Public text denylist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Self-test
+        run: scripts/ci/public-denylist.sh --self-test
+
+      - name: Diff added lines
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --unified=0 "$BASE...$HEAD" -- . ':(exclude).github/public-denylist.pattern' \
+            | grep -E '^\+' | grep -vE '^\+\+\+ ' \
+            | scripts/ci/public-denylist.sh "the diff"
+
+      - name: Commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git log "$BASE..$HEAD" --format=%B | scripts/ci/public-denylist.sh "commit messages"
+
+      - name: Title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$TITLE" | scripts/ci/public-denylist.sh "the PR title"
+
+      - name: Body
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s\n' "$BODY" | scripts/ci/public-denylist.sh "the PR body"
