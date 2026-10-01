@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.1.2](https://github.com/ndee/sovereign-ai-bots/compare/v2.1.1...v2.1.2) (2026-10-01)
+
+
+### Bug Fixes
+
+* **mail-sentinel:** pass --json=true to the lobster exec stage ([#173](https://github.com/ndee/sovereign-ai-bots/issues/173)) ([#174](https://github.com/ndee/sovereign-ai-bots/issues/174)) ([87068e7](https://github.com/ndee/sovereign-ai-bots/commit/87068e728e7347dd0acb14adddede2b5c173f7a0))
+
 ## [2.1.1](https://github.com/ndee/sovereign-ai-bots/compare/v2.1.0...v2.1.1) (2026-09-30)
 
 
