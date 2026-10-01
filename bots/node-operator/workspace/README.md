@@ -1,7 +1,8 @@
 # Node Operator workspace
 
-Provisioned by sovereign-node install flow.
-Managed by Sovereign Node installer.
+Provisioned by the sovereign-node install flow.
+Managed by the Sovereign Node installer.
 
-This agent is intended for conversational node operations in Matrix.
-Human Matrix account onboarding and removal must only be handled in direct chat with the configured operator.
+This agent is the conversational operator surface for the node: daily status,
+health explanations, SAN error-code lookups, and guidance to the local Node
+Status page. All commands are read-only and dispatched deterministically in code — no LLM is involved.

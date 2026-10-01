@@ -13,12 +13,14 @@ export default defineConfig({
         "src/catalog/validate.ts",
         "src/probe/mail-sentinel-chat-model.ts",
         "bots/mail-sentinel/src/**/*.ts",
+        "bots/node-operator/src/**/*.ts",
         "bots/project-sentinel/src/**/*.ts",
         "bots/reality-alignment/src/**/*.ts"
       ],
       exclude: [
         "bots/mail-sentinel/src/**/*.test.ts",
         "bots/mail-sentinel/src/__fixtures__/**",
+        "bots/node-operator/src/**/*.test.ts",
         "bots/project-sentinel/src/**/*.test.ts",
         "bots/reality-alignment/src/**/*.test.ts"
       ],
