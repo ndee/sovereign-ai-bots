@@ -1281,7 +1281,7 @@ describe("config/runtime", () => {
       }
     });
 
-    // pro#377: the payload is mail content, so it must only ever exist inside
+    // the payload is mail content, so it must only ever exist inside
     // a private directory, with owner-only permissions, for the duration of
     // the call — and the whole directory goes away afterwards.
     it("writes the candidate 0600 inside a private mkdtemp directory and removes it", async () => {
@@ -1312,7 +1312,7 @@ describe("config/runtime", () => {
       }
     });
 
-    it("never retries a provider privacy-routing refusal (pro#377)", async () => {
+    it("never retries a provider privacy-routing refusal", async () => {
       const runtime = await loadRuntime();
       const runner = vi.fn().mockRejectedValue(
         Object.assign(new Error("exit 1"), {

@@ -1,7 +1,7 @@
 import { compactText } from "../util/normalize.js";
 
 /**
- * Minimum-necessary body text for the semantic reviewer (pro#377).
+ * Minimum-necessary body text for the semantic reviewer.
  *
  * The first 500 characters of a mail body used to go to the LLM verbatim —
  * quoted replies (other people's mail), signature blocks (names, titles, phone

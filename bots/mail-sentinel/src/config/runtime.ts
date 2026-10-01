@@ -59,7 +59,7 @@ import {
 const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
 
 /**
- * Privacy-routing refusal (pro#377).
+ * Privacy-routing refusal.
  *
  * When the gateway's provider (OpenRouter) is configured to route only to
  * endpoints that satisfy a data policy (no training, no retention, specific
@@ -216,7 +216,7 @@ export class MailSentinelRuntime {
    * `DEFAULT_LLM_MODEL`).
    */
   llmModel!: string;
-  /** How much of the sender the reviewer sees (pro#377). */
+  /** How much of the sender the reviewer sees. */
   llmSenderDetail!: LlmSenderDetail;
   llmTimeoutMs!: number;
   openclawToken: string | undefined;
@@ -551,7 +551,7 @@ export class MailSentinelRuntime {
     const args = {
       prompt: buildLlmPrompt(),
     };
-    // pro#377: the payload is mail content. It lives in a private 0700
+    // the payload is mail content. It lives in a private 0700
     // directory, as a 0600 file, only for the duration of the call.
     const candidateDir = await mkdtemp(resolve(this.workspaceDir, ".mail-sentinel-candidate-"));
     const candidateFile = join(candidateDir, `${randomUUID()}.json`);
@@ -583,7 +583,7 @@ export class MailSentinelRuntime {
           return await this.runClassifyPipeline(pipeline);
         } catch (error) {
           // A routing refusal is final: never retried, and never retried with
-          // different routing or privacy parameters (pro#377).
+          // different routing or privacy parameters.
           if (isLlmRoutingRefusedError(error)) {
             throw error;
           }

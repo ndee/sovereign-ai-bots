@@ -66,7 +66,7 @@ describe("config/lobster", () => {
       });
     });
 
-    // The cathouse-pi shape (#150): the scan unit's PATH is the system default,
+    // The example-node shape (#150): the scan unit's PATH is the system default,
     // HOME is the openclaw-home override, and the node installer put lobster
     // into the service user's passwd-home npm prefix.
     it("falls back to the service user's npm prefix when PATH has no lobster", async () => {

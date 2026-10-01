@@ -518,7 +518,7 @@ describe("scoring/llm", () => {
     expect(result.extractedSignals.hasAmount).toBe(false);
   });
 
-  describe("buildLlmSender / payload minimisation (pro#377)", () => {
+  describe("buildLlmSender / payload minimisation", () => {
     const scored = {
       score: 5,
       category: "financial-relevance" as const,
