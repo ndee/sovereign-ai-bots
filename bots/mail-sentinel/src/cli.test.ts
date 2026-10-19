@@ -112,6 +112,34 @@ describe("cli", () => {
     await expect(runCli(["status"])).rejects.toThrow("Expected --instance <id>");
   });
 
+  it("dispatches reconcile as JSON", async () => {
+    await runCli(["reconcile", "--instance", "ms-core", "--json"]);
+    const payload = JSON.parse(String(stdoutSpy.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload.instanceId).toBe("ms-core");
+    expect(payload.coverage).toBe("partial");
+    expect(payload.days).toEqual([]);
+  });
+
+  it("renders reconcile as plain text", async () => {
+    await runCli(["reconcile", "--instance", "ms-core"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("No mail recorded yet.");
+  });
+
+  it("dispatches integrity as JSON", async () => {
+    await runCli(["integrity", "--instance", "ms-core", "--json"]);
+    const payload = JSON.parse(String(stdoutSpy.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload.unaccounted).toEqual([]);
+  });
+
+  it("renders integrity as plain text", async () => {
+    await runCli(["integrity", "--instance", "ms-core"]);
+    expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("Mail check (coverage: partial).");
+  });
+
+  it("lists reconcile and integrity among the known commands", async () => {
+    await expect(runCli([])).rejects.toThrow("reconcile, integrity");
+  });
+
   it("dispatches digest", async () => {
     await runCli(["digest", "--instance", "ms-core"]);
     expect(String(stdoutSpy.mock.calls[0]?.[0])).toContain("No amber digest entries");

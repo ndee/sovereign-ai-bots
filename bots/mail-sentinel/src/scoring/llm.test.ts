@@ -8,6 +8,7 @@ import {
   buildLlmSender,
   buildUserFacingWhy,
   determineZone,
+  isDefaultedLlmResult,
   normalizeLlmResult,
   quoteLobsterArg,
   REVIEW_SKIPPED_BULK_REASON,
@@ -63,6 +64,53 @@ describe("scoring/llm", () => {
       }),
       defaults: normalizeLlmResult({}),
     }).toEqual(loadGolden("normalizeLlmResult"));
+  });
+
+  describe("isDefaultedLlmResult", () => {
+    const complete = { confidence: 70, suggested_zone: "amber" } as const;
+
+    it("is false for a reply carrying a usable confidence and zone", () => {
+      expect(isDefaultedLlmResult(normalizeLlmResult(complete))).toBe(false);
+      expect(
+        isDefaultedLlmResult(normalizeLlmResult({ confidence: "55", suggested_zone: "red" })),
+      ).toBe(false);
+    });
+
+    it("is true when the confidence is missing, null or not numeric", () => {
+      expect(isDefaultedLlmResult(normalizeLlmResult({ suggested_zone: "amber" }))).toBe(true);
+      expect(isDefaultedLlmResult(normalizeLlmResult({ ...complete, confidence: null }))).toBe(
+        true,
+      );
+      expect(isDefaultedLlmResult(normalizeLlmResult({ ...complete, confidence: "high" }))).toBe(
+        true,
+      );
+    });
+
+    it("is true when the suggested zone is missing or invalid", () => {
+      expect(isDefaultedLlmResult(normalizeLlmResult({ confidence: 70 }))).toBe(true);
+      expect(
+        isDefaultedLlmResult(normalizeLlmResult({ ...complete, suggested_zone: "green" })),
+      ).toBe(true);
+      expect(isDefaultedLlmResult(normalizeLlmResult(null))).toBe(true);
+    });
+
+    it("is false for a result that never went through normalization", () => {
+      expect(isDefaultedLlmResult(llmResult("built by hand"))).toBe(false);
+    });
+
+    it("leaves the normalized shape unchanged", () => {
+      expect(Object.keys(normalizeLlmResult({}))).toEqual([
+        "decisionRequired",
+        "financialRelevance",
+        "riskEscalation",
+        "confidence",
+        "urgency",
+        "reason",
+        "deadlineDetected",
+        "amountDetected",
+        "suggestedZone",
+      ]);
+    });
   });
 
   it("clamps confidence to 0-100 when the input is out of range", () => {

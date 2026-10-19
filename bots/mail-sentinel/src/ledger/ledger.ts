@@ -443,7 +443,9 @@ export const applyInventoryListing = (
   counters.inventoryRuns += 1;
 
   if (cursor === undefined || cursor.keySpace !== listing.keySpace) {
-    if (cursor !== undefined) {
+    // A new key space, or mail the scan already recorded today that predates
+    // the baseline: either way today's count carries no clean claim.
+    if (cursor !== undefined || counters.recorded > 0) {
       flagDay(ledger, today, "coverage-break");
     }
     if (!listing.fullCensus) {
@@ -554,13 +556,18 @@ export const recordedDayOf = (entry: LedgerEntry): string => localDay(entry.firs
 export const inventoriedDayOf = (entry: LedgerEntry): string | undefined =>
   entry.inventoriedAt === undefined ? undefined : localDay(entry.inventoriedAt);
 
+/** Oldest day still inside the retention window. */
+export const retentionCutoffDay = (now: Date): string =>
+  localDay(new Date(now.getTime() - LEDGER_RETENTION_DAYS * DAY_MS));
+
 /**
  * Drop everything older than the retention window. Days and entries are cut on
  * the same day boundary, and an entry is kept while any day it counts on is
- * kept, so a retained day's equation never loses one side.
+ * kept, so a retained day's equation never loses one side. An entry kept for a
+ * later day may still name a dropped day; reports skip days before the cutoff.
  */
 export const pruneLedger = (ledger: MailLedger, now: Date): void => {
-  const cutoff = localDay(new Date(now.getTime() - LEDGER_RETENTION_DAYS * DAY_MS));
+  const cutoff = retentionCutoffDay(now);
   for (const day of Object.keys(ledger.days)) {
     if (day < cutoff) {
       delete ledger.days[day];

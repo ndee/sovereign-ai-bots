@@ -244,9 +244,8 @@ export class MailSentinelRuntime {
   async load(): Promise<void> {
     const raw = await readFile(this.configPath, "utf8");
     this.runtimeConfig = parseRuntimeConfigDocument(raw) as RuntimeConfigDocument;
-    const tool = (this.runtimeConfig.sovereignTools?.instances ?? []).find(
-      (entry) => entry.id === this.instanceId,
-    );
+    const instances = this.runtimeConfig.sovereignTools?.instances ?? [];
+    const tool = instances.find((entry) => entry.id === this.instanceId);
     if (tool === undefined) {
       throw new Error(`Tool instance '${this.instanceId}' was not found in ${this.configPath}`);
     }
@@ -282,9 +281,7 @@ export class MailSentinelRuntime {
       (toolConfig.digestInterval as string | undefined) ?? DEFAULT_DIGEST_INTERVAL;
     this.imapInstanceId =
       (toolConfig.imapInstanceId as string | undefined) ?? DEFAULT_IMAP_INSTANCE_ID;
-    const mailTool = (this.runtimeConfig.sovereignTools?.instances ?? []).find(
-      (entry) => entry.id === this.imapInstanceId,
-    );
+    const mailTool = instances.find((entry) => entry.id === this.imapInstanceId);
     this.mailProtocol = mailTool?.config?.protocol === "pop3" ? "pop3" : "imap";
     this.openclawUrl = (toolConfig.openclawUrl as string | undefined) ?? DEFAULT_OPENCLAW_URL;
     this.llmModel = (toolConfig.llmModel as string | undefined) ?? DEFAULT_LLM_MODEL;

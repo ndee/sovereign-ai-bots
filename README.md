@@ -91,6 +91,8 @@ Not every message reaches the LLM. Heuristic filters run first to discard obviou
 
 Mail Sentinel does not train a model locally. It adapts by updating local policy: scoring adjustments, category weights, and routing preferences driven by operator feedback.
 
+Every message the scan sees ends in exactly one outcome state in a content-free ledger: a verdict, no verdict, not processed, or still in flight. The `reconcile` command balances those outcomes per day against an independent mailbox inventory, and `integrity` lists the messages that were not checked. See [docs/mail-sentinel-outcome-ledger.md](docs/mail-sentinel-outcome-ledger.md).
+
 ### Prerequisites
 
 Mail Sentinel requires:

@@ -16,6 +16,7 @@ import {
   type OutcomeState,
   parseLedgerKey,
   recordedDayOf,
+  retentionCutoffDay,
 } from "./ledger.js";
 
 /**
@@ -125,22 +126,30 @@ const groupOutcomes = (outcomes: Record<OutcomeState, number>): OutcomeGroups =>
   return groups;
 };
 
+const dayCoverage = (ledger: MailLedger, day: string): Coverage =>
+  (ledger.days[day]?.inventoryRuns ?? 0) > 0 ? "full" : "partial";
+
+const countsOn = (entry: LedgerEntry, day: string, coverage: Coverage): boolean =>
+  coverage === "full" ? inventoriedDayOf(entry) === day : recordedDayOf(entry) === day;
+
+/** Whether `entry` is one of the messages `day`'s equation counts. */
+export const countsOnDay = (ledger: MailLedger, entry: LedgerEntry, day: string): boolean =>
+  countsOn(entry, day, dayCoverage(ledger, day));
+
 const reconcileDay = (
   ledger: MailLedger,
   day: string,
   gapDays: ReadonlySet<string>,
 ): DayReconciliation => {
   const counters = ledger.days[day];
-  const coverage: Coverage = (counters?.inventoryRuns ?? 0) > 0 ? "full" : "partial";
+  const coverage = dayCoverage(ledger, day);
   const outcomes = zeroOutcomes();
   const detailedOutcomes: Record<string, number> = {};
   let accounted = 0;
   let scanOnly = 0;
   let outageAffected = 0;
   for (const entry of Object.values(ledger.entries)) {
-    const member =
-      coverage === "full" ? inventoriedDayOf(entry) === day : recordedDayOf(entry) === day;
-    if (!member) {
+    if (!countsOn(entry, day, coverage)) {
       if (
         coverage === "full" &&
         entry.inventoriedAt === undefined &&
@@ -163,7 +172,8 @@ const reconcileDay = (
       accounted += 1;
     }
   }
-  const expected = coverage === "full" ? (counters?.inventoried ?? 0) : (counters?.recorded ?? 0);
+  const expected =
+    counters === undefined ? 0 : coverage === "full" ? counters.inventoried : counters.recorded;
   const groups = groupOutcomes(outcomes);
   const flags = [...(counters?.flags ?? [])];
   if (gapDays.has(day) && !flags.includes("inventory-gap")) {
@@ -204,7 +214,10 @@ export const reconcileLedger = (
       daySet.add(inventoriedDay);
     }
   }
-  const sortedDays = [...daySet].sort((left, right) => right.localeCompare(left));
+  const cutoff = retentionCutoffDay(now);
+  const sortedDays = [...daySet]
+    .filter((day) => day >= cutoff)
+    .sort((left, right) => right.localeCompare(left));
   const selected = options.days === undefined ? sortedDays : sortedDays.slice(0, options.days);
   const days = selected.map((day) => reconcileDay(ledger, day, gapDays));
   const totals: ReconcileTotals = {

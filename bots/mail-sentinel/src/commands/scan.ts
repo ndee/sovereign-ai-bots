@@ -445,7 +445,7 @@ export const scan = async (
       if (inventory.kind === "failed") {
         warnings.push(`Mail inventory failed (${inventory.message}); coverage is partial.`);
       }
-      for (const key of inventory.kind === "listed" ? (inventory.created ?? []) : []) {
+      for (const key of inventory.kind === "listed" ? inventory.created : []) {
         createdThisScan.add(key);
       }
       await writeLedgerSafely();

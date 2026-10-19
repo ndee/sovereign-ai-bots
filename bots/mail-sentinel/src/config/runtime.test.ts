@@ -1504,6 +1504,152 @@ describe("config/runtime", () => {
     });
   });
 
+  describe("outcome ledger, inventory and protocol", () => {
+    const loadRuntime = async (config: Record<string, unknown> = makeRuntimeConfig()) => {
+      readFile
+        .mockResolvedValueOnce(JSON.stringify(config))
+        .mockRejectedValueOnce(new Error("no runtime"));
+      const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+      await runtime.load();
+      return runtime;
+    };
+
+    it("reads pollInterval from the tool config and defaults it to 30m", async () => {
+      expect((await loadRuntime(makeRuntimeConfig({ pollInterval: "15m" }))).pollInterval).toBe(
+        "15m",
+      );
+      expect((await loadRuntime()).pollInterval).toBe("30m");
+    });
+
+    it("defaults mailProtocol to imap when the mail tool instance is absent", async () => {
+      expect((await loadRuntime()).mailProtocol).toBe("imap");
+    });
+
+    it("reads mailProtocol from the mail tool instance's protocol", async () => {
+      const withMailTool = (config: Record<string, unknown> | undefined) => {
+        const base = makeRuntimeConfig();
+        base.sovereignTools.instances.push({
+          id: "ms-imap",
+          ...(config === undefined ? {} : { config }),
+        } as never);
+        return base;
+      };
+      expect((await loadRuntime(withMailTool({ protocol: "pop3" }))).mailProtocol).toBe("pop3");
+      expect((await loadRuntime(withMailTool({ protocol: "imap" }))).mailProtocol).toBe("imap");
+      expect((await loadRuntime(withMailTool(undefined))).mailProtocol).toBe("imap");
+    });
+
+    it("honours a per-call timeout in runTool and names it when the child is killed", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("Command failed"), { killed: true, signal: "SIGKILL" }),
+        );
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.runTool(["mail-inventory"], [], { timeoutMs: 1234 })).rejects.toThrow(
+          "mail-inventory failed: killed by SIGKILL after 1234ms without completing",
+        );
+      } finally {
+        setExecFileAsync(previous);
+      }
+      expect(runner.mock.calls[0]?.[2]).toMatchObject({ timeout: 1234, killSignal: "SIGKILL" });
+    });
+
+    it("runs mail-inventory with the cursor, its own deadline and a later outer kill", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify({ ok: true, result: { uidRanges: [[1, 2]] } }),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.inventoryMail({ afterUid: 41, uidValidity: "777" })).resolves.toEqual({
+          uidRanges: [[1, 2]],
+        });
+        await runtime.inventoryMail();
+      } finally {
+        setExecFileAsync(previous);
+      }
+      expect(runner.mock.calls[0]?.[1]).toEqual([
+        "mail-inventory",
+        "--instance",
+        "ms-imap",
+        "--after-uid",
+        "41",
+        "--uid-validity",
+        "777",
+        "--timeout-ms",
+        "20000",
+        "--config-path",
+        "/tmp/config.json5",
+        "--json",
+      ]);
+      expect(runner.mock.calls[0]?.[2]).toMatchObject({ timeout: 25_000 });
+      expect(runner.mock.calls[1]?.[1]).toEqual([
+        "mail-inventory",
+        "--instance",
+        "ms-imap",
+        "--timeout-ms",
+        "20000",
+        "--config-path",
+        "/tmp/config.json5",
+        "--json",
+      ]);
+    });
+
+    it("passes a search's totalMatches through", async () => {
+      const runtime = await loadRuntime();
+      const runner = vi.fn().mockResolvedValue({
+        stdout: JSON.stringify({ ok: true, result: { messages: [{ uid: 3 }], totalMatches: 60 } }),
+        stderr: "",
+      });
+      const previous = setExecFileAsync(runner);
+      try {
+        await expect(runtime.searchMail(50)).resolves.toMatchObject({ totalMatches: 60 });
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("reads and writes the ledger beside the state file", async () => {
+      const runtime = await loadRuntime();
+      readFile.mockResolvedValueOnce(
+        JSON.stringify({
+          version: 1,
+          entries: {
+            "imap:9:1": {
+              firstSeenAt: "2026-08-15T10:00:00.000Z",
+              state: "gray",
+              attempts: 1,
+              updatedAt: "2026-08-15T10:00:00.000Z",
+            },
+          },
+        }),
+      );
+      const ledger = await runtime.readLedger(new Date("2026-08-15T12:00:00.000Z"));
+      expect(readFile).toHaveBeenLastCalledWith(
+        "/tmp/ms-workspace/data/mail-sentinel-ledger.json",
+        "utf8",
+      );
+      expect(ledger.entries["imap:9:1"]?.state).toBe("gray");
+
+      writeFile.mockResolvedValueOnce(undefined);
+      await runtime.writeLedger(ledger);
+      const [tempPath, payload] = writeFile.mock.calls.at(-1) ?? [];
+      expect(tempPath).toBe("/tmp/ms-workspace/data/mail-sentinel-ledger.json.tmp");
+      expect(JSON.parse(String(payload)).entries["imap:9:1"].state).toBe("gray");
+    });
+
+    it("uses the current time when readLedger is given no clock", async () => {
+      const runtime = await loadRuntime();
+      readFile.mockRejectedValueOnce(Object.assign(new Error("nf"), { code: "ENOENT" }));
+      const ledger = await runtime.readLedger();
+      expect(ledger.entries).toEqual({});
+    });
+  });
+
   describe("classifyCandidate additional shapes", () => {
     const loadRuntime = async () => {
       const runtimeConfig = makeRuntimeConfig();

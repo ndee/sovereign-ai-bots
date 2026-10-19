@@ -62,6 +62,35 @@ describe("alerts/format", () => {
     expect(message).toEqual(loadGolden("buildDigestMessage.few"));
   });
 
+  it("puts a coverage line right after the window line, escaped in HTML", () => {
+    const alerts = [
+      { ...sampleAlert, alertId: "a1", zone: "amber" as const },
+      { ...sampleAlert, alertId: "a2", zone: "amber" as const, subject: "Invoice $600" },
+    ];
+    const plain = buildDigestMessage(alerts, "12h");
+    const coverage = 'Since the last digest: 3 mails, 2 checked, 1 not checked (ask "integrity").';
+    const withLine = buildDigestMessage(alerts, "12h", coverage);
+    const bodyLines = withLine.body.split("\n");
+    expect(bodyLines[1]).toBe("Window: last 12h");
+    expect(bodyLines[2]).toBe(coverage);
+    expect(withLine.body).toBe(
+      plain.body.replace("Window: last 12h", `Window: last 12h\n${coverage}`),
+    );
+    expect(withLine.formattedBody).toContain(
+      "Window: last 12h<br>\nSince the last digest: 3 mails, 2 checked, 1 not checked (ask &quot;integrity&quot;).</p>",
+    );
+  });
+
+  it("keeps the digest byte-identical when no coverage line is given", () => {
+    const alerts = [
+      { ...sampleAlert, alertId: "a1", zone: "amber" as const },
+      { ...sampleAlert, alertId: "a2", zone: "amber" as const, subject: "Invoice $600" },
+    ];
+    expect(buildDigestMessage(alerts, "12h", undefined)).toEqual(
+      loadGolden("buildDigestMessage.few"),
+    );
+  });
+
   it("falls back to 'RED' when zone is undefined in formatAlertLine", () => {
     const line = formatAlertLine({
       alertId: "a",

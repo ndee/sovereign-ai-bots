@@ -18,7 +18,7 @@ import {
 const UNSUPPORTED_COMMAND_PATTERN = /unknown command/iu;
 
 export type InventoryOutcome =
-  | { kind: "listed"; listing: InventoryListing; created?: string[] }
+  | { kind: "listed"; listing: InventoryListing; created: string[] }
   | { kind: "unsupported" }
   | { kind: "failed"; message: string };
 
@@ -101,13 +101,17 @@ export const runInventory = async (
   runtime: Pick<MailSentinelRuntime, "inventoryMail" | "mailProtocol">,
   ledger: MailLedger,
 ): Promise<InventoryOutcome> => {
+  // The tool refuses `--after-uid` without the UIDVALIDITY it belongs to, and
+  // POP3 always lists everything; both then get a full listing, which the
+  // ledger filters against its own cursor.
   const cursor = ledger.inventory.cursor;
+  const uidValidity = cursor === undefined ? undefined : uidValidityOf(cursor.keySpace);
   let raw: unknown;
   try {
     raw = await runtime.inventoryMail(
-      cursor === undefined
+      cursor === undefined || uidValidity === undefined || runtime.mailProtocol === "pop3"
         ? {}
-        : { afterUid: cursor.afterUid, uidValidity: uidValidityOf(cursor.keySpace) },
+        : { afterUid: cursor.afterUid, uidValidity },
     );
   } catch (error) {
     const message = describeError(error);
@@ -118,7 +122,7 @@ export const runInventory = async (
   const listing = parseInventoryResult(raw, runtime.mailProtocol);
   return listing === undefined
     ? { kind: "failed", message: "mail-inventory returned no identifier listing" }
-    : { kind: "listed", listing };
+    : { kind: "listed", listing, created: [] };
 };
 
 /** Run the inventory and fold the result into the ledger. Never throws. */

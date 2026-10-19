@@ -1,6 +1,6 @@
 import { resolveToolRuntime } from "../config/runtime.js";
 import { isUnaccountedState, LEDGER_RETENTION_DAYS, localDay } from "../ledger/ledger.js";
-import { type Coverage, reconcileLedger } from "../ledger/reconcile.js";
+import { type Coverage, countsOnDay, reconcileLedger } from "../ledger/reconcile.js";
 import type { CommandOptions } from "../types.js";
 import { clampLimit } from "../util/time.js";
 
@@ -52,11 +52,13 @@ export const integrity = async (
   const ledger = await runtime.readLedger(now);
   const state = await runtime.readState();
   const report = reconcileLedger(ledger, now, { days: dayCount });
-  const shownDays = new Set(report.days.map((day) => day.day));
   const details = state.integrityDetails ?? {};
   const unaccounted = Object.values(ledger.entries)
     .filter(
-      (entry) => isUnaccountedState(entry.state) && shownDays.has(localDay(entry.firstSeenAt)),
+      // The same membership the day summaries use, so the list matches the counts.
+      (entry) =>
+        isUnaccountedState(entry.state) &&
+        report.days.some((day) => countsOnDay(ledger, entry, day.day)),
     )
     .sort((left, right) => right.firstSeenAt.localeCompare(left.firstSeenAt))
     .slice(0, MAX_LISTED_MESSAGES)
