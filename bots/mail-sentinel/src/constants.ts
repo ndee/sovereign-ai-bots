@@ -4,6 +4,7 @@ export const DEFAULT_RULES_PATH = "config/default-rules.json";
 export const DEFAULT_POLICY_PATH = "config/user-policy.json";
 export const DEFAULT_IMAP_INSTANCE_ID = "mail-sentinel-imap";
 export const DEFAULT_LOOKBACK_WINDOW = "1h";
+export const DEFAULT_POLL_INTERVAL = "30m";
 export const DEFAULT_REMINDER_DELAY = "4h";
 export const DEFAULT_DIGEST_INTERVAL = "12h";
 export const DEFAULT_IMAP_SEARCH_LIMIT = 50;
@@ -44,6 +45,13 @@ export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 // 300 s). Reads are not retried here: a skipped read leaves the watermark
 // alone and is re-read on the next tick.
 export const DEFAULT_IMAP_SEARCH_ATTEMPTS = 2;
+// The independent mail inventory runs first in every scan and is counted in
+// the same budget, so it gets a tight deadline of its own: a slow listing must
+// cost one inventory, not the scan. Worst case 25 s + 2 × 60 s search is still
+// inside the 180 s budget, after which at most one read (60 s) and one review
+// (30 s) follow, under TimeoutStartSec 300 s.
+export const MAIL_INVENTORY_TIMEOUT_MS = 20_000;
+export const MAIL_INVENTORY_KILL_MS = 25_000;
 export const DEFAULT_AGENT_ID = "mail-sentinel";
 export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
 // NOTE: `llmModel` is carried in the tool config for compatibility only. The

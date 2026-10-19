@@ -230,6 +230,7 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
 export const buildDigestMessage = (
   alerts: readonly StoredAlert[],
   interval: string,
+  coverageLine?: string,
 ): MatrixMessageBody => {
   const count = alerts.length;
   const zone = "AMBER";
@@ -238,10 +239,16 @@ export const buildDigestMessage = (
   const windowLine = `Window: last ${interval}`;
   const visible = alerts.slice(0, DIGEST_VISIBLE_LIMIT);
 
-  const bodyLines: string[] = [`${emoji} ${headerText}`, windowLine];
+  const bodyLines: string[] = [
+    `${emoji} ${headerText}`,
+    windowLine,
+    ...(coverageLine === undefined ? [] : [coverageLine]),
+  ];
   const htmlParts: string[] = [
     `<p>${emoji} <strong>${escapeHtml(headerText)}</strong><br>`,
-    `${escapeHtml(windowLine)}</p>`,
+    coverageLine === undefined
+      ? `${escapeHtml(windowLine)}</p>`
+      : `${escapeHtml(windowLine)}<br>\n${escapeHtml(coverageLine)}</p>`,
   ];
 
   visible.forEach((alert, index) => {

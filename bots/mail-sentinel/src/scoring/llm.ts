@@ -28,6 +28,19 @@ type RawLlmPayload = Partial<{
   suggested_zone: unknown;
 }>;
 
+/**
+ * Results `normalizeLlmResult` had to complete with defaults because the reply
+ * lacked a usable confidence or zone. The verdict path still treats them as
+ * ordinary results; the ledger counts them as `no-verdict:defaulted` so such
+ * replies are visible. Tracked out of band so the result shape is unchanged.
+ */
+const defaultedResults = new WeakSet<LlmResult>();
+
+export const isDefaultedLlmResult = (result: LlmResult): boolean => defaultedResults.has(result);
+
+const isZone = (value: unknown): value is Zone =>
+  value === "red" || value === "amber" || value === "gray";
+
 export const normalizeLlmResult = (raw: RawLlmPayload | null | undefined): LlmResult => {
   const confidence = Number.isFinite(Number(raw?.confidence))
     ? Math.max(0, Math.min(100, Math.round(Number(raw?.confidence))))
@@ -38,11 +51,8 @@ export const normalizeLlmResult = (raw: RawLlmPayload | null | undefined): LlmRe
       ? urgencyCandidate
       : "low";
   const suggestedCandidate = raw?.suggested_zone;
-  const suggestedZone: Zone =
-    suggestedCandidate === "red" || suggestedCandidate === "amber" || suggestedCandidate === "gray"
-      ? suggestedCandidate
-      : "gray";
-  return {
+  const suggestedZone: Zone = isZone(suggestedCandidate) ? suggestedCandidate : "gray";
+  const result: LlmResult = {
     decisionRequired: raw?.decision_required === true,
     financialRelevance: raw?.financial_relevance === true,
     riskEscalation: raw?.risk_escalation === true,
@@ -53,6 +63,16 @@ export const normalizeLlmResult = (raw: RawLlmPayload | null | undefined): LlmRe
     amountDetected: raw?.amount_detected === true,
     suggestedZone,
   };
+  const rawConfidence = raw?.confidence;
+  if (
+    rawConfidence === undefined ||
+    rawConfidence === null ||
+    !Number.isFinite(Number(rawConfidence)) ||
+    !isZone(suggestedCandidate)
+  ) {
+    defaultedResults.add(result);
+  }
+  return result;
 };
 
 export const buildLlmPrompt = (): string =>

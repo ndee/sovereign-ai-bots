@@ -1,3 +1,5 @@
+import type { IntegrityBlock } from "./ledger/reconcile.js";
+
 export type Zone = "gray" | "amber" | "red";
 
 export type Category = "decision-required" | "financial-relevance" | "risk-escalation";
@@ -200,6 +202,16 @@ export interface ZoneHistoryEntry {
   reason: string;
 }
 
+/**
+ * Sender and subject of a message the outcome ledger counts as unaccounted,
+ * kept only so the operator's own `integrity` reply can name it. Lives in the
+ * content-bearing state file, never in the ledger or the `integrity` counts.
+ */
+export interface IntegrityDetail {
+  from: string;
+  subject: string;
+}
+
 export interface MailSentinelState {
   version: number;
   lastPollAt?: string | undefined;
@@ -229,6 +241,10 @@ export interface MailSentinelState {
   learning: LearningState;
   digest: DigestState;
   zoneHistory: ZoneHistoryEntry[];
+  /** Per-day outcome counts, recomputed from the outcome ledger on every scan write. */
+  integrity?: IntegrityBlock | undefined;
+  /** Keyed by ledger key; only messages currently unaccounted for. */
+  integrityDetails?: Record<string, IntegrityDetail> | undefined;
 }
 
 export type PolicyScope = "subject" | "body" | "snippet" | "any";

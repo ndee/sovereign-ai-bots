@@ -24,7 +24,26 @@ import {
 } from "../constants.js";
 import { deriveDegradationState } from "../health/degradation.js";
 import { announceDegradationIfChanged } from "../health/notice.js";
-import { parseMessage } from "../imap/parse.js";
+import { parseAddressFromList, parseMessage } from "../imap/parse.js";
+import { takeInventory } from "../ledger/inventory.js";
+import {
+  buildKeySpace,
+  buildLedgerKey,
+  flagDay,
+  isUnaccountedState,
+  localDay,
+  type MailLedger,
+  markOutageAffected,
+  noteBelowWatermark,
+  noteSearchTruncated,
+  type Outcome,
+  pendingGraceMs,
+  pruneLedger,
+  recordOutcome,
+  resolveOverduePending,
+} from "../ledger/ledger.js";
+import { announceUnaccountedIfDue } from "../ledger/notice.js";
+import { buildCoverageLine, summarizeIntegrity } from "../ledger/reconcile.js";
 import { evaluatePolicy } from "../policy/engine.js";
 import { detectBulkSignals } from "../scoring/bulk.js";
 import { scoreMessage } from "../scoring/heuristics.js";
@@ -32,6 +51,7 @@ import {
   buildLlmCandidate,
   buildUserFacingWhy,
   determineZone,
+  isDefaultedLlmResult,
   REVIEW_SKIPPED_BULK_REASON,
 } from "../scoring/llm.js";
 import { withLockedState } from "../state/io.js";
@@ -39,10 +59,13 @@ import { queueAmberAlert, resolvePendingAmberAlerts } from "../state/thread.js";
 import type {
   AlertSummary,
   CommandOptions,
+  IntegrityDetail,
   LlmResult,
   MailSentinelState,
   StoredAlert,
+  StoredMessage,
 } from "../types.js";
+import { compactText } from "../util/normalize.js";
 import { nowIso, parseDurationMs } from "../util/time.js";
 import { announceBuildIfChanged } from "./announce-build.js";
 
@@ -56,6 +79,7 @@ export const flushDigestIfDue = async (
   runtime: MailSentinelRuntime,
   state: MailSentinelState,
   scanAt: string,
+  ledger?: MailLedger,
 ): Promise<DigestFlushResult> => {
   const pendingAlerts = resolvePendingAmberAlerts(state);
   if (pendingAlerts.length === 0) {
@@ -70,7 +94,11 @@ export const flushDigestIfDue = async (
   if (Date.now() < dueAt) {
     return { sent: false, count: 0, alerts: [] };
   }
-  await runtime.sendMatrixRoomMessage(buildDigestMessage(pendingAlerts, runtime.digestInterval));
+  const coverageLine =
+    ledger === undefined ? undefined : buildCoverageLine(ledger, lastDigestAt, new Date());
+  await runtime.sendMatrixRoomMessage(
+    buildDigestMessage(pendingAlerts, runtime.digestInterval, coverageLine),
+  );
   state.digest.lastDigestAt = scanAt;
   state.digest.pendingAmber = [];
   // Persist the order the user actually saw (the visible slice the digest
@@ -108,6 +136,24 @@ const createInterruptedError = (signal: NodeJS.Signals): Error =>
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+/** Degradation states during which newly seen mail is marked outage-affected. */
+const OUTAGE_STATES = new Set<string>(["classification-degraded", "scans-failing"]);
+
+// The search is day-granular (`since:<date of now - lookback - 24h>`), so mail
+// older than lookback + 24 h may already be out of its reach.
+const SEARCH_WINDOW_SLACK_MS = 24 * 60 * 60 * 1000;
+
+const durationMsOr = (value: string, fallback: string): number => {
+  try {
+    return parseDurationMs(value);
+  } catch {
+    return parseDurationMs(fallback);
+  }
+};
+
+/** A read the tool killed at its deadline, as opposed to one that failed outright. */
+const READ_TIMEOUT_PATTERN = /killed by|timed? ?out|timeout/iu;
 
 /**
  * The search that opens every scan, with one retry on a fresh connection
@@ -262,6 +308,42 @@ export const scan = async (
       throw createToolUnavailableError(availability.reason);
     }
 
+    // Every message this scan sees ends in exactly one ledger outcome. The
+    // ledger is persisted on every path out of the scan, success or failure,
+    // and its writes never decide whether the scan itself succeeded.
+    const ledger = await runtime.readLedger(new Date());
+    const outageAtStart = OUTAGE_STATES.has(state.degradationState ?? "");
+    const createdThisScan = new Set<string>();
+    let ledgerWriteError: string | undefined;
+    const writeLedgerSafely = async (): Promise<void> => {
+      try {
+        await runtime.writeLedger(ledger);
+      } catch (error) {
+        ledgerWriteError = describeError(error);
+      }
+    };
+    const record = (key: string, outcome: Outcome, attempt = false): void => {
+      if (
+        recordOutcome(ledger, key, outcome, new Date(), { attempt, outageAffected: outageAtStart })
+      ) {
+        createdThisScan.add(key);
+      }
+    };
+    const integrityDetails: Record<string, IntegrityDetail> = { ...state.integrityDetails };
+    const finalizeLedger = (degradation: string): void => {
+      const now = new Date();
+      if (OUTAGE_STATES.has(degradation)) {
+        markOutageAffected(ledger, createdThisScan);
+      }
+      pruneLedger(ledger, now);
+      state.integrityDetails = Object.fromEntries(
+        Object.entries(integrityDetails).filter(([key]) =>
+          isUnaccountedState(ledger.entries[key]?.state),
+        ),
+      );
+      state.integrity = summarizeIntegrity(ledger, now);
+    };
+
     // Failure bookkeeping is shared by the ordinary catch below and the
     // termination-signal path, and it must run at most once per scan: the
     // signal handler and the unwinding body would otherwise both bump
@@ -304,6 +386,8 @@ export const scan = async (
         previousState: state.degradationState,
       });
       state.degradationState = degradation;
+      finalizeLedger(degradation);
+      await writeLedgerSafely();
       await runtime.writeState(state);
       await announceDegradationIfChanged(runtime, degradation);
     };
@@ -351,6 +435,21 @@ export const scan = async (
       }
 
       const warnings: string[] = [];
+      // The independent inventory runs before the search, and its result is
+      // persisted before the search too, so a scan that dies later still keeps
+      // the record of what was in the mailbox.
+      const inventory = await takeInventory(runtime, ledger, new Date(), {
+        searchWindowMs: durationMsOr(runtime.lookbackWindow, "1h") + SEARCH_WINDOW_SLACK_MS,
+        outageAffected: outageAtStart,
+      });
+      if (inventory.kind === "failed") {
+        warnings.push(`Mail inventory failed (${inventory.message}); coverage is partial.`);
+      }
+      for (const key of inventory.kind === "listed" ? (inventory.created ?? []) : []) {
+        createdThisScan.add(key);
+      }
+      await writeLedgerSafely();
+      throwIfInterrupted();
       const searchResult = await searchMailWithRetry(runtime, warnings, throwIfInterrupted);
       throwIfInterrupted();
       // The mail tool can annotate a structurally impaired mailbox view (e.g.
@@ -372,8 +471,24 @@ export const scan = async (
           );
           state.mailbox.lastSeenUid = undefined;
           previousLastSeenUid = undefined;
+          // Identifiers restart in a new key space; the same mail may be
+          // counted again under new keys, so the day carries no clean claim.
+          flagDay(ledger, localDay(new Date()), "coverage-break");
         }
         state.mailbox.uidValidity = observedUidValidity;
+      }
+      const keySpace = buildKeySpace(runtime.mailProtocol, observedUidValidity);
+      const keyFor = (uid: number): string => buildLedgerKey(keySpace, uid);
+      if (
+        typeof searchResult.totalMatches === "number" &&
+        searchResult.totalMatches > searchMessages.length
+      ) {
+        noteSearchTruncated(
+          ledger,
+          keySpace,
+          searchMessages[0]?.uid ?? Number.POSITIVE_INFINITY,
+          new Date(),
+        );
       }
       let redAlertsSent = 0;
       let amberQueued = 0;
@@ -410,14 +525,23 @@ export const scan = async (
         // message from here on is new. The watermark is already `undefined`
         // here when UIDVALIDITY changed, so a reset mailbox is re-read in full.
         if (state.mailbox.lastSeenUid !== undefined && summary.uid <= state.mailbox.lastSeenUid) {
+          noteBelowWatermark(ledger, keyFor(summary.uid));
           continue;
         }
+        const key = keyFor(summary.uid);
+        const summaryDetail = (): IntegrityDetail => ({
+          from: parseAddressFromList(summary.from),
+          subject: compactText(summary.subject ?? "(no subject)"),
+        });
         // Stop reading once the budget is spent and finish on our own terms.
         // The watermark only advances past what was actually read, so the
         // messages left here are simply the first ones the next tick reads —
         // deferred, not dropped.
         if (Date.now() >= scanDeadline) {
           deferredMessages = searchMessages.length - index;
+          for (const deferred of searchMessages.slice(index)) {
+            record(keyFor(deferred.uid), { state: "deferred" });
+          }
           warnings.push(
             `Scan time budget (${String(Math.round(DEFAULT_SCAN_BUDGET_MS / 1000))}s) exhausted; deferred ${String(deferredMessages)} unread message(s) to the next scan.`,
           );
@@ -427,6 +551,8 @@ export const scan = async (
           warnings.push(
             `Skipped UID ${String(summary.uid)} because it exceeds the IMAP read limit.`,
           );
+          record(key, { state: "too-large" });
+          integrityDetails[key] = summaryDetail();
           continue;
         }
         let readResult: Awaited<ReturnType<MailSentinelRuntime["readMail"]>>;
@@ -444,11 +570,19 @@ export const scan = async (
           if (isToolUnavailableError(error)) {
             throw error;
           }
+          const readError = describeError(error);
           warnings.push(
-            `Skipped UID ${String(summary.uid)} because it could not be read: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+            `Skipped UID ${String(summary.uid)} because it could not be read: ${readError}`,
           );
+          record(
+            key,
+            {
+              state: "read-failed",
+              reason: READ_TIMEOUT_PATTERN.test(readError) ? "timeout" : "other",
+            },
+            true,
+          );
+          integrityDetails[key] = summaryDetail();
           continue;
         }
         const parsed = parseMessage(summary, readResult);
@@ -477,6 +611,15 @@ export const scan = async (
           ...(knownMessage?.alertId === undefined ? {} : { alertId: knownMessage.alertId }),
         };
         if (!shouldConsider) {
+          // Same Message-ID already handled under another identifier: it
+          // inherits that outcome rather than being left without one.
+          const entry = ledger.entries[key];
+          if (entry === undefined || entry.state === "pending") {
+            const knownAlertId = (knownMessage as StoredMessage).alertId;
+            const knownZone =
+              state.alerts.find((alert) => alert.alertId === knownAlertId)?.zone ?? "gray";
+            record(key, { state: knownZone, review: "duplicate" }, true);
+          }
           continue;
         }
 
@@ -493,6 +636,7 @@ export const scan = async (
             zone: "gray",
             reason: "candidate threshold not reached",
           });
+          record(key, { state: "gray", review: "rules-only" }, true);
           continue;
         }
         // everything that can suppress a mail locally is evaluated
@@ -501,6 +645,7 @@ export const scan = async (
         const bulk = detectBulkSignals(parsed, rules.bulk);
         let llmResult: LlmResult | null = null;
         let reviewSkippedReason: string | undefined;
+        let reviewRefused = false;
         if (policyResult.muted) {
           // determineZone returns gray for a muted mail regardless of the
           // reviewer, so nothing is lost by not asking.
@@ -510,6 +655,7 @@ export const scan = async (
         } else if (llmRoutingRefused !== undefined) {
           llmCandidates += 1;
           llmFailures += 1;
+          reviewRefused = true;
         } else {
           llmCandidates += 1;
           try {
@@ -521,6 +667,7 @@ export const scan = async (
             const message = error instanceof Error ? error.message : String(error);
             if (isLlmRoutingRefusedError(error)) {
               llmRoutingRefused = message;
+              reviewRefused = true;
               warnings.push(
                 `Semantic review refused by the model provider under the configured privacy routing; no further mail is sent to the reviewer this scan: ${message}`,
               );
@@ -545,6 +692,23 @@ export const scan = async (
           zone: zoneDecision.zone,
           reason: zoneDecision.reasons[0] as string,
         });
+        // A fallback zone still drives the alert as before, but without a
+        // review verdict it is counted as `no-verdict:*`, never as a verdict.
+        const outcome: Outcome = policyResult.muted
+          ? { state: zoneDecision.zone, review: "policy-skipped" }
+          : bulk.isBulk
+            ? { state: zoneDecision.zone, review: "rules-only" }
+            : reviewRefused
+              ? { state: "no-verdict:refused" }
+              : llmResult === null
+                ? { state: "no-verdict:reviewer-unavailable" }
+                : isDefaultedLlmResult(llmResult)
+                  ? { state: "no-verdict:defaulted" }
+                  : { state: zoneDecision.zone, review: "reviewer" };
+        record(key, outcome, true);
+        if (isUnaccountedState(outcome.state)) {
+          integrityDetails[key] = { from: parsed.from, subject: parsed.subject };
+        }
         if (zoneDecision.zone === "gray") {
           continue;
         }
@@ -606,7 +770,12 @@ export const scan = async (
       // Last checkpoint before the success write: an interrupt that landed
       // during the final read must not turn into a "healthy" scan record.
       throwIfInterrupted();
-      const digestResult = await flushDigestIfDue(runtime, state, scanAt);
+      resolveOverduePending(
+        ledger,
+        new Date(),
+        pendingGraceMs(durationMsOr(runtime.pollInterval, "30m")),
+      );
+      const digestResult = await flushDigestIfDue(runtime, state, scanAt, ledger);
       if (digestResult.sent) {
         state.lastAlertAt = scanAt;
       }
@@ -624,7 +793,6 @@ export const scan = async (
       // so `doctor` reads the same counters the notice below is derived from.
       state.lastScanLlmFailures = llmFailures;
       state.lastScanCandidates = llmCandidates;
-      state.lastScanWarnings = warnings.length;
       const degradation = deriveDegradationState({
         consecutiveFailures: state.consecutiveFailures,
         lastScanLlmFailures: llmFailures,
@@ -634,10 +802,21 @@ export const scan = async (
         previousState: state.degradationState,
       });
       state.degradationState = degradation;
+      finalizeLedger(degradation);
+      // Only the final write decides whether this scan's outcomes are on disk.
+      ledgerWriteError = undefined;
+      await writeLedgerSafely();
+      if (ledgerWriteError !== undefined) {
+        warnings.push(`Outcome ledger could not be written: ${ledgerWriteError}`);
+      }
+      state.lastScanWarnings = warnings.length;
       await runtime.writeState(state);
       // Outside the send-bearing loop but still inside the state lock, matching
       // how the digest and alert sends already work. It never throws.
       await announceDegradationIfChanged(runtime, degradation);
+      if (await announceUnaccountedIfDue(runtime, ledger, new Date())) {
+        await writeLedgerSafely();
+      }
       scanResult = {
         instanceId: runtime.instanceId,
         configured: true,

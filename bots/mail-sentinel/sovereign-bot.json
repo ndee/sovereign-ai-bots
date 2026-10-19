@@ -52,7 +52,8 @@
         "mail-sentinel.feedback",
         "mail-sentinel.alerts.read",
         "mail-sentinel.version.read",
-        "mail-sentinel.status.read"
+        "mail-sentinel.status.read",
+        "mail-sentinel.integrity.read"
       ],
       "openclawBundledPlugins": [
         "lobster",
@@ -76,6 +77,8 @@
       "allowedCommands": [
         "<agent-workspace>/bin/mail-sentinel.js version --json",
         "<agent-workspace>/bin/mail-sentinel.js status --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js reconcile --instance <tool-instance-id> --json",
+        "<agent-workspace>/bin/mail-sentinel.js integrity --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js scan --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js digest --instance <tool-instance-id> --json",
         "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view today --json",
@@ -162,6 +165,9 @@
         },
         "lookbackWindow": {
           "from": "instance.config.lookbackWindow"
+        },
+        "pollInterval": {
+          "from": "instance.config.pollInterval"
         },
         "defaultReminderDelay": {
           "from": "instance.config.defaultReminderDelay"
