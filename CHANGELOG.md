@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.2.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.1.2...v2.2.0) (2026-10-19)
+
+
+### Features
+
+* **mail-sentinel:** per-message outcome ledger and daily reconcile ([#180](https://github.com/ndee/sovereign-ai-bots/issues/180)) ([71aef0a](https://github.com/ndee/sovereign-ai-bots/commit/71aef0acc1c0dd48f5f829e61460e77304804151))
+
 ## [2.1.2](https://github.com/ndee/sovereign-ai-bots/compare/v2.1.1...v2.1.2) (2026-10-01)
 
 
