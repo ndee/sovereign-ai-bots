@@ -10,3 +10,7 @@ override the exact state path per Mail Sentinel instance through the installed t
 - User feedback
 - Learned score adjustments
 - Reminder scheduling
+
+`mail-sentinel-ledger.json` beside the state file is the content-free outcome
+ledger: one outcome state per message identifier, with no subject, sender or
+body. `reconcile` and `integrity` read it.

@@ -1,5 +1,6 @@
 import type { LlmCandidate, LlmResult, MailSentinelPolicy, MailSentinelState, RulesDocument } from "../types.js";
 import { createDefaultPolicy, createDefaultState } from "../state/schema.js";
+import { createLedger, type MailLedger } from "../ledger/ledger.js";
 
 /**
  * In-memory stand-in for MailSentinelRuntime used by command tests. Mirrors
@@ -13,6 +14,8 @@ export class FakeMailSentinelRuntime {
   rulesPath = "/tmp/ms-workspace/config/rules.json";
   policyPath = "/tmp/ms-workspace/config/policy.json";
   lookbackWindow = "1h";
+  pollInterval = "30m";
+  mailProtocol: "imap" | "pop3" = "imap";
   defaultReminderDelay = "4h";
   digestInterval = "12h";
   imapInstanceId = "ms-imap";
@@ -51,6 +54,18 @@ export class FakeMailSentinelRuntime {
     this.policy = policy;
   };
   readRules = async (): Promise<RulesDocument> => this.rules;
+  ledger: MailLedger = createLedger();
+  readLedger = async (_now?: Date): Promise<MailLedger> => structuredClone(this.ledger);
+  writeLedger = async (ledger: MailLedger): Promise<void> => {
+    this.ledger = structuredClone(ledger);
+  };
+  // Default: a mail tool that predates `mail-inventory`, as commander rejects it.
+  inventoryMail = async (_cursor?: {
+    afterUid?: number;
+    uidValidity?: string | undefined;
+  }): Promise<unknown> => {
+    throw new Error("mail-inventory failed: error: unknown command 'mail-inventory'");
+  };
 
   // IMAP tool surface
   searchMail = async (

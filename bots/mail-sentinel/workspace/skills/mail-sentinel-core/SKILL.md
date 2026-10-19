@@ -23,7 +23,8 @@ Checklist:
 7. Use the local Mail Sentinel helper `policy` command for other sender/domain preference changes
 8. The direct sender helper posts its own visible confirmation/error into the alert room; do not assume silent success is acceptable
 9. If a helper command fails, reply with a short error summary instead of staying silent
-10. Keep the interaction scoped to signal detection, alerts, digests, policy, and feedback
+10. Use the local Mail Sentinel helper `integrity` command when the operator asks whether every mail was checked, which mails were not checked, or replies to the daily "could not be checked" notice; use `reconcile` for the per-day counts (content-free, safe to share for support)
+11. Keep the interaction scoped to signal detection, alerts, digests, policy, feedback, and mail-check integrity
 
 ## Confirm scope before applying a rule
 

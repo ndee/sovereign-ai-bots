@@ -11,6 +11,26 @@ Managed by Sovereign Node installer.
 - visible Matrix alerts use a compact operator format: the zone/category share one line, the subject is the headline, and sender display is normalized for readability.
 - visible AMBER digests no longer number items or show alert IDs; when an operator replies to a digest item, Mail Sentinel resolves the target by subject or sender.
 
+## Outcome ledger: was every message checked?
+
+Every message the scan sees ends in exactly one outcome state in
+`data/mail-sentinel-ledger.json`: a verdict (red / amber / gray), no verdict
+(reviewer unavailable, refused, or an incomplete reply), not processed (read
+failed, too large, never returned by a search), or in flight (pending,
+deferred). The ledger holds identifiers, timestamps and states only, never a
+subject, sender or body, and keeps 45 days.
+
+- `reconcile` balances the outcomes per day against an independent mailbox
+  inventory (or, without one, against the ledger's own count: coverage
+  partial). The residual must be 0; anything else is shown as a defect.
+- `integrity` lists the messages that were not checked, in the operator's own
+  room.
+- The state file's `integrity` block carries the same counts for status and
+  diagnostics; digests carry one coverage line; at most one notice per day
+  reports messages that could not be checked.
+
+Details: `docs/mail-sentinel-outcome-ledger.md` in the bot catalog repository.
+
 ## Semantic review: what leaves the node
 
 The heuristic prefilter, bulk/newsletter detection, and the operator's mute

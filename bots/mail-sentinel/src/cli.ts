@@ -14,8 +14,10 @@ import {
 import { digest } from "./commands/digest.js";
 import { explainAlert, isAmbiguousExplain } from "./commands/explain.js";
 import { applyFeedback, isAmbiguousFeedback } from "./commands/feedback.js";
+import { formatIntegrityResult, integrity } from "./commands/integrity.js";
 import { listAlerts } from "./commands/list-alerts.js";
 import { policyAdd, policyImportantSender, policyList, policyRemove } from "./commands/policy.js";
+import { formatReconcileResult, reconcile } from "./commands/reconcile.js";
 import { scan } from "./commands/scan.js";
 import { formatStatusResult, status } from "./commands/status.js";
 import { formatVersionResult, version } from "./commands/version.js";
@@ -26,7 +28,7 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
   const { command, options } = parseArgs(argv);
   if (typeof command !== "string" || command.length === 0) {
     throw new Error(
-      "Expected a command: scan, digest, feedback, explain, list-alerts, policy, status, or version",
+      "Expected a command: scan, digest, feedback, explain, list-alerts, policy, status, reconcile, integrity, or version",
     );
   }
 
@@ -50,6 +52,14 @@ export const runCli = async (argv: readonly string[]): Promise<void> => {
     // A status report, not a probe: exit code stays 0 whether or not the
     // instance is ready — the verdict travels in the `ready` field.
     printOutput(await status(options), options, formatStatusResult);
+    return;
+  }
+  if (command === "reconcile") {
+    printOutput(await reconcile(options), options, formatReconcileResult);
+    return;
+  }
+  if (command === "integrity") {
+    printOutput(await integrity(options), options, formatIntegrityResult);
     return;
   }
   if (command === "digest") {

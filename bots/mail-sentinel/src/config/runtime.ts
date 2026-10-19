@@ -19,13 +19,18 @@ import {
   DEFAULT_LOOKBACK_WINDOW,
   DEFAULT_OPENCLAW_URL,
   DEFAULT_POLICY_PATH,
+  DEFAULT_POLL_INTERVAL,
   DEFAULT_REMINDER_DELAY,
   DEFAULT_RULES_PATH,
   DEFAULT_STATE_PATH,
   DEFAULT_TOOL_EXECUTABLE,
   DEFAULT_TOOL_TIMEOUT_MS,
+  MAIL_INVENTORY_KILL_MS,
+  MAIL_INVENTORY_TIMEOUT_MS,
 } from "../constants.js";
 import { execFileAsync, resolveSecretRefValue } from "../imap/exec.js";
+import { ledgerPathFor, readLedgerFile, writeLedgerFile } from "../ledger/io.js";
+import type { MailLedger } from "../ledger/ledger.js";
 import { buildLlmPrompt, normalizeLlmResult, quoteLobsterArg } from "../scoring/llm.js";
 import { readJsonFile, writeJsonFile } from "../state/io.js";
 import {
@@ -206,6 +211,10 @@ export class MailSentinelRuntime {
   rulesPath!: string;
   policyPath!: string;
   lookbackWindow!: string;
+  /** Scan timer interval; sets how long an inventoried message may wait for a scan. */
+  pollInterval!: string;
+  /** Protocol of the mail tool instance, for ledger key spaces. */
+  mailProtocol!: "imap" | "pop3";
   defaultReminderDelay!: string;
   digestInterval!: string;
   imapInstanceId!: string;
@@ -235,9 +244,8 @@ export class MailSentinelRuntime {
   async load(): Promise<void> {
     const raw = await readFile(this.configPath, "utf8");
     this.runtimeConfig = parseRuntimeConfigDocument(raw) as RuntimeConfigDocument;
-    const tool = (this.runtimeConfig.sovereignTools?.instances ?? []).find(
-      (entry) => entry.id === this.instanceId,
-    );
+    const instances = this.runtimeConfig.sovereignTools?.instances ?? [];
+    const tool = instances.find((entry) => entry.id === this.instanceId);
     if (tool === undefined) {
       throw new Error(`Tool instance '${this.instanceId}' was not found in ${this.configPath}`);
     }
@@ -266,12 +274,15 @@ export class MailSentinelRuntime {
     );
     this.lookbackWindow =
       (toolConfig.lookbackWindow as string | undefined) ?? DEFAULT_LOOKBACK_WINDOW;
+    this.pollInterval = (toolConfig.pollInterval as string | undefined) ?? DEFAULT_POLL_INTERVAL;
     this.defaultReminderDelay =
       (toolConfig.defaultReminderDelay as string | undefined) ?? DEFAULT_REMINDER_DELAY;
     this.digestInterval =
       (toolConfig.digestInterval as string | undefined) ?? DEFAULT_DIGEST_INTERVAL;
     this.imapInstanceId =
       (toolConfig.imapInstanceId as string | undefined) ?? DEFAULT_IMAP_INSTANCE_ID;
+    const mailTool = instances.find((entry) => entry.id === this.imapInstanceId);
+    this.mailProtocol = mailTool?.config?.protocol === "pop3" ? "pop3" : "imap";
     this.openclawUrl = (toolConfig.openclawUrl as string | undefined) ?? DEFAULT_OPENCLAW_URL;
     this.llmModel = (toolConfig.llmModel as string | undefined) ?? DEFAULT_LLM_MODEL;
     this.llmSenderDetail = normalizeSenderDetail(toolConfig.llmSenderDetail);
@@ -372,14 +383,27 @@ export class MailSentinelRuntime {
     await writeJsonFile(this.statePath, pruneState(migrateState(state)));
   }
 
-  async runTool(command: readonly string[], args: readonly string[]): Promise<unknown> {
+  async readLedger(now: Date = new Date()): Promise<MailLedger> {
+    return readLedgerFile(ledgerPathFor(this.statePath), now);
+  }
+
+  async writeLedger(ledger: MailLedger): Promise<void> {
+    await writeLedgerFile(ledgerPathFor(this.statePath), ledger);
+  }
+
+  async runTool(
+    command: readonly string[],
+    args: readonly string[],
+    options: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
     const executable = resolveToolExecutable();
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
     const result = await execFileAsync(executable, [...command, ...args], {
       maxBuffer: 10 * 1024 * 1024,
       // A wedged child must fail on the scan's own terms, well before systemd's
       // TimeoutStartSec kills the unit. SIGKILL rather than the
       // default SIGTERM: a stuck TLS socket does not honour SIGTERM promptly.
-      timeout: DEFAULT_TOOL_TIMEOUT_MS,
+      timeout: timeoutMs,
       killSignal: "SIGKILL",
     }).catch(
       (
@@ -404,7 +428,7 @@ export class MailSentinelRuntime {
         // "failed:" and goes looking for a mailbox problem that is not there.
         if (error.killed === true) {
           throw new Error(
-            `${command.join(" ")} failed: killed by ${String(error.signal ?? "signal")} after ${String(DEFAULT_TOOL_TIMEOUT_MS)}ms without completing`,
+            `${command.join(" ")} failed: killed by ${String(error.signal ?? "signal")} after ${String(timeoutMs)}ms without completing`,
           );
         }
         const stdout = typeof error.stdout === "string" ? error.stdout : "";
@@ -441,6 +465,8 @@ export class MailSentinelRuntime {
       subject?: unknown;
     }>;
     uidValidity?: string;
+    /** Matches before the result limit; more than returned means the oldest were cut. */
+    totalMatches?: number;
     /**
      * Diagnostic from the mail tool about the mailbox view itself (e.g. a
      * POP3 window that excludes recent mail). Surfaced as a scan warning.
@@ -472,9 +498,35 @@ export class MailSentinelRuntime {
         subject?: unknown;
       }>;
       uidValidity?: string;
+      totalMatches?: number;
       note?: string;
     };
     return { ...result, query };
+  }
+
+  /**
+   * Independent identifier listing (`mail-inventory`), bounded by its own
+   * deadline. The outer kill sits a little later so the tool's own timeout,
+   * which reports itself by name, fires first.
+   */
+  async inventoryMail(
+    cursor: { afterUid?: number; uidValidity?: string | undefined } = {},
+  ): Promise<unknown> {
+    return this.runTool(
+      ["mail-inventory"],
+      [
+        "--instance",
+        this.imapInstanceId,
+        ...(cursor.afterUid === undefined ? [] : ["--after-uid", String(cursor.afterUid)]),
+        ...(cursor.uidValidity === undefined ? [] : ["--uid-validity", cursor.uidValidity]),
+        "--timeout-ms",
+        String(MAIL_INVENTORY_TIMEOUT_MS),
+        "--config-path",
+        this.configPath,
+        "--json",
+      ],
+      { timeoutMs: MAIL_INVENTORY_KILL_MS },
+    );
   }
 
   async readMail(selector: string | number): Promise<{
