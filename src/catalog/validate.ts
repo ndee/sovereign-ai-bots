@@ -357,6 +357,8 @@ function validatePackageInvariants(rootDir: string, pkg: ParsedPackage): string[
     }
   }
 
+  errors.push(...validateTypedToolTemplates(manifestPath, pkg));
+
   const hostResourceIds = pkg.manifest.hostResources.map((entry) => entry.id);
   if (!hasUniqueValues(hostResourceIds)) {
     errors.push(`${manifestPath}: hostResources ids must be unique`);
@@ -398,6 +400,55 @@ function validatePackageInvariants(rootDir: string, pkg: ParsedPackage): string[
     errors.push(
       `${manifestPath}: matrixRouting.defaultAccount requires matrixIdentity.mode = dedicated-account`,
     );
+  }
+  return errors;
+}
+
+function validateTypedToolTemplates(manifestPath: string, pkg: ParsedPackage): string[] {
+  const errors: string[] = [];
+  const managedSources = new Set(
+    pkg.manifest.hostResources
+      .filter((entry) => entry.kind === "managedFile")
+      .map((entry) => entry.spec.source),
+  );
+  for (const [index, template] of pkg.manifest.toolTemplates.entries()) {
+    const at = `${manifestPath}: toolTemplates[${index}]`;
+    const typedTool = template.openclawTypedTool;
+    if (typedTool !== undefined) {
+      // A typed tool replaces shell commands for its agent; mixing both would
+      // put exec back next to it.
+      if (template.allowedCommands.length > 0) {
+        errors.push(`${at} must not declare allowedCommands next to openclawTypedTool`);
+      }
+      // The typed tool and the bot's workspace copy must run the same build.
+      if (!isSafeRelativePath(typedTool.script) || !managedSources.has(typedTool.script)) {
+        errors.push(
+          `${at}.openclawTypedTool.script must be the source of a managedFile host resource`,
+        );
+      }
+      const names = typedTool.operations.map((operation) => operation.name);
+      if (!hasUniqueValues(names)) {
+        errors.push(`${at}.openclawTypedTool operations must use unique names`);
+      }
+      for (const operation of typedTool.operations) {
+        if (operation.effect === "change" && !operation.argv.includes("<tool-instance-id>")) {
+          errors.push(
+            `${at}.openclawTypedTool operation '${operation.name}' changes state and must target <tool-instance-id>`,
+          );
+        }
+      }
+    }
+    const loadedPlugins = new Set([
+      ...template.openclawPlugins,
+      ...template.openclawBundledPlugins,
+    ]);
+    for (const toolName of template.openclawScanAgent?.toolNames ?? []) {
+      if (!loadedPlugins.has(toolName)) {
+        errors.push(
+          `${at}.openclawScanAgent tool '${toolName}' must come from a plugin the template enables`,
+        );
+      }
+    }
   }
   return errors;
 }
