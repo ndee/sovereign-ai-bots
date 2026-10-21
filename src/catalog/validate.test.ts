@@ -394,6 +394,77 @@ describe("catalog validator", () => {
     );
   });
 
+  it("reports typed tool and scan agent invariant errors", async () => {
+    const rootDir = await createCatalogRoot();
+    const operation = {
+      name: "feedback",
+      description: "Feedback",
+      effect: "change",
+      argv: ["feedback", "--json"],
+    };
+    await writeCanonicalJson(
+      join(rootDir, "bots", "typed", "sovereign-bot.json"),
+      createValidManifest("typed", {
+        toolTemplates: [
+          createToolTemplate({
+            allowedCommands: ["<agent-workspace>/bin/typed.js status --json"],
+            openclawBundledPlugins: ["llm-task"],
+            openclawTypedTool: {
+              name: "typed_tool",
+              description: "Typed",
+              script: "workspace/bin/typed.js",
+              operations: [operation, operation],
+            },
+            openclawScanAgent: { toolNames: ["llm-task", "lobster"] },
+          }),
+        ],
+      }),
+    );
+    await writeCanonicalJson(
+      join(rootDir, "bots", "unsafe", "sovereign-bot.json"),
+      createValidManifest("unsafe", {
+        toolTemplates: [
+          createToolTemplate({
+            openclawTypedTool: {
+              name: "unsafe_tool",
+              description: "Unsafe",
+              script: "../outside.js",
+              operations: [{ ...operation, argv: ["feedback", "<tool-instance-id>"] }],
+            },
+          }),
+        ],
+      }),
+    );
+    await writeCanonicalJson(
+      join(rootDir, "bots", "fine", "sovereign-bot.json"),
+      createValidManifest("fine", {
+        toolTemplates: [
+          createToolTemplate({
+            openclawTypedTool: {
+              name: "fine_tool",
+              description: "Fine",
+              script: "workspace/README.md",
+              operations: [
+                { name: "status", description: "Status", effect: "read", argv: ["status"] },
+              ],
+            },
+          }),
+        ],
+      }),
+    );
+
+    const result = await testCatalog(rootDir);
+    expect(result.errors).toEqual([
+      "bots/typed/sovereign-bot.json: toolTemplates[0] must not declare allowedCommands next to openclawTypedTool",
+      "bots/typed/sovereign-bot.json: toolTemplates[0].openclawTypedTool.script must be the source of a managedFile host resource",
+      "bots/typed/sovereign-bot.json: toolTemplates[0].openclawTypedTool operations must use unique names",
+      "bots/typed/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'feedback' changes state and must target <tool-instance-id>",
+      "bots/typed/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'feedback' changes state and must target <tool-instance-id>",
+      "bots/typed/sovereign-bot.json: toolTemplates[0].openclawScanAgent tool 'lobster' must come from a plugin the template enables",
+      "bots/unsafe/sovereign-bot.json: toolTemplates[0].openclawTypedTool.script must be the source of a managedFile host resource",
+    ]);
+  });
+
   it("runs the catalog CLI and reports usage errors", async () => {
     expect(parseCatalogCommand(["lint"])).toBe("lint");
     expect(() => parseCatalogCommand([])).toThrow(

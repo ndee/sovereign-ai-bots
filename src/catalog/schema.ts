@@ -32,6 +32,44 @@ const toolTemplateRefSchema = z
     version: nonEmptyStringSchema,
   })
   .passthrough();
+// Node renders the typed tool and enforces its full rules; the catalog checks
+// the shape so a malformed declaration fails here, before it reaches a node.
+const typedToolParamSchema = z
+  .object({
+    type: z.enum(["string", "boolean"]),
+    description: nonEmptyStringSchema,
+    enum: z.array(nonEmptyStringSchema).min(1).optional(),
+    pattern: nonEmptyStringSchema.optional(),
+    maxLength: z.number().int().min(1).max(500).optional(),
+    argv: z.array(nonEmptyStringSchema).min(1).max(2),
+  })
+  .passthrough();
+const typedToolOperationSchema = z
+  .object({
+    name: z.string().regex(/^[a-z][a-z0-9-]{0,47}$/),
+    description: nonEmptyStringSchema,
+    effect: z.enum(["read", "change"]),
+    argv: z.array(nonEmptyStringSchema).min(1),
+    params: z.record(z.string(), typedToolParamSchema).optional(),
+    required: z.array(nonEmptyStringSchema).optional(),
+    exactlyOneOf: z.array(z.array(nonEmptyStringSchema).min(2)).optional(),
+    confirm: z
+      .union([
+        z.literal("always"),
+        z.object({ param: nonEmptyStringSchema, values: z.array(nonEmptyStringSchema).min(1) }),
+      ])
+      .optional(),
+    confirmPreviewArgv: z.array(nonEmptyStringSchema).min(1).optional(),
+  })
+  .passthrough();
+const typedToolSchema = z
+  .object({
+    name: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
+    description: nonEmptyStringSchema,
+    script: nonEmptyStringSchema,
+    operations: z.array(typedToolOperationSchema).min(1),
+  })
+  .passthrough();
 const toolTemplateSchema = z
   .object({
     kind: z.literal("sovereign-tool-template"),
@@ -45,6 +83,11 @@ const toolTemplateSchema = z
     openclawPlugins: z.array(nonEmptyStringSchema).default([]),
     openclawBundledPlugins: z.array(nonEmptyStringSchema).default([]),
     openclawToolNames: z.array(nonEmptyStringSchema).default([]),
+    openclawTypedTool: typedToolSchema.optional(),
+    openclawScanAgent: z
+      .object({ toolNames: z.array(nonEmptyStringSchema).min(1) })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 const toolInstanceSchema = z

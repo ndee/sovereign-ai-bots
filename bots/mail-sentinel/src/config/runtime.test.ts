@@ -857,6 +857,29 @@ describe("config/runtime", () => {
       }
     });
 
+    it("runs the review in the dedicated scan agent's session when the node names one", async () => {
+      readFile
+        .mockResolvedValueOnce(
+          JSON.stringify(makeRuntimeConfig({ scanAgentId: "mail-sentinel-scan" })),
+        )
+        .mockRejectedValueOnce(new Error("no runtime"));
+      const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+      await runtime.load();
+      expect(runtime.scanAgentId).toBe("mail-sentinel-scan");
+      const runner = vi.fn().mockResolvedValue({ stdout: "[]", stderr: "" });
+      const previous = setExecFileAsync(runner);
+      writeFile.mockResolvedValue(undefined);
+      rm.mockResolvedValue(undefined);
+      try {
+        await runtime.classifyCandidate(sampleCandidate).catch(() => undefined);
+        const pipeline = (runner.mock.calls[0] as [string, readonly string[]])[1][0] as string;
+        expect(pipeline).toContain('--session-key "agent:mail-sentinel-scan:main"');
+        expect(pipeline).not.toContain("agent:mail-sentinel:main");
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
     // Regression (#173): the REAL lobster parser (installed @clawdbot/lobster,
     // not a mock) binds the token after a bare `--json` as its value, so
     // `exec --json cat <file>` tried to spawn the JSON file (EACCES).

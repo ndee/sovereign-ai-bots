@@ -207,6 +207,12 @@ export class MailSentinelRuntime {
     ? I
     : never;
   workspaceDir!: string;
+  /**
+   * Agent whose session the semantic review runs in. Nodes that render a
+   * dedicated tool-less scan agent name it in the tool config; elsewhere the
+   * review falls back to the chat agent.
+   */
+  scanAgentId!: string;
   statePath!: string;
   rulesPath!: string;
   policyPath!: string;
@@ -260,6 +266,7 @@ export class MailSentinelRuntime {
     this.agent = agent as this["agent"];
     this.tool = tool as this["tool"];
     this.workspaceDir = agent.workspace;
+    this.scanAgentId = (toolConfig.scanAgentId as string | undefined) ?? agentId;
     this.statePath = resolveRelativeToBase(
       (toolConfig.statePath as string | undefined) ?? DEFAULT_STATE_PATH,
       this.workspaceDir,
@@ -611,7 +618,7 @@ export class MailSentinelRuntime {
       encoding: "utf8",
       mode: 0o600,
     });
-    const sessionKey = `agent:${this.agent.id}:main`;
+    const sessionKey = `agent:${this.scanAgentId}:main`;
     const pipeline = [
       "exec",
       // Plain argv, never `--shell`: lobster runs a shell line via `/bin/sh -lc`,

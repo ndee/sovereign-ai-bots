@@ -46,7 +46,7 @@
       "kind": "sovereign-tool-template",
       "id": "mail-sentinel-tool",
       "version": "2.0.0",
-      "description": "Local-first mail watcher for heuristic candidate filtering, Lobster semantic review, policy-driven zoning, digests, and feedback tuning.",
+      "description": "Local-first mail watcher for heuristic candidate filtering, Lobster semantic review, policy-driven zoning, digests, and feedback tuning. Chat commands run through a typed tool; the scan uses a dedicated tool-less agent.",
       "capabilities": [
         "mail-sentinel.scan",
         "mail-sentinel.feedback",
@@ -56,13 +56,9 @@
         "mail-sentinel.integrity.read"
       ],
       "openclawBundledPlugins": [
-        "lobster",
         "llm-task"
       ],
-      "openclawToolNames": [
-        "lobster",
-        "llm-task"
-      ],
+      "openclawToolNames": [],
       "requiredSecretRefs": [],
       "requiredConfigKeys": [
         "agentId",
@@ -74,34 +70,368 @@
         "openclawUrl",
         "llmModel"
       ],
-      "allowedCommands": [
-        "<agent-workspace>/bin/mail-sentinel.js version --json",
-        "<agent-workspace>/bin/mail-sentinel.js status --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js reconcile --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js integrity --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js scan --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js digest --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view today --json",
-        "<agent-workspace>/bin/mail-sentinel.js list-alerts --instance <tool-instance-id> --view recent --json",
-        "<agent-workspace>/bin/mail-sentinel.js policy list --instance <tool-instance-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js policy important-sender --instance <tool-instance-id> --query <query> --announce --json",
-        "<agent-workspace>/bin/mail-sentinel.js policy add --instance <tool-instance-id> --type <type> --match <pattern> --min-zone <zone> --json",
-        "<agent-workspace>/bin/mail-sentinel.js policy remove --instance <tool-instance-id> --id <policy-id> --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action important --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action not-important --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action less-often --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action remind-later --delay <duration> --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action always-like-this --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action reduce --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --latest --action digest-only --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action important --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action not-important --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action less-often --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action remind-later --delay <duration> --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action always-like-this --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action reduce --json",
-        "<agent-workspace>/bin/mail-sentinel.js feedback --instance <tool-instance-id> --alert-id <alert-id> --action digest-only --json"
-      ]
+      "allowedCommands": [],
+      "openclawTypedTool": {
+        "name": "mail_sentinel",
+        "description": "Mail Sentinel alerts, digest, feedback and sender policy for this node.",
+        "script": "workspace/bin/dist/mail-sentinel.js",
+        "operations": [
+          {
+            "name": "version",
+            "description": "Report the running Mail Sentinel build.",
+            "effect": "read",
+            "argv": [
+              "version",
+              "--json"
+            ]
+          },
+          {
+            "name": "status",
+            "description": "Report whether the mailbox connection and the scan are healthy.",
+            "effect": "read",
+            "argv": [
+              "status",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ]
+          },
+          {
+            "name": "list-alerts",
+            "description": "List today's or recent alerts, with their alert ids.",
+            "effect": "read",
+            "argv": [
+              "list-alerts",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ],
+            "params": {
+              "view": {
+                "type": "string",
+                "description": "today or recent",
+                "enum": [
+                  "today",
+                  "recent"
+                ],
+                "argv": [
+                  "--view",
+                  "{value}"
+                ]
+              }
+            },
+            "required": [
+              "view"
+            ]
+          },
+          {
+            "name": "digest",
+            "description": "Show the pending amber digest.",
+            "effect": "read",
+            "argv": [
+              "digest",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ]
+          },
+          {
+            "name": "explain",
+            "description": "Explain why one alert was flagged: matched rules, policy, reviewer verdict and final zone.",
+            "effect": "read",
+            "argv": [
+              "explain",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ],
+            "params": {
+              "alertId": {
+                "type": "string",
+                "description": "Alert id from list-alerts",
+                "pattern": "^[A-Za-z0-9-]{1,64}$",
+                "maxLength": 64,
+                "argv": [
+                  "--alert-id",
+                  "{value}"
+                ]
+              },
+              "latest": {
+                "type": "boolean",
+                "description": "The newest alert",
+                "argv": [
+                  "--latest"
+                ]
+              },
+              "ref": {
+                "type": "string",
+                "description": "Short alert reference shown in the room",
+                "maxLength": 64,
+                "argv": [
+                  "--ref",
+                  "{value}"
+                ]
+              }
+            },
+            "exactlyOneOf": [
+              [
+                "alertId",
+                "latest",
+                "ref"
+              ]
+            ]
+          },
+          {
+            "name": "integrity",
+            "description": "Report whether every mail was checked and name the messages that were not.",
+            "effect": "read",
+            "argv": [
+              "integrity",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ]
+          },
+          {
+            "name": "reconcile",
+            "description": "Report the daily counts (no subjects or senders) for support.",
+            "effect": "read",
+            "argv": [
+              "reconcile",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ]
+          },
+          {
+            "name": "policy-list",
+            "description": "List the sender, domain and other policies.",
+            "effect": "read",
+            "argv": [
+              "policy",
+              "list",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ]
+          },
+          {
+            "name": "feedback",
+            "description": "Record operator feedback on one alert. not-important, less-often, reduce and digest-only lower alerting: the tool returns a preview and a code, and the change applies only after the operator confirms it.",
+            "effect": "change",
+            "argv": [
+              "feedback",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ],
+            "params": {
+              "alertId": {
+                "type": "string",
+                "description": "Alert id from list-alerts",
+                "pattern": "^[A-Za-z0-9-]{1,64}$",
+                "maxLength": 64,
+                "argv": [
+                  "--alert-id",
+                  "{value}"
+                ]
+              },
+              "latest": {
+                "type": "boolean",
+                "description": "The newest alert",
+                "argv": [
+                  "--latest"
+                ]
+              },
+              "action": {
+                "type": "string",
+                "description": "important, not-important, less-often, remind-later, always-like-this, reduce or digest-only",
+                "enum": [
+                  "important",
+                  "not-important",
+                  "less-often",
+                  "remind-later",
+                  "always-like-this",
+                  "reduce",
+                  "digest-only"
+                ],
+                "argv": [
+                  "--action",
+                  "{value}"
+                ]
+              },
+              "delay": {
+                "type": "string",
+                "description": "Reminder delay for remind-later, e.g. 30m, 4h or 2d (at most 999m, 99h or 7d)",
+                "pattern": "^([1-9][0-9]{0,2}m|[1-9][0-9]?h|[1-7]d)$",
+                "maxLength": 4,
+                "argv": [
+                  "--delay",
+                  "{value}"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "description": "How broadly always-like-this, reduce or digest-only applies: item (default), sender, domain, subject or content",
+                "enum": [
+                  "item",
+                  "sender",
+                  "domain",
+                  "subject",
+                  "content"
+                ],
+                "argv": [
+                  "--scope",
+                  "{value}"
+                ]
+              },
+              "contains": {
+                "type": "string",
+                "description": "Token for a subject or content scope",
+                "maxLength": 200,
+                "argv": [
+                  "--contains",
+                  "{value}"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "exactlyOneOf": [
+              [
+                "alertId",
+                "latest"
+              ]
+            ],
+            "confirm": {
+              "param": "action",
+              "values": [
+                "not-important",
+                "less-often",
+                "reduce",
+                "digest-only"
+              ]
+            },
+            "confirmPreviewArgv": [
+              "--dry-run"
+            ]
+          },
+          {
+            "name": "policy-important-sender",
+            "description": "Mark the sender that matches the query as important and post a confirmation in the alert room.",
+            "effect": "change",
+            "argv": [
+              "policy",
+              "important-sender",
+              "--instance",
+              "<tool-instance-id>",
+              "--announce",
+              "--json"
+            ],
+            "params": {
+              "query": {
+                "type": "string",
+                "description": "Name or address of the sender, as the operator wrote it",
+                "maxLength": 200,
+                "argv": [
+                  "--query",
+                  "{value}"
+                ]
+              }
+            },
+            "required": [
+              "query"
+            ]
+          },
+          {
+            "name": "policy-add",
+            "description": "Add a sender, domain or receiver policy that keeps matching mail at least at the given zone.",
+            "effect": "change",
+            "argv": [
+              "policy",
+              "add",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ],
+            "params": {
+              "type": {
+                "type": "string",
+                "description": "sender, domain or receiver",
+                "enum": [
+                  "sender",
+                  "domain",
+                  "receiver"
+                ],
+                "argv": [
+                  "--type",
+                  "{value}"
+                ]
+              },
+              "match": {
+                "type": "string",
+                "description": "Address, domain or pattern to match",
+                "maxLength": 200,
+                "argv": [
+                  "--match",
+                  "{value}"
+                ]
+              },
+              "minZone": {
+                "type": "string",
+                "description": "red or amber",
+                "enum": [
+                  "red",
+                  "amber"
+                ],
+                "argv": [
+                  "--min-zone",
+                  "{value}"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "match",
+              "minZone"
+            ]
+          },
+          {
+            "name": "policy-remove",
+            "description": "Remove one policy by id. This can lower alerting and needs the operator's confirmation.",
+            "effect": "change",
+            "argv": [
+              "policy",
+              "remove",
+              "--instance",
+              "<tool-instance-id>",
+              "--json"
+            ],
+            "params": {
+              "id": {
+                "type": "string",
+                "description": "Policy id from policy-list",
+                "pattern": "^[A-Za-z0-9-]{1,64}$",
+                "maxLength": 64,
+                "argv": [
+                  "--id",
+                  "{value}"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "confirm": "always"
+          }
+        ]
+      },
+      "openclawScanAgent": {
+        "toolNames": [
+          "llm-task"
+        ]
+      }
     }
   ],
   "toolInstances": [

@@ -11,6 +11,20 @@ Managed by Sovereign Node installer.
 - visible Matrix alerts use a compact operator format: the zone/category share one line, the subject is the headline, and sender display is normalized for readability.
 - visible AMBER digests no longer number items or show alert IDs; when an operator replies to a digest item, Mail Sentinel resolves the target by subject or sender.
 
+## Chat commands
+
+In chat, the bot has one tool, `mail_sentinel`, with a fixed set of operations
+(alerts, digest, explain, integrity, reconcile, status, version, feedback and
+sender policy). It has no shell, exec or file access, and the scan is not
+available from chat; it runs on its timer.
+
+- Feedback and policy changes are accepted only when the operator wrote the
+  message that started the turn.
+- Changes that lower alerting (`not-important`, `less-often`, `reduce`,
+  `digest-only` and removing a policy) are only recorded at first. The bot shows
+  what would change and a code; the change applies after the operator sends
+  `/confirm <code>` within 15 minutes.
+
 ## Outcome ledger: was every message checked?
 
 Every message the scan sees ends in exactly one outcome state in
@@ -54,9 +68,12 @@ matched rule ids, parsed amounts. The payload is written 0600 into a private
 0700 temp directory for the duration of the single `lobster` call and removed
 afterwards.
 
-The review runs inside the bot's own OpenClaw session, so the model that
-classifies is the agent's configured model (`agentTemplate.model` in the bot
-package, `qwen/qwen3.5-27b` by default). The instance config key `llmModel` is
+The review runs in the session of a dedicated scan agent that the node renders
+for this bot: same model as the bot, the `llm-task` tool only, and no chat
+binding, so mail candidates never pass through the chat agent's session (on a
+node without a scan agent the review falls back to the bot's own session). The
+model that classifies is the agent's configured model (`agentTemplate.model` in
+the bot package, `qwen/qwen3.5-27b` by default). The instance config key `llmModel` is
 kept for compatibility only and is not sent anywhere. If the gateway's provider
 refuses to route a review under the configured privacy/data policy ("No
 endpoints found …"), the scan records it as a classification degradation, sends
