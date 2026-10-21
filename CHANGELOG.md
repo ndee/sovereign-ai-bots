@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.3.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.2.0...v2.3.0) (2026-10-21)
+
+
+### Features
+
+* **mail-sentinel:** chat commands through a typed tool instead of shell exec ([#183](https://github.com/ndee/sovereign-ai-bots/issues/183)) ([d6990f3](https://github.com/ndee/sovereign-ai-bots/commit/d6990f3fca8ecb4a062880d49130bb284440c11d))
+
 ## [2.2.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.1.2...v2.2.0) (2026-10-19)
 
 
