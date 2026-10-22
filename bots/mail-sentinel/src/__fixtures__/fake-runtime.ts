@@ -83,7 +83,10 @@ export class FakeMailSentinelRuntime {
   ): Promise<void> => undefined;
 
   // LLM surface
-  classifyCandidate = async (_candidate: LlmCandidate): Promise<LlmResult> => ({
+  classifyCandidate = async (
+    _candidate: LlmCandidate,
+    _options?: { deadline?: number | undefined },
+  ): Promise<LlmResult> => ({
     decisionRequired: false,
     financialRelevance: false,
     riskEscalation: false,

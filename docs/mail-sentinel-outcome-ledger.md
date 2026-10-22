@@ -22,7 +22,7 @@ Each entry is keyed by `<protocol>:<uidValidity>:<uid>` and holds:
 | `key` | Message identifier. Identifiers never match across key spaces, so a UIDVALIDITY change starts a new one. |
 | `firstSeenAt` | When the scan or the inventory first recorded it. |
 | `state` | Exactly one outcome state (below). |
-| `reason` | Sub-cause where known, e.g. `timeout` for a read that hit the tool deadline. |
+| `reason` | Sub-cause where known, e.g. `timeout` for a read that hit the tool deadline or a review call the bot killed. |
 | `review` | For verdicts: `reviewer`, `rules-only`, `policy-skipped` or `duplicate`. |
 | `attempts` | Read or review attempts the scan made. |
 | `updatedAt` | Last state change. |
@@ -40,7 +40,7 @@ history stays visible.
 | Group | State | Meaning |
 |---|---|---|
 | Verdict | `red`, `amber`, `gray` | A zone was decided. `review` says how: by the semantic reviewer, by local rules only (below the candidate threshold, or bulk mail), skipped by a mute policy, or inherited from a duplicate Message-ID. |
-| No verdict | `no-verdict:reviewer-unavailable` | The semantic reviewer failed. The alert still shows the fallback zone (usually amber) in the digest, but the ledger does **not** count it as an amber verdict. |
+| No verdict | `no-verdict:reviewer-unavailable` | The semantic reviewer failed. The alert still shows the fallback zone (usually amber) in the digest, but the ledger does **not** count it as an amber verdict. `reason` is how the last review call failed (`timeout`, `gateway-timeout`, `connection`, `http` or `invalid-reply`), or `postponed` when the scan never sent the message because the reviewer had failed twice in a row or the time budget was spent; a postponed message counts no attempt. |
 | | `no-verdict:refused` | The model provider refused the review under the configured privacy routing. |
 | | `no-verdict:defaulted` | The reviewer replied without a usable confidence or zone, so defaults filled the gaps. |
 | Not processed | `read-failed` | The message could not be read. `reason` is `timeout` or `other`. |

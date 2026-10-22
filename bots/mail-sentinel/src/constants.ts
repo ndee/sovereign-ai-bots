@@ -31,8 +31,11 @@ export const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
 // once the budget is spent the scan stops reading, defers the remaining
 // (higher-UID) messages to the next timer tick via the watermark, and finishes
 // on its own terms — instead of being SIGKILLed mid-write and losing both the
-// progress and the failure bookkeeping. Worst case after the last budget check
-// is one tool call (60s) plus one LLM review (30s), still under the ceiling.
+// progress and the failure bookkeeping. No review call starts after the budget
+// either, so the worst case after the last budget check is the larger of one
+// read (60 s, its review then postponed) and one review call up to its client
+// kill (`DEFAULT_LLM_TIMEOUT_MS` + `LLM_CLIENT_KILL_MARGIN_MS` = 75 s): the
+// message loop ends by 255 s, leaving 45 s of the ceiling for the writes.
 export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 // Attempts for the one search that opens every scan. A remote IMAP provider
 // (Gmail observed on example-node, bots#152) answers the same 3–12-message
@@ -40,27 +43,49 @@ export const DEFAULT_SCAN_BUDGET_MS = 180_000;
 // a per-connection basis — and a scan had exactly one shot at it, so about
 // half of all scans failed outright and marched toward "scans-failing". A
 // second attempt on a fresh connection costs at most one more tool timeout;
-// the budget math still holds (2 × 60 s search, then reads until the 180 s
-// budget, plus one trailing read (60 s) and review (30 s) < TimeoutStartSec
-// 300 s). Reads are not retried here: a skipped read leaves the watermark
+// the budget math still holds (2 × 60 s search, then reads and reviews until
+// the 180 s budget, plus one trailing read (60 s) or review call (75 s) <
+// TimeoutStartSec 300 s). Reads are not retried here: a skipped read leaves the watermark
 // alone and is re-read on the next tick.
 export const DEFAULT_IMAP_SEARCH_ATTEMPTS = 2;
 // The independent mail inventory runs first in every scan and is counted in
 // the same budget, so it gets a tight deadline of its own: a slow listing must
 // cost one inventory, not the scan. Worst case 25 s + 2 × 60 s search is still
-// inside the 180 s budget, after which at most one read (60 s) and one review
-// (30 s) follow, under TimeoutStartSec 300 s.
+// inside the 180 s budget, after which at most one read (60 s) or one review
+// call (75 s) follows, under TimeoutStartSec 300 s.
 export const MAIL_INVENTORY_TIMEOUT_MS = 20_000;
 export const MAIL_INVENTORY_KILL_MS = 25_000;
 export const DEFAULT_AGENT_ID = "mail-sentinel";
 export const DEFAULT_OPENCLAW_URL = "http://127.0.0.1:18789";
 // NOTE: `llmModel` is carried in the tool config for compatibility only. The
-// semantic review runs through `lobster … | clawd.invoke --tool llm-task` in
-// the agent's own OpenClaw session, so the model that actually classifies is
-// the agent's configured model (`agentTemplate.model` in sovereign-bot.json),
-// not this value — it is never sent to the gateway.
+// semantic review runs through `lobster … | clawd.invoke --tool llm-task`, and
+// the node pins the gateway's `llm-task` plugin to a single default and
+// allowed model, so that model classifies — not this value, and not the
+// agent's `agentTemplate.model`. It is never sent to the gateway.
 export const DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b";
-export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
+// Gateway-side limit for one review call, sent with every call as llm-task's
+// `timeoutMs` (`llmTimeoutMs` in the tool config). At normal load the review
+// took about 15 s at the median and at least 30 s at p95, so a 30 s limit
+// timed out about a third of all calls.
+export const DEFAULT_LLM_TIMEOUT_MS = 60_000;
+// The client kills the lobster child this long after the gateway-side limit.
+// The gateway reports its own timeout as a generic error, and lobster start-up
+// plus the HTTP round trip take seconds on a small device; with this margin
+// that error comes back first, and a killed call does not keep running in the
+// gateway while the next one starts.
+export const LLM_CLIENT_KILL_MARGIN_MS = 15_000;
+// In-scan retry window for one review: at most two calls, the second only
+// after a failure that came back faster than `LLM_FAST_FAILURE_MS` (connection
+// refused, HTTP error, invalid reply), after `LLM_RETRY_PAUSE_MS`, and only
+// while the scan budget lasts. A slow failure or a timeout is not retried in
+// the same scan: at normal latency a retry would just time out again.
+export const LLM_FAST_FAILURE_MS = 10_000;
+export const LLM_RETRY_PAUSE_MS = 5_000;
+// After this many reviews in a row without a verdict the scan stops sending
+// candidates and postpones the rest. With two calls per review that caps a
+// scan with a dead reviewer at four calls, while one slow call alone does not
+// take the reviewer away from the rest of the scan.
+export const LLM_REVIEW_BREAKER_FAILURES = 2;
 /** Default for `llmSenderDetail`: the bare address, never the display name. */
 export const DEFAULT_LLM_SENDER_DETAIL = "address";
 export const RULE_ADJUSTMENT_FLOOR = -1;

@@ -247,10 +247,10 @@ describe("commands/scan > outcome ledger", () => {
 
     it("records the messages left by an exhausted budget as deferred", async () => {
       const runtime = setup([10, 20, 30]);
-      const read = runtime.readMail;
-      runtime.readMail = async (selector: unknown) => {
+      const classify = runtime.classifyCandidate;
+      runtime.classifyCandidate = async (...args) => {
         vi.setSystemTime(new Date(FIXED_NOW.getTime() + 181_000));
-        return read(selector as number);
+        return classify(...args);
       };
       const result = await scan({ instance: "ms-core" });
       expect(result.deferredMessages).toBe(2);
