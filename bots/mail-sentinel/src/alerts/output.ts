@@ -17,7 +17,7 @@ import type {
 } from "../types.js";
 import { formatConfidenceLabel } from "../util/time.js";
 import { formatSignalChip } from "./evidence.js";
-import { formatAlertLine } from "./format.js";
+import { describeReviewStatus, formatAlertLine } from "./format.js";
 
 export interface ScanResult {
   configured: boolean;
@@ -305,9 +305,26 @@ const renderPolicySection = (policy: ExplainCommandResult["policy"]): string[] =
 // The semantic half: the reviewer's verdict verbatim, or an explicit
 // "unavailable" line when no LLM result was recorded for this alert. Never
 // mixes in policy mechanics.
-const renderSemanticSection = (semantic: ExplainCommandResult["semantic"]): string[] => {
+const renderReviewRetry = (review: ExplainCommandResult["review"]): string[] =>
+  review === undefined
+    ? []
+    : [
+        `Status: ${describeReviewStatus(review.status)}`,
+        `Attempts: ${String(review.attempts)}${
+          review.recoveryAttempted === true ? ", including the one recovery attempt" : ""
+        }`,
+        ...(review.lastReason === undefined ? [] : [`Last failure: ${review.lastReason}`]),
+      ];
+
+const renderSemanticSection = (
+  semantic: ExplainCommandResult["semantic"],
+  review: ExplainCommandResult["review"],
+): string[] => {
   if (!semantic.available || semantic.result === undefined) {
-    return renderSection("Semantic review", ["unavailable — no reviewer verdict recorded"]);
+    return renderSection("Semantic review", [
+      "unavailable — no reviewer verdict recorded",
+      ...renderReviewRetry(review),
+    ]);
   }
   const result = semantic.result;
   const flags = [
@@ -324,6 +341,7 @@ const renderSemanticSection = (semantic: ExplainCommandResult["semantic"]): stri
     `Extracted signals: deadline=${String(result.deadlineDetected)}, amount=${String(
       result.amountDetected,
     )}`,
+    ...renderReviewRetry(review),
   ]);
 };
 
@@ -352,7 +370,7 @@ export const formatExplainResult = (result: ExplainResult): string => {
     "",
     ...renderPolicySection(result.policy),
     "",
-    ...renderSemanticSection(result.semantic),
+    ...renderSemanticSection(result.semantic, result.review),
     "",
     ...renderDecisionSection(result.decision),
   ].join("\n");

@@ -1,6 +1,6 @@
 import { CATEGORY_LABELS } from "../constants.js";
-import type { AlertSummary, StoredAlert } from "../types.js";
-import { formatConfidenceLabel } from "../util/time.js";
+import type { AlertSummary, ReviewRetryStatus, StoredAlert } from "../types.js";
+import { formatConfidenceLabel, formatLocalDateTime } from "../util/time.js";
 import { formatSignalChip } from "./evidence.js";
 import { deriveShortRef } from "./short-ref.js";
 
@@ -40,6 +40,22 @@ const ZONE_EMOJI: Record<string, string> = {
   amber: "🟠",
   gray: "⚪",
 };
+
+const REVIEW_STATUS_LABELS: Record<ReviewRetryStatus, string> = {
+  retrying: "not reviewed yet: the AI reviewer was unavailable, Mail Sentinel will try again",
+  exhausted: "not reviewed: please look at this one yourself",
+  stopped: "not reviewed: please look at this one yourself",
+  reviewed: "checked again: the verdict came in on a later scan",
+};
+
+export const describeReviewStatus = (status: ReviewRetryStatus): string =>
+  REVIEW_STATUS_LABELS[status];
+
+// Shown on an alert only while it has no verdict; a late verdict speaks for itself.
+const pendingReviewLabel = (alert: Pick<StoredAlert, "review">): string | undefined =>
+  alert.review === undefined || alert.review.status === "reviewed"
+    ? undefined
+    : describeReviewStatus(alert.review.status);
 
 const DIGEST_SUBJECT_MAX = 120;
 export const DIGEST_VISIBLE_LIMIT = 10;
@@ -160,7 +176,12 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
   const category = categoryLabel(alert.category);
   const zone = zoneLabel(alert.zone);
   const emoji = zoneEmoji(alert.zone);
-  const reminderSuffix = kind === "reminder" ? " · reminder" : "";
+  const kindSuffix = kind === "reminder" ? " · reminder" : kind === "late" ? " · late" : "";
+  const review = pendingReviewLabel(alert);
+  const checkedAgain =
+    kind === "late"
+      ? `first seen ${formatLocalDateTime(alert.sentAt)}, while the AI reviewer was unavailable.`
+      : undefined;
   // Bracketed so the handle reads as a typeable reference, not prose. Users
   // reply "feedback <ref> not important" to target this exact alert.
   const ref = `[${alertShortRef(alert)}]`;
@@ -171,7 +192,7 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
   const signals = formatSignalChip(alert.reasons);
 
   const bodyLines = [
-    `${emoji} ${zone} · ${category}${reminderSuffix}`,
+    `${emoji} ${zone} · ${category}${kindSuffix}`,
     "",
     `${ref} ${subject}`,
     "",
@@ -180,6 +201,8 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
     ...(excerpt === undefined ? [] : ["", ...renderExcerptLines(excerpt)]),
     ...(signals === undefined ? [] : [`Signals: ${signals}`]),
     `Confidence: ${confidence}`,
+    ...(review === undefined ? [] : [`Review: ${review}`]),
+    ...(checkedAgain === undefined ? [] : [`Checked again: ${checkedAgain}`]),
     "",
     "Reply in thread with:",
     ALERT_FEEDBACK_OPTIONS.join(" · "),
@@ -192,6 +215,16 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
   // is preserved byte-for-byte so existing alerts render unchanged.
   const signalsHtmlLine =
     signals === undefined ? [] : [`<strong>Signals:</strong> ${escapeHtml(signals)}<br>`];
+  const statusHtmlLines = [
+    ...(review === undefined ? [] : [`<strong>Review:</strong> ${escapeHtml(review)}`]),
+    ...(checkedAgain === undefined
+      ? []
+      : [`<strong>Checked again:</strong> ${escapeHtml(checkedAgain)}`]),
+  ];
+  const confidenceHtml = [
+    `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+    ...statusHtmlLines,
+  ].join("<br>\n");
   const metaHtml =
     excerpt === undefined
       ? [
@@ -199,7 +232,7 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
           `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
           `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}<br>`,
           ...signalsHtmlLine,
-          `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+          confidenceHtml,
           "</p>",
         ]
       : [
@@ -210,12 +243,12 @@ export const buildRedAlertMessage = (alert: StoredAlert, kind: AlertKind): Matri
           renderExcerptHtml(excerpt),
           "<p>",
           ...signalsHtmlLine,
-          `<strong>Confidence:</strong> ${escapeHtml(confidence)}`,
+          confidenceHtml,
           "</p>",
         ];
 
   const formattedBody = [
-    `<p>${emoji} <strong>${escapeHtml(`${zone} · ${category}${reminderSuffix}`)}</strong></p>`,
+    `<p>${emoji} <strong>${escapeHtml(`${zone} · ${category}${kindSuffix}`)}</strong></p>`,
     `<p><code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong></p>`,
     ...metaHtml,
     "<p>",
@@ -255,6 +288,7 @@ export const buildDigestMessage = (
     const subject = trimSubject(cleanSubjectForDisplay(alert.subject));
     const sender = formatSenderDisplay(alert.from);
     const confidence = formatCategoryConfidence(alert.category, alert.confidence);
+    const review = pendingReviewLabel(alert);
     const position = String(index + 1);
     // The position is digest-scoped (it shifts between digests); the bracketed
     // ref is stable, so both are shown and either targets this item.
@@ -269,6 +303,7 @@ export const buildDigestMessage = (
       `${position}. ${ref} ${subject}`,
       `From: ${sender}`,
       confidence,
+      ...(review === undefined ? [] : [`Review: ${review}`]),
       `Why it matters: ${alert.why}`,
       ...(excerpt === undefined ? [] : renderExcerptLines(excerpt)),
       ...(signals === undefined ? [] : [`Signals: ${signals}`]),
@@ -282,6 +317,7 @@ export const buildDigestMessage = (
       `<strong>${position}.</strong> <code>${escapeHtml(ref)}</code> <strong>${escapeHtml(subject)}</strong><br>`,
       `<strong>From:</strong> ${escapeHtml(sender)}<br>`,
       `${escapeHtml(confidence)}<br>`,
+      ...(review === undefined ? [] : [`<strong>Review:</strong> ${escapeHtml(review)}<br>`]),
       `<strong>Why it matters:</strong> ${escapeHtml(alert.why)}${
         excerpt === undefined && signals !== undefined ? "<br>" : ""
       }`,

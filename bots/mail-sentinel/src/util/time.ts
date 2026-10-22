@@ -43,6 +43,16 @@ export const isSameLocalDay = (value: string | Date | number, reference: Date): 
   return !Number.isNaN(parsed.getTime()) && startOfLocalDay(parsed) === startOfLocalDay(reference);
 };
 
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+/** `YYYY-MM-DD HH:MM` in the device's local time zone. */
+export const formatLocalDateTime = (iso: string): string => {
+  const date = new Date(iso);
+  return `${String(date.getFullYear())}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(
+    date.getHours(),
+  )}:${pad2(date.getMinutes())}`;
+};
+
 export const formatConfidenceLabel = (confidence: unknown): string => {
   if (typeof confidence !== "number") {
     return "unknown";

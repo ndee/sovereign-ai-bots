@@ -1,8 +1,8 @@
 import { resolveToolRuntime } from "../config/runtime.js";
-import { isUnaccountedState, LEDGER_RETENTION_DAYS, localDay } from "../ledger/ledger.js";
+import { isUnaccountedState, LEDGER_RETENTION_DAYS } from "../ledger/ledger.js";
 import { type Coverage, countsOnDay, reconcileLedger } from "../ledger/reconcile.js";
 import type { CommandOptions } from "../types.js";
-import { clampLimit } from "../util/time.js";
+import { clampLimit, formatLocalDateTime } from "../util/time.js";
 
 /**
  * The operator's answer to "which mails were not checked?". Unlike
@@ -95,12 +95,16 @@ const STATE_LABELS: Record<string, string> = {
   "not-returned": "in the mailbox, but never reached the scan",
 };
 
-const pad2 = (value: number): string => String(value).padStart(2, "0");
+// Re-reviews on later scans ran out: from here on only the operator can check it.
+const GAVE_UP_REASONS = new Set(["retries-exhausted", "recovery-failed"]);
+const GAVE_UP_LABEL = "not reviewed: please look at this one yourself";
 
-const formatLocalTime = (iso: string): string => {
-  const date = new Date(iso);
-  return `${localDay(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-};
+const labelFor = (message: UnaccountedMessage): string =>
+  message.state === "no-verdict:reviewer-unavailable" &&
+  message.reason !== undefined &&
+  GAVE_UP_REASONS.has(message.reason)
+    ? GAVE_UP_LABEL
+    : (STATE_LABELS[message.state] ?? message.state);
 
 export const formatIntegrityResult = (result: IntegrityCommandResult): string => {
   const lines = [`Mail check (coverage: ${result.coverage}).`];
@@ -125,13 +129,13 @@ export const formatIntegrityResult = (result: IntegrityCommandResult): string =>
   }
   lines.push("Not checked:");
   for (const message of result.unaccounted) {
-    const label = STATE_LABELS[message.state] ?? message.state;
+    const label = labelFor(message);
     const reason = message.reason === undefined ? "" : ` (${message.reason})`;
     const who =
       message.from === undefined
         ? "never read; look in your mail client around this time"
         : `${message.from} · ${message.subject as string}`;
-    lines.push(`- ${formatLocalTime(message.firstSeenAt)} · ${label}${reason} · ${who}`);
+    lines.push(`- ${formatLocalDateTime(message.firstSeenAt)} · ${label}${reason} · ${who}`);
   }
   return lines.join("\n");
 };

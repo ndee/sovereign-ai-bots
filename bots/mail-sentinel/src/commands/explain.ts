@@ -1,6 +1,6 @@
 import { alertShortRef } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
-import type { CommandOptions, LlmResult, StoredAlert, Zone } from "../types.js";
+import type { CommandOptions, LlmResult, ReviewRetryStatus, StoredAlert, Zone } from "../types.js";
 import { sortAlertsNewestFirst } from "../util/time.js";
 import { type AlertTargetCandidate, resolveAlertTarget } from "./resolve.js";
 
@@ -46,6 +46,17 @@ export interface ZoneDecisionExplanation {
   why: string;
 }
 
+/** Present when the first review gave no verdict and later scans reviewed it again. */
+export interface ReviewRetryExplanation {
+  status: ReviewRetryStatus;
+  /** Scans that sent the mail to the reviewer, the first one included. */
+  attempts: number;
+  /** How the last attempt ended without a verdict. */
+  lastReason?: string | undefined;
+  /** The one attempt after the retry window ran out has been spent. */
+  recoveryAttempted?: true | undefined;
+}
+
 export interface ExplainCommandResult {
   instanceId: string;
   alertId: string;
@@ -55,6 +66,7 @@ export interface ExplainCommandResult {
   policy: PolicyExplanation;
   semantic: SemanticExplanation;
   decision: ZoneDecisionExplanation;
+  review?: ReviewRetryExplanation | undefined;
 }
 
 /**
@@ -102,6 +114,16 @@ const explainAlertEntry = (instanceId: string, alert: StoredAlert): ExplainComma
     ...(typeof alert.confidence === "number" ? { confidence: alert.confidence } : {}),
     why: alert.why,
   },
+  ...(alert.review === undefined
+    ? {}
+    : {
+        review: {
+          status: alert.review.status,
+          attempts: alert.review.attempts,
+          ...(alert.review.lastReason === undefined ? {} : { lastReason: alert.review.lastReason }),
+          ...(alert.review.recoveryAttempted === true ? { recoveryAttempted: true as const } : {}),
+        },
+      }),
 });
 
 /**
