@@ -92,3 +92,17 @@ review starts after the scan's 180 s budget; postponed mail counts as a
 reviewer failure. Each failed review is reported in the scan warnings with the
 reason and elapsed time of every call (`timeout`, `gateway-timeout`,
 `connection`, `http`, `invalid-reply`).
+
+A review that gave no verdict (a failed call, or postponed) is not lost: later
+scans send the same payload again, after the new mail and under the same
+breaker and budget, up to 6 attempts within 12 h (at about 0, 0.5, 1.5, 3.5,
+7.5 and 11.5 h on a 30-minute timer), at most 5 per scan. Meanwhile the alert
+says "not reviewed yet" and `integrity` counts the mail as in progress. A late
+verdict updates the same alert: a change to red sends one red message marked
+late, anything else changes silently. If the attempts run out, the alert says
+"not reviewed: please look at this one yourself" and `integrity` lists it as
+not checked; the first scan in which the reviewer answers again gives such mail
+(up to 7 days old) exactly one more attempt. Routing refusals, bulk and muted
+mail, and alerts you already gave feedback on are never sent again. `explain`
+shows the review status, the attempts and the last failure reason. A mail
+therefore costs at most 14 review calls over its whole life.
