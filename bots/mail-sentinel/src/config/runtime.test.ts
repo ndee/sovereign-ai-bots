@@ -49,6 +49,43 @@ const {
 } = await import("./runtime.js");
 const { setExecFileAsync } = await import("../imap/exec.js");
 
+/** Drive the fake clock until `promise` settles, firing every pause it schedules. */
+const settle = async <T>(promise: Promise<T>): Promise<T> => {
+  let pending = true;
+  promise.then(
+    () => {
+      pending = false;
+    },
+    () => {
+      pending = false;
+    },
+  );
+  for (let turn = 0; pending && turn < 1000; turn += 1) {
+    await vi.runAllTimersAsync();
+  }
+  return promise;
+};
+
+/** The `--args-json` payload of a lobster pipeline, as sent to llm-task. */
+const llmTaskArgsOf = (pipeline: string): Record<string, unknown> => {
+  const quoted = /--args-json ("(?:[^"\\]|\\.)*")/u.exec(pipeline)?.[1];
+  return JSON.parse(JSON.parse(quoted ?? '""') as string) as Record<string, unknown>;
+};
+
+/** An execFile rejection for a child the client killed at its `timeout`. */
+const killedAfter = (ms: number) => {
+  vi.setSystemTime(Date.now() + ms);
+  return Object.assign(new Error("Command failed: lobster"), {
+    killed: true,
+    signal: "SIGKILL",
+    stdout: "",
+    stderr: "",
+  });
+};
+
+const reviewAttempts = (error: unknown) =>
+  (error as { reviewAttempts?: Array<{ reason: string; elapsedMs: number }> }).reviewAttempts;
+
 const makeRuntimeConfig = (overrides: Record<string, unknown> = {}) => ({
   sovereignTools: {
     instances: [
@@ -156,6 +193,20 @@ describe("config/runtime", () => {
       expect(runtime.digestInterval).toBe("12h");
       expect(runtime.openclawToken).toBeUndefined();
       expect(runtime.imapConfigured).toBe(true);
+      expect(runtime.llmTimeoutMs).toBe(60_000);
+    });
+
+    it.each([
+      ["a non-number", "soon"],
+      ["zero", 0],
+      ["a negative value", -5],
+    ])("falls back to the default review timeout when llmTimeoutMs is %s", async (_label, value) => {
+      readFile
+        .mockResolvedValueOnce(JSON.stringify(makeRuntimeConfig({ llmTimeoutMs: value })))
+        .mockRejectedValueOnce(new Error("no gateway runtime"));
+      const runtime = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+      await runtime.load();
+      expect(runtime.llmTimeoutMs).toBe(60_000);
     });
 
     it("throws when the instance is not found", async () => {
@@ -787,8 +838,8 @@ describe("config/runtime", () => {
   });
 
   describe("classifyCandidate", () => {
-    const loadRuntime = async () => {
-      const runtimeConfig = makeRuntimeConfig();
+    const loadRuntime = async (overrides: Record<string, unknown> = {}) => {
+      const runtimeConfig = makeRuntimeConfig(overrides);
       readFile
         .mockResolvedValueOnce(JSON.stringify(runtimeConfig))
         .mockRejectedValueOnce(new Error("no runtime"));
@@ -796,6 +847,15 @@ describe("config/runtime", () => {
       await runtime.load();
       return runtime;
     };
+
+    // The pause between review calls is a real timer; the fake clock lets the
+    // tests pin its length and the elapsed time of each call.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
     const sampleCandidate = {
       subject: "s",
@@ -871,7 +931,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await runtime.classifyCandidate(sampleCandidate).catch(() => undefined);
+        await settle(runtime.classifyCandidate(sampleCandidate)).catch(() => undefined);
         const pipeline = (runner.mock.calls[0] as [string, readonly string[]])[1][0] as string;
         expect(pipeline).toContain('--session-key "agent:mail-sentinel-scan:main"');
         expect(pipeline).not.toContain("agent:mail-sentinel:main");
@@ -891,7 +951,7 @@ describe("config/runtime", () => {
       rm.mockResolvedValue(undefined);
       const dir = realMkdtempSync(join(tmpdir(), "lobster-real-"));
       try {
-        await runtime.classifyCandidate(sampleCandidate).catch(() => undefined);
+        await settle(runtime.classifyCandidate(sampleCandidate)).catch(() => undefined);
         const pipeline = (runner.mock.calls[0] as [string, readonly string[]])[1][0] as string;
         const execStage = pipeline.split(" | ")[0] as string;
         const file = /"([^"]+\.json)"/.exec(execStage)?.[1] as string;
@@ -939,7 +999,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        const result = await runtime.classifyCandidate(sampleCandidate);
+        const result = await settle(runtime.classifyCandidate(sampleCandidate));
         expect(result.decisionRequired).toBe(true);
         expect(result.confidence).toBe(88);
         expect(result.suggestedZone).toBe("red");
@@ -1015,7 +1075,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           /stdout: Wi-Fi is currently blocked by rfkill\./u,
         );
       } finally {
@@ -1030,7 +1090,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           /stdout: <empty>/u,
         );
       } finally {
@@ -1045,7 +1105,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification returned no structured JSON payload",
         );
       } finally {
@@ -1067,7 +1127,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification failed: stdout-only",
         );
       } finally {
@@ -1087,7 +1147,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification failed: plain error",
         );
       } finally {
@@ -1178,7 +1238,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification failed: crashed",
         );
       } finally {
@@ -1235,7 +1295,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification failed: lobster CLI not found at /opt/missing/lobster (configured via SOVEREIGN_LOBSTER_EXECUTABLE)",
         );
       } finally {
@@ -1255,7 +1315,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           /lobster classification failed: lobster CLI not found \(searched: \/nonexistent\/bin\/lobster, .*\/usr\/bin\/lobster\); install @clawdbot\/lobster/,
         );
         expect(runner.mock.calls[0]?.[0]).toBe("lobster");
@@ -1264,40 +1324,47 @@ describe("config/runtime", () => {
       }
     });
 
-    it("retries after a transient failure and returns the successful result", async () => {
+    it("retries a fast failure once, after a 5 s pause, and returns the second result", async () => {
       const runtime = await loadRuntime();
+      const callTimes: number[] = [];
       const runner = vi
         .fn()
-        .mockRejectedValueOnce(
-          Object.assign(new Error("boom"), { stdout: "", stderr: "transient 502" }),
-        )
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify([
-            {
-              details: {
-                json: {
-                  decision_required: false,
-                  financial_relevance: false,
-                  risk_escalation: false,
-                  confidence: 50,
-                  urgency: "low",
-                  reason: "recovered",
-                  deadline_detected: false,
-                  amount_detected: false,
-                  suggested_zone: "gray",
+        .mockImplementationOnce(async () => {
+          callTimes.push(Date.now());
+          throw Object.assign(new Error("boom"), { stdout: "", stderr: "Error: fetch failed" });
+        })
+        .mockImplementationOnce(async () => {
+          callTimes.push(Date.now());
+          return {
+            stdout: JSON.stringify([
+              {
+                details: {
+                  json: {
+                    decision_required: false,
+                    financial_relevance: false,
+                    risk_escalation: false,
+                    confidence: 50,
+                    urgency: "low",
+                    reason: "recovered",
+                    deadline_detected: false,
+                    amount_detected: false,
+                    suggested_zone: "gray",
+                  },
                 },
               },
-            },
-          ]),
-          stderr: "",
+            ]),
+            stderr: "",
+          };
         });
       const previous = setExecFileAsync(runner);
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        const result = await runtime.classifyCandidate(sampleCandidate);
+        const result = await settle(runtime.classifyCandidate(sampleCandidate));
         expect(result.reason).toBe("recovered");
         expect(runner).toHaveBeenCalledTimes(2);
+        // A fast failure gets one more call, after a 5 s pause.
+        expect((callTimes[1] as number) - (callTimes[0] as number)).toBe(5_000);
         expect(rm).toHaveBeenCalledTimes(1);
       } finally {
         setExecFileAsync(previous);
@@ -1388,16 +1455,24 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        const failure = await runtime.classifyCandidate(sampleCandidate).catch((error) => error);
+        const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+          (error) => error,
+        );
         expect(isLlmRoutingRefusedError(failure)).toBe(false);
-        expect(String(failure.message)).toBe("lobster classification failed: unknown error");
-        expect(runner).toHaveBeenCalledTimes(3);
+        expect(String(failure.message)).toMatch(
+          /^lobster classification failed: unknown error \(invalid-reply after 0 ms\)/u,
+        );
+        expect(reviewAttempts(failure)?.map((attempt) => attempt.reason)).toEqual([
+          "invalid-reply",
+          "invalid-reply",
+        ]);
+        expect(runner).toHaveBeenCalledTimes(2);
       } finally {
         setExecFileAsync(previous);
       }
     });
 
-    it("gives up after the retry budget is exhausted and surfaces the last error", async () => {
+    it("makes at most two calls for one review and surfaces both failures", async () => {
       const runtime = await loadRuntime();
       const runner = vi
         .fn()
@@ -1408,13 +1483,208 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
-          "lobster classification failed: upstream down",
+        const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+          (error) => error,
         );
-        expect(runner).toHaveBeenCalledTimes(3);
+        expect(String(failure.message)).toContain("lobster classification failed: upstream down");
+        expect(reviewAttempts(failure)).toHaveLength(2);
+        expect(runner).toHaveBeenCalledTimes(2);
       } finally {
         setExecFileAsync(previous);
       }
+    });
+
+    describe("latency budget and in-scan retry window", () => {
+      const verdict = {
+        stdout: JSON.stringify([{ details: { json: { confidence: 80, suggested_zone: "red" } } }]),
+        stderr: "",
+      };
+      const failingWith = (stderr: string) =>
+        Object.assign(new Error("Command failed: lobster"), { stdout: "", stderr });
+      const classifyBefore = (
+        runtime: InstanceType<typeof MailSentinelRuntime>,
+        deadline: number,
+      ): Promise<unknown> =>
+        (
+          runtime.classifyCandidate as (
+            candidate: typeof sampleCandidate,
+            options: { deadline: number },
+          ) => Promise<unknown>
+        ).call(runtime, sampleCandidate, { deadline });
+
+      beforeEach(() => {
+        writeFile.mockResolvedValue(undefined);
+        rm.mockResolvedValue(undefined);
+      });
+
+      it("sends the gateway-side limit with every call and kills the client 15 s after it", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn().mockResolvedValue(verdict);
+        const previous = setExecFileAsync(runner);
+        try {
+          await settle(runtime.classifyCandidate(sampleCandidate));
+          const [, lobsterArgs, options] = runner.mock.calls[0] as [
+            string,
+            readonly string[],
+            { timeout?: number },
+          ];
+          const args = llmTaskArgsOf(lobsterArgs[0] as string);
+          expect(args.timeoutMs).toBe(60_000);
+          expect(typeof args.prompt).toBe("string");
+          expect(options.timeout).toBe(75_000);
+          // The gateway's own timeout must come back before the client kills.
+          expect(options.timeout).toBeGreaterThanOrEqual((args.timeoutMs as number) + 10_000);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("derives both limits from a configured llmTimeoutMs", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: 45_000 });
+        const runner = vi.fn().mockResolvedValue(verdict);
+        const previous = setExecFileAsync(runner);
+        try {
+          await settle(runtime.classifyCandidate(sampleCandidate));
+          const [, lobsterArgs, options] = runner.mock.calls[0] as [
+            string,
+            readonly string[],
+            { timeout?: number },
+          ];
+          expect(llmTaskArgsOf(lobsterArgs[0] as string).timeoutMs).toBe(45_000);
+          expect(options.timeout).toBe(60_000);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("does not retry a call the client killed, and names the kill and the elapsed time", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(async (_file: string, _args: readonly string[], options) => {
+          throw killedAfter(Number((options as { timeout?: number }).timeout));
+        });
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+            (error) => error,
+          );
+          expect(runner).toHaveBeenCalledTimes(1);
+          expect(String(failure.message)).toMatch(/killed by SIGKILL/u);
+          expect(String(failure.message)).toMatch(/\(timeout after 75000 ms\)/u);
+          expect(reviewAttempts(failure)).toEqual([
+            expect.objectContaining({ reason: "timeout", elapsedMs: 75_000 }),
+          ]);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("reports a generic error at or past the gateway limit as gateway-timeout, without a retry", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(async () => {
+          vi.setSystemTime(Date.now() + 60_000);
+          throw failingWith("Error: clawd.invoke tool error: LLM returned empty output");
+        });
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+            (error) => error,
+          );
+          expect(runner).toHaveBeenCalledTimes(1);
+          expect(String(failure.message)).toMatch(/\(gateway-timeout after 60000 ms\)/u);
+          expect(reviewAttempts(failure)).toEqual([
+            expect.objectContaining({ reason: "gateway-timeout", elapsedMs: 60_000 }),
+          ]);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("does not retry a failure that took 10 s or longer", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(async () => {
+          vi.setSystemTime(Date.now() + 10_000);
+          throw failingWith("Error: clawd.invoke failed (502): bad gateway");
+        });
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+            (error) => error,
+          );
+          expect(runner).toHaveBeenCalledTimes(1);
+          expect(reviewAttempts(failure)).toEqual([
+            expect.objectContaining({ reason: "http", elapsedMs: 10_000 }),
+          ]);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it.each([
+        ["connection", () => Promise.reject(failingWith("TypeError: fetch failed"))],
+        ["connection", () => Promise.reject(failingWith("connect ECONNREFUSED 127.0.0.1:18789"))],
+        ["http", () => Promise.reject(failingWith("Error: clawd.invoke failed (503): busy"))],
+        [
+          "invalid-reply",
+          () =>
+            Promise.reject(
+              failingWith("Error: clawd.invoke tool error: LLM returned empty output"),
+            ),
+        ],
+        ["invalid-reply", () => Promise.resolve({ stdout: "null", stderr: "" })],
+      ])("records a fast %s failure for each of its two calls", async (reason, outcome) => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(outcome);
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+            (error) => error,
+          );
+          expect(runner).toHaveBeenCalledTimes(2);
+          expect(reviewAttempts(failure)?.map((attempt) => attempt.reason)).toEqual([
+            reason,
+            reason,
+          ]);
+          expect(String(failure.message)).toContain(`(${reason} after 0 ms)`);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("makes no second call when the pause would end past the review deadline", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(() => Promise.reject(failingWith("TypeError: fetch failed")));
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(classifyBefore(runtime, Date.now() + 3_000)).catch(
+            (error) => error,
+          );
+          expect(runner).toHaveBeenCalledTimes(1);
+          expect(reviewAttempts(failure)).toEqual([
+            expect.objectContaining({ reason: "connection" }),
+          ]);
+          expect(rm).toHaveBeenCalledTimes(1);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
+      it("makes the second call when it still starts inside the review deadline", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi
+          .fn()
+          .mockRejectedValueOnce(failingWith("TypeError: fetch failed"))
+          .mockResolvedValueOnce(verdict);
+        const previous = setExecFileAsync(runner);
+        try {
+          const result = (await settle(classifyBefore(runtime, Date.now() + 6_000))) as {
+            suggestedZone: string;
+          };
+          expect(result.suggestedZone).toBe("red");
+          expect(runner).toHaveBeenCalledTimes(2);
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
     });
   });
 
@@ -1674,6 +1944,13 @@ describe("config/runtime", () => {
   });
 
   describe("classifyCandidate additional shapes", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     const loadRuntime = async () => {
       const runtimeConfig = makeRuntimeConfig();
       readFile
@@ -1777,7 +2054,7 @@ describe("config/runtime", () => {
       writeFile.mockResolvedValue(undefined);
       rm.mockResolvedValue(undefined);
       try {
-        await expect(runtime.classifyCandidate(sampleCandidate)).rejects.toThrow(
+        await expect(settle(runtime.classifyCandidate(sampleCandidate))).rejects.toThrow(
           "lobster classification failed: stdout-info",
         );
       } finally {
