@@ -69,13 +69,26 @@ matched rule ids, parsed amounts. The payload is written 0600 into a private
 afterwards.
 
 The review runs in the session of a dedicated scan agent that the node renders
-for this bot: same model as the bot, the `llm-task` tool only, and no chat
-binding, so mail candidates never pass through the chat agent's session (on a
-node without a scan agent the review falls back to the bot's own session). The
-model that classifies is the agent's configured model (`agentTemplate.model` in
-the bot package, `qwen/qwen3.5-27b` by default). The instance config key `llmModel` is
-kept for compatibility only and is not sent anywhere. If the gateway's provider
-refuses to route a review under the configured privacy/data policy ("No
-endpoints found …"), the scan records it as a classification degradation, sends
-no further mail to the reviewer in that scan, and never retries with different
-routing or privacy parameters.
+for this bot: the `llm-task` tool only, and no chat binding, so mail candidates
+never pass through the chat agent's session (on a node without a scan agent the
+review falls back to the bot's own session). The model that classifies is the
+one the node configures for the gateway's `llm-task` plugin (its default and
+only allowed model), not the agent's `agentTemplate.model`. The instance config
+key `llmModel` is kept for compatibility only and is not sent anywhere. If the
+gateway's provider refuses to route a review under the configured privacy/data
+policy ("No endpoints found …"), the scan records it as a classification
+degradation, sends no further mail to the reviewer in that scan, and never
+retries with different routing or privacy parameters.
+
+Each review call carries a gateway-side time limit, `llmTimeoutMs` (60 s by
+default), sent as `llm-task`'s `timeoutMs`. The bot kills the call only 15 s
+after that limit, so the gateway's own timeout normally comes back first. One
+review makes at most two calls: the second only after a failure that came back
+within 10 s (connection refused, HTTP error, unusable reply), after a 5 s pause,
+and only while the scan's time budget lasts. A call that timed out is not
+retried in the same scan. After two reviews in a row without a verdict, the
+scan sends no further mail to the reviewer and postpones the rest, and no
+review starts after the scan's 180 s budget; postponed mail counts as a
+reviewer failure. Each failed review is reported in the scan warnings with the
+reason and elapsed time of every call (`timeout`, `gateway-timeout`,
+`connection`, `http`, `invalid-reply`).
