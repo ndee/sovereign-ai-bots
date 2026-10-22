@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.4.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.3.0...v2.4.0) (2026-10-22)
+
+
+### Features
+
+* **mail-sentinel:** re-review failed reviews on later scans and label unreviewed mail ([#187](https://github.com/ndee/sovereign-ai-bots/issues/187)) ([f17f778](https://github.com/ndee/sovereign-ai-bots/commit/f17f7787036c38ae7d245d2c1e70b46318c25590))
+
 ## [2.3.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.2.0...v2.3.0) (2026-10-21)
 
 
