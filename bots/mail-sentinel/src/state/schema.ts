@@ -2,6 +2,7 @@ import { MAX_PENDING_AMBER_ITEMS } from "../constants.js";
 import type {
   MailSentinelPolicy,
   MailSentinelState,
+  ReviewRetryState,
   StoredAlert,
   StoredMessage,
 } from "../types.js";
@@ -62,6 +63,38 @@ type PartialState = Partial<MailSentinelState> & {
 const readCounter = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 
+const REVIEW_RETRY_STATUSES = new Set<string>(["retrying", "exhausted", "reviewed", "stopped"]);
+
+/**
+ * A review retry drives AI calls, so one the scan cannot read safely (a
+ * hand-edited or truncated state file) is dropped rather than guessed at: the
+ * alert then simply keeps its fallback zone, and the ledger sweep closes its
+ * entry.
+ */
+const isReviewRetryState = (value: unknown): value is ReviewRetryState => {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const review = value as Partial<Record<keyof ReviewRetryState, unknown>>;
+  return (
+    typeof review.status === "string" &&
+    REVIEW_RETRY_STATUSES.has(review.status) &&
+    typeof review.attempts === "number" &&
+    Number.isInteger(review.attempts) &&
+    review.attempts >= 0 &&
+    typeof review.firstFailedAt === "string" &&
+    typeof review.ledgerKey === "string"
+  );
+};
+
+const migrateAlert = (alert: StoredAlert): StoredAlert => {
+  if (alert.review === undefined || isReviewRetryState(alert.review)) {
+    return alert;
+  }
+  const { review: _dropped, ...rest } = alert;
+  return rest;
+};
+
 export const migrateState = (state: unknown): MailSentinelState => {
   const defaults = createDefaultState();
   const source = (state ?? {}) as PartialState;
@@ -78,7 +111,7 @@ export const migrateState = (state: unknown): MailSentinelState => {
       ...(source.mailbox ?? {}),
     },
     messages: (source.messages ?? {}) as Record<string, StoredMessage>,
-    alerts: Array.isArray(source.alerts) ? (source.alerts as StoredAlert[]) : [],
+    alerts: Array.isArray(source.alerts) ? (source.alerts as StoredAlert[]).map(migrateAlert) : [],
     feedback: Array.isArray(source.feedback) ? source.feedback : [],
     learning: {
       ...defaults.learning,

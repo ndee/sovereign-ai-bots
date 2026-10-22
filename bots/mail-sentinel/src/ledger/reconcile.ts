@@ -7,6 +7,7 @@ import {
   isOutcomeState,
   isUnaccountedState,
   isVerdictState,
+  LATE_VERDICT_REASON,
   type LedgerEntry,
   localDay,
   type MailLedger,
@@ -53,6 +54,8 @@ export interface DayReconciliation extends OutcomeGroups {
   /** Seen by a scan but never listed by the inventory (full coverage only). */
   scanOnly: number;
   outageAffected: number;
+  /** Verdicts a later scan's review produced after the first one gave none. */
+  lateVerdicts: number;
   flags: DayFlag[];
 }
 
@@ -64,6 +67,7 @@ export interface ReconcileTotals extends OutcomeGroups {
   unaccounted: number;
   scanOnly: number;
   outageAffected: number;
+  lateVerdicts: number;
 }
 
 export interface ReconcileReport {
@@ -148,6 +152,7 @@ const reconcileDay = (
   let accounted = 0;
   let scanOnly = 0;
   let outageAffected = 0;
+  let lateVerdicts = 0;
   for (const entry of Object.values(ledger.entries)) {
     if (!countsOn(entry, day, coverage)) {
       if (
@@ -162,6 +167,9 @@ const reconcileDay = (
     }
     if (entry.outageAffected === true) {
       outageAffected += 1;
+    }
+    if (isVerdictState(entry.state) && entry.reason === LATE_VERDICT_REASON) {
+      lateVerdicts += 1;
     }
     // An unknown state is left out of `accounted` on purpose, so it shows up
     // in the residual rather than vanishing.
@@ -191,6 +199,7 @@ const reconcileDay = (
     unaccounted: groups.noVerdict + groups.notProcessed,
     scanOnly,
     outageAffected,
+    lateVerdicts,
     flags,
   };
 };
@@ -232,6 +241,7 @@ export const reconcileLedger = (
     unaccounted: 0,
     scanOnly: 0,
     outageAffected: 0,
+    lateVerdicts: 0,
   };
   for (const day of days) {
     totals.expected += day.expected;
@@ -247,6 +257,7 @@ export const reconcileLedger = (
     totals.unaccounted += day.unaccounted;
     totals.scanOnly += day.scanOnly;
     totals.outageAffected += day.outageAffected;
+    totals.lateVerdicts += day.lateVerdicts;
   }
   const { status, lastSuccessAt } = ledger.inventory;
   return {
@@ -275,6 +286,7 @@ export interface IntegrityDay {
   unaccounted?: number;
   inFlight?: number;
   outageAffected?: number;
+  lateVerdicts?: number;
   seenNotInventoried?: number;
   uidGaps?: number;
   flags?: DayFlag[];
@@ -315,6 +327,7 @@ export const summarizeIntegrity = (ledger: MailLedger, now: Date): IntegrityBloc
           ...nonZero("unaccounted", day.unaccounted),
           ...nonZero("inFlight", day.inFlight),
           ...nonZero("outageAffected", day.outageAffected),
+          ...nonZero("lateVerdicts", day.lateVerdicts),
           ...nonZero("seenNotInventoried", day.scanOnly),
           ...nonZero("uidGaps", ledger.days[day.day]?.uidGaps ?? 0),
           ...(day.flags.length === 0 ? {} : { flags: day.flags }),

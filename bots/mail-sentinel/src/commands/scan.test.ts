@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFakeRuntime, resetFakeRuntime } from "../__fixtures__/fake-runtime.js";
 import { sampleRules } from "../__fixtures__/inputs.js";
-import type { LlmResult, StoredAlert } from "../types.js";
+import type { LlmResult, ReviewRetryState, StoredAlert } from "../types.js";
 
 // Controllable tool-availability verdict (#324). Hoisted so the mock factory
 // below can close over it; reset to "available" in beforeEach.
@@ -931,8 +931,12 @@ describe("commands/scan", () => {
       await scan({ instance: "ms-core" });
       expect(runtime.state.degradationState).toBe("classification-degraded");
 
-      // Next tick: nothing new in the mailbox, reviewer still broken.
+      // Next tick: nothing new in the mailbox, reviewer still broken, and the
+      // re-review of the first mail is not due yet.
       runtime.searchMail = async () => ({ messages: [] });
+      const review = runtime.state.alerts[0]?.review as ReviewRetryState;
+      review.attempts = 2;
+      review.lastAttemptAt = new Date().toISOString();
       await scan({ instance: "ms-core" });
       expect(runtime.state.lastScanCandidates).toBe(0);
       expect(runtime.state.lastScanLlmFailures).toBe(0);

@@ -142,7 +142,7 @@ describe("review/retry > selection", () => {
       alert("not-due", { attempts: 2, lastAttemptAt: at(0).toISOString() }),
       alert("done", { status: "reviewed" }),
       alert("no-payload", { candidate: undefined }),
-      { ...alert("feedback"), feedbackState: "important" },
+      { ...alert("feedback"), feedbackState: "important" as const },
       { ...alert("legacy"), review: undefined },
     ];
     const selected = selectReviewRetries(alerts, at(MINUTE), new Set(["skipped"]));

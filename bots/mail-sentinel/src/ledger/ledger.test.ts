@@ -539,8 +539,18 @@ describe("ledger/ledger > stuck review retries", () => {
       WINDOW,
     );
     recordOutcome(ledger, key(11), { state: "deferred", reason: "review-retry" }, NOON);
+    // An entry without a scan record falls back to when it was first seen.
+    ledger.entries[key(12)] = {
+      key: key(12),
+      firstSeenAt: at(-DAY_MS).toISOString(),
+      updatedAt: at(-DAY_MS).toISOString(),
+      state: "deferred",
+      reason: "review-retry",
+      attempts: 1,
+    };
     resolveStuckReviewRetries(ledger, at(HOUR_MS), 12 * HOUR_MS);
     expect(ledger.entries[key(11)]?.state).toBe("deferred");
+    expect(ledger.entries[key(12)]?.state).toBe("no-verdict:reviewer-unavailable");
   });
 });
 

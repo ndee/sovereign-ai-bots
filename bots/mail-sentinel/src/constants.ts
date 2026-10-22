@@ -86,6 +86,31 @@ export const LLM_RETRY_PAUSE_MS = 5_000;
 // scan with a dead reviewer at four calls, while one slow call alone does not
 // take the reviewer away from the rest of the scan.
 export const LLM_REVIEW_BREAKER_FAILURES = 2;
+// Re-review on later scans. A review that failed or was postponed is tried
+// again at most until `REVIEW_MAX_ATTEMPTS` scans have sent it (the first one
+// included) or `REVIEW_RETRY_WINDOW_MS` has passed since the first failure,
+// whichever comes first. `REVIEW_RETRY_GAPS_MS[n - 1]` is the wait after the
+// n-th attempt: with a 30-minute timer that is attempts at about 0, 0.5, 1.5,
+// 3.5, 7.5 and 11.5 h. The slack lets a timer tick that lands a little early
+// still count. Each attempt is at most two calls (see above), so a mail costs
+// at most 12 calls in the window and 2 more for its one recovery attempt.
+export const REVIEW_MAX_ATTEMPTS = 6;
+export const REVIEW_RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
+export const REVIEW_RETRY_GAPS_MS: readonly number[] = [
+  0,
+  60 * 60 * 1000,
+  2 * 60 * 60 * 1000,
+  4 * 60 * 60 * 1000,
+  4 * 60 * 60 * 1000,
+];
+export const REVIEW_RETRY_SLACK_MS = 5 * 60 * 1000;
+export const REVIEW_RETRIES_PER_SCAN = 5;
+// Mail whose window ran out during an outage gets exactly one more attempt in
+// the first scan in which the reviewer returns a real verdict again, so no
+// call is made into an outage. Older mail is history rather than news, the
+// same horizon the daily unchecked-mail notice uses.
+export const REVIEW_RECOVERIES_PER_SCAN = 5;
+export const REVIEW_RECOVERY_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
 /** Default for `llmSenderDetail`: the bare address, never the display name. */
 export const DEFAULT_LLM_SENDER_DETAIL = "address";
 export const RULE_ADJUSTMENT_FLOOR = -1;

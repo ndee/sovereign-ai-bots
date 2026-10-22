@@ -28,6 +28,7 @@ vi.mock("../state/io.js", async () => {
 });
 
 const { scan } = await import("./scan.js");
+const { normalizeLlmResult } = await import("../scoring/llm.js");
 const { createLlmRoutingRefusedError, LLM_REVIEW_FAILED_ERROR_CODE } = await import(
   "../config/runtime.js"
 );
@@ -333,6 +334,34 @@ describe("commands/scan > re-review on later scans", () => {
     });
   });
 
+  it("counts a late reply without a usable confidence as no-verdict:defaulted", async () => {
+    const harness = setup([10]);
+    await scanAt(0);
+    harness.replies.push(normalizeLlmResult({ reason: "unsure" }));
+    await scanAt(30 * MINUTE);
+    expect(alertFor(harness.runtime, 10).review).toMatchObject({ status: "reviewed" });
+    expect(entry(harness.runtime, 10)?.state).toBe("no-verdict:defaulted");
+    expect(Object.keys(harness.runtime.state.integrityDetails ?? {})).toEqual(["imap:-:10"]);
+  });
+
+  it("still zones a late verdict when the stored alert lost its scores and policy", async () => {
+    const harness = setup([10]);
+    await scanAt(0);
+    const fallback = alertFor(harness.runtime, 10);
+    delete fallback.score;
+    delete fallback.categoryScores;
+    delete fallback.messageKey;
+    delete fallback.review?.policy;
+    harness.replies.push(RED);
+    await scanAt(30 * MINUTE);
+    // Without a score the mail is below the candidate threshold, so gray.
+    expect(alertFor(harness.runtime, 10).zone).toBe("gray");
+    expect(harness.runtime.state.zoneHistory.at(-1)).toMatchObject({
+      messageKey: "imap:-:10",
+      zone: "gray",
+    });
+  });
+
   describe("eligibility", () => {
     it("never re-reviews an alert the operator already gave feedback on", async () => {
       const harness = setup([10]);
@@ -634,6 +663,17 @@ describe("commands/scan > re-review on later scans", () => {
       harness.fallback.current = AMBER;
       await scanAt(14 * HOUR);
       expect(harness.calls).toEqual(["Invoice #20", "Invoice #10"]);
+    });
+
+    it("stops the recovery pass at the breaker", async () => {
+      const harness = setup([10, 11, 12]);
+      await scanEvery30Minutes(0, 13 * HOUR);
+      harness.calls.length = 0;
+      harness.mailbox.push(20);
+      harness.replies.push(AMBER);
+      await scanAt(13.5 * HOUR);
+      expect(harness.calls).toEqual(["Invoice #20", "Invoice #10", "Invoice #11"]);
+      expect(alertFor(harness.runtime, 12).review?.recoveryAttempted).toBeUndefined();
     });
 
     it("leaves mail older than 7 days as it is", async () => {

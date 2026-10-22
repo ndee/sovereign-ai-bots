@@ -54,6 +54,7 @@ type EquationParts = Pick<
   | "outcomes"
   | "scanOnly"
   | "outageAffected"
+  | "lateVerdicts"
 >;
 
 const renderEquation = (label: string, parts: EquationParts): string[] => {
@@ -77,6 +78,7 @@ const renderEquation = (label: string, parts: EquationParts): string[] => {
   const extras = [
     ...(parts.scanOnly > 0 ? [`seen by a scan but not inventoried ${String(parts.scanOnly)}`] : []),
     ...(parts.outageAffected > 0 ? [`outage-affected ${String(parts.outageAffected)}`] : []),
+    ...(parts.lateVerdicts > 0 ? [`late verdicts ${String(parts.lateVerdicts)}`] : []),
   ];
   if (extras.length > 0) {
     lines.push(`  ${extras.join(" · ")}`);

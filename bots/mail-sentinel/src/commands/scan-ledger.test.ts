@@ -191,7 +191,7 @@ describe("commands/scan > outcome ledger", () => {
     });
 
     it("counts a fallback gray without an alert as no-verdict:reviewer-unavailable", async () => {
-      const runtime = setup();
+      const runtime = setup([10, 11, 12]);
       runtime.policy.senderPolicies.push({
         id: "cap",
         match: "alice@example.com",
@@ -204,6 +204,12 @@ describe("commands/scan > outcome ledger", () => {
       await scan({ instance: "ms-core" });
       expect(runtime.state.alerts).toEqual([]);
       expect(entry(runtime, 10)).toMatchObject({ state: "no-verdict:reviewer-unavailable" });
+      // The breaker postponed the third one unsent.
+      expect(entry(runtime, 12)).toMatchObject({
+        state: "no-verdict:reviewer-unavailable",
+        reason: "postponed",
+        attempts: 0,
+      });
       expect(runtime.state.integrityDetails?.["imap:-:10"]).toEqual({
         from: "Alice <alice@example.com>",
         subject: "Invoice #10",
