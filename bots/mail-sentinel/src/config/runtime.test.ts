@@ -1578,6 +1578,22 @@ describe("config/runtime", () => {
         }
       });
 
+      it("still names a kill whose signal the runner did not report", async () => {
+        const runtime = await loadRuntime({ llmTimeoutMs: undefined });
+        const runner = vi.fn(async () => {
+          throw Object.assign(killedAfter(75_000), { signal: null });
+        });
+        const previous = setExecFileAsync(runner);
+        try {
+          const failure = await settle(runtime.classifyCandidate(sampleCandidate)).catch(
+            (error) => error,
+          );
+          expect(String(failure.message)).toContain("killed by signal at the client limit");
+        } finally {
+          setExecFileAsync(previous);
+        }
+      });
+
       it("reports a generic error at or past the gateway limit as gateway-timeout, without a retry", async () => {
         const runtime = await loadRuntime({ llmTimeoutMs: undefined });
         const runner = vi.fn(async () => {

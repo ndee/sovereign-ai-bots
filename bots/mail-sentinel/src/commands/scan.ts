@@ -14,6 +14,7 @@ import {
   isLlmRoutingRefusedError,
   isToolUnavailableError,
   resolveToolRuntime,
+  reviewAttemptsOf,
   TOOL_UNAVAILABLE_ERROR_CODE,
 } from "../config/runtime.js";
 import {
@@ -21,6 +22,7 @@ import {
   DEFAULT_IMAP_SEARCH_ATTEMPTS,
   DEFAULT_IMAP_SEARCH_LIMIT,
   DEFAULT_SCAN_BUDGET_MS,
+  LLM_REVIEW_BREAKER_FAILURES,
 } from "../constants.js";
 import { deriveDegradationState } from "../health/degradation.js";
 import { announceDegradationIfChanged } from "../health/notice.js";
@@ -503,6 +505,10 @@ export const scan = async (
       // re-sending other mail would not change it. Every candidate that would
       // have been reviewed still counts as a failure so the scan degrades.
       let llmRoutingRefused: string | undefined;
+      // Reviews in a row that ended without a verdict. At the breaker limit the
+      // reviewer is taken to be down for the rest of the scan: the remaining
+      // candidates are postponed instead of each waiting out its own calls.
+      let consecutiveReviewFailures = 0;
       const alerts: AlertSummary[] = [...reminderAlerts];
       // Watermark only ever advances past mail we actually reckoned with —
       // messages processed this scan or already seen in a prior one. Messages
@@ -646,6 +652,9 @@ export const scan = async (
         let llmResult: LlmResult | null = null;
         let reviewSkippedReason: string | undefined;
         let reviewRefused = false;
+        // Never sent to the reviewer, so no review attempt is counted for it.
+        let reviewPostponed = false;
+        let reviewFailureReason: string | undefined;
         if (policyResult.muted) {
           // determineZone returns gray for a muted mail regardless of the
           // reviewer, so nothing is lost by not asking.
@@ -656,12 +665,28 @@ export const scan = async (
           llmCandidates += 1;
           llmFailures += 1;
           reviewRefused = true;
+        } else if (
+          consecutiveReviewFailures >= LLM_REVIEW_BREAKER_FAILURES ||
+          Date.now() >= scanDeadline
+        ) {
+          // Postponed mail still counts as a reviewer failure, so a scan whose
+          // reviewer is down degrades even when most of it was never sent.
+          llmCandidates += 1;
+          llmFailures += 1;
+          reviewPostponed = true;
+          if (consecutiveReviewFailures < LLM_REVIEW_BREAKER_FAILURES) {
+            warnings.push(
+              `Scan time budget (${String(Math.round(DEFAULT_SCAN_BUDGET_MS / 1000))}s) exhausted before the semantic review of UID ${String(parsed.uid)}; review postponed.`,
+            );
+          }
         } else {
           llmCandidates += 1;
           try {
             llmResult = await runtime.classifyCandidate(
               buildLlmCandidate(parsed, scored, { senderDetail: runtime.llmSenderDetail }),
+              { deadline: scanDeadline },
             );
+            consecutiveReviewFailures = 0;
           } catch (error) {
             llmFailures += 1;
             const message = error instanceof Error ? error.message : String(error);
@@ -672,7 +697,14 @@ export const scan = async (
                 `Semantic review refused by the model provider under the configured privacy routing; no further mail is sent to the reviewer this scan: ${message}`,
               );
             } else {
+              consecutiveReviewFailures += 1;
+              reviewFailureReason = reviewAttemptsOf(error)?.at(-1)?.reason;
               warnings.push(`Semantic review failed for UID ${String(parsed.uid)}: ${message}`);
+              if (consecutiveReviewFailures === LLM_REVIEW_BREAKER_FAILURES) {
+                warnings.push(
+                  `Semantic review failed for ${String(LLM_REVIEW_BREAKER_FAILURES)} messages in a row; no further mail is sent to the reviewer this scan.`,
+                );
+              }
             }
           }
         }
@@ -701,11 +733,14 @@ export const scan = async (
             : reviewRefused
               ? { state: "no-verdict:refused" }
               : llmResult === null
-                ? { state: "no-verdict:reviewer-unavailable" }
+                ? {
+                    state: "no-verdict:reviewer-unavailable",
+                    reason: reviewPostponed ? "postponed" : reviewFailureReason,
+                  }
                 : isDefaultedLlmResult(llmResult)
                   ? { state: "no-verdict:defaulted" }
                   : { state: zoneDecision.zone, review: "reviewer" };
-        record(key, outcome, true);
+        record(key, outcome, !reviewPostponed);
         if (isUnaccountedState(outcome.state)) {
           integrityDetails[key] = { from: parsed.from, subject: parsed.subject };
         }

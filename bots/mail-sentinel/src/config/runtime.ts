@@ -25,6 +25,9 @@ import {
   DEFAULT_STATE_PATH,
   DEFAULT_TOOL_EXECUTABLE,
   DEFAULT_TOOL_TIMEOUT_MS,
+  LLM_CLIENT_KILL_MARGIN_MS,
+  LLM_FAST_FAILURE_MS,
+  LLM_RETRY_PAUSE_MS,
   MAIL_INVENTORY_KILL_MS,
   MAIL_INVENTORY_TIMEOUT_MS,
 } from "../constants.js";
@@ -61,8 +64,6 @@ import {
   resolveLobsterExecutable,
 } from "./lobster.js";
 
-const CLASSIFY_RETRY_BACKOFF_MS: readonly number[] = [250, 750];
-
 /**
  * Privacy-routing refusal.
  *
@@ -97,6 +98,74 @@ export const createLlmRoutingRefusedError = (message: string): Error =>
 export const isLlmRoutingRefusedError = (error: unknown): boolean =>
   error instanceof Error &&
   (error as NodeJS.ErrnoException).code === LLM_ROUTING_REFUSED_ERROR_CODE;
+
+/**
+ * Why one review call ended without a verdict. `timeout` is the client's own
+ * kill; `gateway-timeout` is any other failure that came back at or after the
+ * gateway-side limit, because the gateway reports its own timeout only as a
+ * generic error (an empty reply, a tool error).
+ */
+export type ReviewFailureReason =
+  | "timeout"
+  | "gateway-timeout"
+  | "connection"
+  | "http"
+  | "invalid-reply";
+
+export interface ReviewAttempt {
+  reason: ReviewFailureReason;
+  elapsedMs: number;
+  message: string;
+}
+
+export const LLM_REVIEW_FAILED_ERROR_CODE = "MAIL_SENTINEL_LLM_REVIEW_FAILED";
+
+const HTTP_FAILURE_PATTERN = /clawd\.invoke failed \(\d{3}\)/u;
+const CONNECTION_FAILURE_PATTERNS: readonly RegExp[] = [
+  /fetch failed/iu,
+  /\bE(?:CONNREFUSED|CONNRESET|HOSTUNREACH|NETUNREACH|NOTFOUND|AI_AGAIN)\b/u,
+  /socket hang up/iu,
+];
+
+/** Reason for a call that failed in the pipeline itself rather than in the reply. */
+const describePipelineFailure = (text: string): ReviewFailureReason => {
+  if (HTTP_FAILURE_PATTERN.test(text)) {
+    return "http";
+  }
+  if (CONNECTION_FAILURE_PATTERNS.some((pattern) => pattern.test(text))) {
+    return "connection";
+  }
+  // A tool error is the gateway answering without a usable result.
+  return /tool error/iu.test(text) ? "invalid-reply" : "connection";
+};
+
+const createReviewAttemptError = (attempt: ReviewAttempt): Error =>
+  Object.assign(new Error(attempt.message), { reviewAttempt: attempt });
+
+const createReviewFailedError = (attempts: readonly ReviewAttempt[]): Error =>
+  Object.assign(new Error(attempts.map((attempt) => attempt.message).join("; retry: ")), {
+    code: LLM_REVIEW_FAILED_ERROR_CODE,
+    reviewAttempts: attempts,
+  });
+
+/** The calls of a failed review, newest last; undefined for any other error. */
+export const reviewAttemptsOf = (error: unknown): readonly ReviewAttempt[] | undefined =>
+  error instanceof Error && (error as NodeJS.ErrnoException).code === LLM_REVIEW_FAILED_ERROR_CODE
+    ? (error as Error & { reviewAttempts: readonly ReviewAttempt[] }).reviewAttempts
+    : undefined;
+
+export interface ClassifyOptions {
+  /**
+   * Epoch ms after which no further review call may start (the scan budget).
+   * The first call is the caller's decision; this bounds the retry.
+   */
+  deadline?: number | undefined;
+}
+
+const parseTimeoutMs = (value: unknown): number => {
+  const parsed = Number.parseInt(String(value ?? DEFAULT_LLM_TIMEOUT_MS), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LLM_TIMEOUT_MS;
+};
 
 const normalizeSenderDetail = (value: unknown): LlmSenderDetail =>
   value === "domain" ? "domain" : DEFAULT_LLM_SENDER_DETAIL;
@@ -226,13 +295,16 @@ export class MailSentinelRuntime {
   imapInstanceId!: string;
   openclawUrl!: string;
   /**
-   * Compatibility only — never sent anywhere. The review runs in the agent's
-   * OpenClaw session, so the agent's configured model classifies (see
-   * `DEFAULT_LLM_MODEL`).
+   * Compatibility only — never sent anywhere. The gateway's llm-task plugin
+   * decides which model classifies (see `DEFAULT_LLM_MODEL`).
    */
   llmModel!: string;
   /** How much of the sender the reviewer sees. */
   llmSenderDetail!: LlmSenderDetail;
+  /**
+   * Gateway-side limit for one review call, sent as llm-task's `timeoutMs`.
+   * The client kill is derived from it (+ `LLM_CLIENT_KILL_MARGIN_MS`).
+   */
   llmTimeoutMs!: number;
   openclawToken: string | undefined;
   matrix!: {
@@ -293,10 +365,7 @@ export class MailSentinelRuntime {
     this.openclawUrl = (toolConfig.openclawUrl as string | undefined) ?? DEFAULT_OPENCLAW_URL;
     this.llmModel = (toolConfig.llmModel as string | undefined) ?? DEFAULT_LLM_MODEL;
     this.llmSenderDetail = normalizeSenderDetail(toolConfig.llmSenderDetail);
-    this.llmTimeoutMs = Number.parseInt(
-      String(toolConfig.llmTimeoutMs ?? DEFAULT_LLM_TIMEOUT_MS),
-      10,
-    );
+    this.llmTimeoutMs = parseTimeoutMs(toolConfig.llmTimeoutMs);
     this.openclawToken = await this.readOpenClawGatewayToken();
     this.matrix = {
       adminBaseUrl:
@@ -606,9 +675,13 @@ export class MailSentinelRuntime {
     }
   }
 
-  async classifyCandidate(candidate: LlmCandidate): Promise<LlmResult> {
+  async classifyCandidate(
+    candidate: LlmCandidate,
+    options: ClassifyOptions = {},
+  ): Promise<LlmResult> {
     const args = {
       prompt: buildLlmPrompt(),
+      timeoutMs: this.llmTimeoutMs,
     };
     // the payload is mail content. It lives in a private 0700
     // directory, as a 0600 file, only for the duration of the call.
@@ -636,8 +709,9 @@ export class MailSentinelRuntime {
       "--each --item-key input",
       "| json",
     ].join(" ");
+    const attempts: ReviewAttempt[] = [];
     try {
-      for (const backoffMs of CLASSIFY_RETRY_BACKOFF_MS) {
+      for (;;) {
         try {
           return await this.runClassifyPipeline(pipeline);
         } catch (error) {
@@ -646,10 +720,21 @@ export class MailSentinelRuntime {
           if (isLlmRoutingRefusedError(error)) {
             throw error;
           }
-          await delay(backoffMs);
+          const attempt = (error as Error & { reviewAttempt: ReviewAttempt }).reviewAttempt;
+          attempts.push(attempt);
+          const fastFailure =
+            attempt.reason !== "timeout" &&
+            attempt.reason !== "gateway-timeout" &&
+            attempt.elapsedMs < LLM_FAST_FAILURE_MS;
+          if (attempts.length >= 2 || !fastFailure) {
+            throw createReviewFailedError(attempts);
+          }
+          await delay(LLM_RETRY_PAUSE_MS);
+          if (options.deadline !== undefined && Date.now() >= options.deadline) {
+            throw createReviewFailedError(attempts);
+          }
         }
       }
-      return await this.runClassifyPipeline(pipeline);
     } finally {
       await rm(candidateDir, { recursive: true, force: true });
     }
@@ -669,29 +754,59 @@ export class MailSentinelRuntime {
 
   private async runClassifyPipeline(pipeline: string): Promise<LlmResult> {
     const lobster = await this.resolveLobster();
+    const clientKillMs = this.llmTimeoutMs + LLM_CLIENT_KILL_MARGIN_MS;
+    const startedAt = Date.now();
+    const failed = (reason: ReviewFailureReason, description: string): Error => {
+      const elapsedMs = Date.now() - startedAt;
+      const effective =
+        reason !== "timeout" && elapsedMs >= this.llmTimeoutMs ? "gateway-timeout" : reason;
+      return createReviewAttemptError({
+        reason: effective,
+        elapsedMs,
+        message: `${description} (${effective} after ${String(elapsedMs)} ms)`,
+      });
+    };
     const result = await execFileAsync(lobster.executable, [pipeline], {
       cwd: this.workspaceDir,
-      timeout: this.llmTimeoutMs,
+      timeout: clientKillMs,
       maxBuffer: 10 * 1024 * 1024,
       env: {
         ...process.env,
         CLAWD_URL: this.openclawUrl,
         ...(this.openclawToken === undefined ? {} : { CLAWD_TOKEN: this.openclawToken }),
       },
-    }).catch((error: NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }) => {
-      // A missing binary is an install/PATH defect, not a classifier fault
-      // (#150): say where we looked, so SAN-LLM-001 points at the right thing.
-      if (error.code === "ENOENT") {
-        throw new Error(`lobster classification failed: ${describeLobsterNotFound(lobster)}`);
-      }
-      const stdout = typeof error.stdout === "string" ? error.stdout : "";
-      const stderr = typeof error.stderr === "string" ? error.stderr : "";
-      const detail = stderr || stdout || error.message;
-      if (describesLlmRoutingRefusal(`${stderr}\n${stdout}`)) {
-        throw createLlmRoutingRefusedError(`lobster classification refused: ${detail}`);
-      }
-      throw new Error(`lobster classification failed: ${detail}`);
-    });
+    }).catch(
+      (
+        error: NodeJS.ErrnoException & {
+          stdout?: unknown;
+          stderr?: unknown;
+          killed?: unknown;
+          signal?: unknown;
+        },
+      ) => {
+        // A missing binary is an install/PATH defect, not a classifier fault
+        // (#150): say where we looked, so SAN-LLM-001 points at the right thing.
+        if (error.code === "ENOENT") {
+          throw failed(
+            "connection",
+            `lobster classification failed: ${describeLobsterNotFound(lobster)}`,
+          );
+        }
+        if (error.killed === true) {
+          throw failed(
+            "timeout",
+            `lobster classification failed: killed by ${String(error.signal ?? "signal")} at the client limit of ${String(clientKillMs)} ms`,
+          );
+        }
+        const stdout = typeof error.stdout === "string" ? error.stdout : "";
+        const stderr = typeof error.stderr === "string" ? error.stderr : "";
+        const detail = stderr || stdout || error.message;
+        if (describesLlmRoutingRefusal(`${stderr}\n${stdout}`)) {
+          throw createLlmRoutingRefusedError(`lobster classification refused: ${detail}`);
+        }
+        throw failed(describePipelineFailure(detail), `lobster classification failed: ${detail}`);
+      },
+    );
     const parsed = parseJsonAfterPreamble(String(result.stdout));
     const first = Array.isArray(parsed)
       ? (parsed[0] as Record<string, unknown>)
@@ -705,7 +820,7 @@ export class MailSentinelRuntime {
       if (describesLlmRoutingRefusal(envelopeError)) {
         throw createLlmRoutingRefusedError(`lobster classification refused: ${envelopeError}`);
       }
-      throw new Error(`lobster classification failed: ${envelopeError}`);
+      throw failed("invalid-reply", `lobster classification failed: ${envelopeError}`);
     }
     const output = first?.output as { text?: unknown; data?: unknown } | undefined;
     // `output.text` is the model's own answer, which can arrive wrapped in
@@ -721,7 +836,8 @@ export class MailSentinelRuntime {
       // to tell a dead classifier apart from stdout polluted by a login-shell
       // banner, which is what made this failure mode hard to diagnose.
       const excerpt = compactText(String(result.stdout)).slice(0, 200);
-      throw new Error(
+      throw failed(
+        "invalid-reply",
         `lobster classification returned no structured JSON payload (stdout: ${
           excerpt.length > 0 ? excerpt : "<empty>"
         })`,

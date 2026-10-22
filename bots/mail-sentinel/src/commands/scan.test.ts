@@ -1364,20 +1364,12 @@ describe("commands/scan > watermark reads, time budget, and interruption", () =>
     runtime.state.mailbox.lastSeenUid = 5;
     runtime.searchMail = async () => threeMessages();
     const read = readMailFor(runtime);
-    read.mockImplementationOnce(async (selector: unknown) => {
-      // The first read is slow enough to burn the whole budget.
+    runtime.classifyCandidate = async () => {
+      // The first review is slow enough to burn the whole budget. (A read that
+      // burns it leaves its own review postponed, which is pinned elsewhere.)
       vi.setSystemTime(new Date(FIXED_NOW.getTime() + 181_000));
-      return {
-        message: {
-          uid: Number(selector),
-          messageId: `<m${String(selector)}@ex>`,
-          from: ["Alice <alice@example.com>"],
-          subject: "Invoice #10",
-          text: "Please pay $500 for invoice.",
-          headers: [],
-        },
-      };
-    });
+      return makeLlm();
+    };
     const result = await scan({ instance: "ms-core" });
     expect(read.mock.calls.map(([selector]) => selector)).toEqual([10]);
     expect(result.deferredMessages).toBe(2);
