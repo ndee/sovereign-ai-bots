@@ -68,6 +68,8 @@ const makeToolUnavailable = () => {
 };
 
 const FIXED_NOW = new Date("2026-04-08T12:00:00.000Z");
+// Captured before any test installs fake timers, which replace setImmediate.
+const realSetImmediate = globalThis.setImmediate;
 
 const makeLlm = (overrides: Partial<LlmResult> = {}): LlmResult => ({
   decisionRequired: true,
@@ -1533,7 +1535,12 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
 
   let previousRunner: Runner | undefined;
 
-  /** Drive the fake clock until the scan settles, firing every pause it schedules. */
+  /**
+   * Drive the fake clock until the scan settles, firing every pause it
+   * schedules. Each turn also yields to the real event loop: the review writes
+   * its payload to a real temp file, and a pause scheduled after that I/O
+   * would otherwise be left waiting once the turns ran out.
+   */
   const settle = async <T>(promise: Promise<T>): Promise<T> => {
     let pending = true;
     promise.then(
@@ -1544,8 +1551,9 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
         pending = false;
       },
     );
-    for (let turn = 0; pending && turn < 1000; turn += 1) {
+    while (pending) {
       await vi.runAllTimersAsync();
+      await new Promise((resolve) => realSetImmediate(resolve));
     }
     return promise;
   };
