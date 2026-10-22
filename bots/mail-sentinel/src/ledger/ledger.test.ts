@@ -28,6 +28,7 @@ import {
   recordInventoryUnavailable,
   recordOutcome,
   resolveOverduePending,
+  resolveStuckReviewRetries,
 } from "./ledger.js";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -504,6 +505,42 @@ describe("ledger/ledger > overdue, outage and retention", () => {
     expect(Object.keys(ledger.entries).sort()).toEqual([key(2), key(3)]);
     expect(Object.keys(ledger.days)).toEqual([localDay(recent)]);
     expect(ledger.notice.reported).toEqual({ [localDay(recent)]: 2 });
+  });
+});
+
+describe("ledger/ledger > stuck review retries", () => {
+  it("finalizes a review retry older than its window as retries-exhausted, and nothing else", () => {
+    const ledger = createLedger();
+    const maxAge = 12 * HOUR_MS + 30 * 60 * 1000;
+    recordOutcome(ledger, key(1), { state: "deferred", reason: "review-retry" }, NOON);
+    recordOutcome(ledger, key(2), { state: "deferred", reason: "review-retry" }, at(HOUR_MS));
+    // Unread mail deferred by the time budget is re-read, not swept.
+    recordOutcome(ledger, key(3), { state: "deferred" }, NOON);
+    recordOutcome(ledger, key(4), { state: "amber", review: "reviewer" }, NOON);
+    resolveStuckReviewRetries(ledger, at(maxAge), maxAge);
+    expect(ledger.entries[key(1)]?.state).toBe("deferred");
+    resolveStuckReviewRetries(ledger, at(maxAge + 1), maxAge);
+    expect(ledger.entries[key(1)]).toMatchObject({
+      state: "no-verdict:reviewer-unavailable",
+      reason: "retries-exhausted",
+      updatedAt: at(maxAge + 1).toISOString(),
+    });
+    expect(ledger.entries[key(2)]).toMatchObject({ state: "deferred", reason: "review-retry" });
+    expect(ledger.entries[key(3)]).toMatchObject({ state: "deferred" });
+    expect(ledger.entries[key(4)]).toMatchObject({ state: "amber" });
+  });
+
+  it("measures the age from the first scan that acted on the message", () => {
+    const ledger = withBaseline(10);
+    applyInventoryListing(
+      ledger,
+      { keySpace: KS, fullCensus: false, uidRanges: [[11, 11]] },
+      at(-DAY_MS),
+      WINDOW,
+    );
+    recordOutcome(ledger, key(11), { state: "deferred", reason: "review-retry" }, NOON);
+    resolveStuckReviewRetries(ledger, at(HOUR_MS), 12 * HOUR_MS);
+    expect(ledger.entries[key(11)]?.state).toBe("deferred");
   });
 });
 

@@ -4,6 +4,7 @@ import { loadGolden } from "../__fixtures__/load.js";
 import {
   clampLimit,
   formatConfidenceLabel,
+  formatLocalDateTime,
   isSameLocalDay,
   nowIso,
   parseDurationMs,
@@ -130,5 +131,12 @@ describe("util/time", () => {
 
   it("nowIso returns the frozen time", () => {
     expect(nowIso()).toBe("2026-04-08T12:00:00.000Z");
+  });
+});
+
+describe("util/time > formatLocalDateTime", () => {
+  it("renders an instant as the local day and minute", () => {
+    const value = new Date(2026, 3, 8, 7, 5, 30);
+    expect(formatLocalDateTime(value.toISOString())).toBe("2026-04-08 07:05");
   });
 });

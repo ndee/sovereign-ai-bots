@@ -171,7 +171,7 @@ describe("commands/scan > outcome ledger", () => {
       expect(entry(runtime, 11)).toMatchObject({ state: "amber", review: "rules-only" });
     });
 
-    it("counts a fallback amber only as no-verdict:reviewer-unavailable, alert unchanged", async () => {
+    it("counts a fallback amber as in progress (deferred for a re-review), alert unchanged", async () => {
       const runtime = setup();
       runtime.classifyCandidate = async () => {
         throw new Error("llm down");
@@ -179,14 +179,34 @@ describe("commands/scan > outcome ledger", () => {
       const result = await scan({ instance: "ms-core" });
       expect(result.amberQueued).toBe(1);
       expect(runtime.state.alerts.at(-1)?.zone).toBe("amber");
-      expect(entry(runtime, 10)).toMatchObject({ state: "no-verdict:reviewer-unavailable" });
+      expect(entry(runtime, 10)).toMatchObject({ state: "deferred", reason: "review-retry" });
       expect(entry(runtime, 10)?.review).toBeUndefined();
+      // Not listed as unchecked while the re-review is still open.
+      expect(runtime.state.integrityDetails).toEqual({});
+      expect(runtime.state.integrity?.days["2026-04-08"]).toMatchObject({
+        states: { deferred: 1 },
+        inFlight: 1,
+      });
+      expect(runtime.state.integrity?.days["2026-04-08"]).not.toHaveProperty("unaccounted");
+    });
+
+    it("counts a fallback gray without an alert as no-verdict:reviewer-unavailable", async () => {
+      const runtime = setup();
+      runtime.policy.senderPolicies.push({
+        id: "cap",
+        match: "alice@example.com",
+        maxZone: "gray",
+        reason: "never alert",
+      });
+      runtime.classifyCandidate = async () => {
+        throw new Error("llm down");
+      };
+      await scan({ instance: "ms-core" });
+      expect(runtime.state.alerts).toEqual([]);
+      expect(entry(runtime, 10)).toMatchObject({ state: "no-verdict:reviewer-unavailable" });
       expect(runtime.state.integrityDetails?.["imap:-:10"]).toEqual({
         from: "Alice <alice@example.com>",
         subject: "Invoice #10",
-      });
-      expect(runtime.state.integrity?.days["2026-04-08"]?.states).toEqual({
-        "no-verdict:reviewer-unavailable": 1,
       });
     });
 

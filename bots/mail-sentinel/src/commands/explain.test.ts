@@ -95,6 +95,57 @@ describe("commands/explain explainAlert", () => {
     });
   });
 
+  it("shows the review status, the attempts and the last reason of a retried review", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(
+      alert({
+        zone: "amber",
+        llmResult: null,
+        confidence: null,
+        review: {
+          status: "retrying",
+          attempts: 2,
+          firstFailedAt: "2026-04-08T08:00:00.000Z",
+          lastAttemptAt: "2026-04-08T08:30:00.000Z",
+          lastReason: "timeout",
+          ledgerKey: "imap:-:1",
+        },
+      }),
+    );
+    const result = await explainAlert({ instance: "ms-core", latest: true });
+    if (isAmbiguousExplain(result)) {
+      throw new Error("expected a resolved explanation");
+    }
+    expect(result.review).toEqual({ status: "retrying", attempts: 2, lastReason: "timeout" });
+    expect(result.semantic).toEqual({ available: false });
+    expect(result.decision).not.toHaveProperty("confidence");
+  });
+
+  it("names a spent recovery attempt, and leaves review out for a first-scan verdict", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(
+      alert({
+        alertId: "late",
+        sentAt: "2026-04-08T09:00:00.000Z",
+        review: {
+          status: "exhausted",
+          attempts: 7,
+          firstFailedAt: "2026-04-08T08:00:00.000Z",
+          recoveryAttempted: true,
+          ledgerKey: "imap:-:1",
+        },
+      }),
+      alert({ alertId: "plain", sentAt: "2026-04-08T07:00:00.000Z" }),
+    );
+    const late = await explainAlert({ instance: "ms-core", alertId: "late" });
+    const plain = await explainAlert({ instance: "ms-core", alertId: "plain" });
+    if (isAmbiguousExplain(late) || isAmbiguousExplain(plain)) {
+      throw new Error("expected a resolved explanation");
+    }
+    expect(late.review).toEqual({ status: "exhausted", attempts: 7, recoveryAttempted: true });
+    expect(plain).not.toHaveProperty("review");
+  });
+
   it("selects the newest alert with --latest", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts.push(

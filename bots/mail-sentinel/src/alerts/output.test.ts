@@ -658,4 +658,55 @@ describe("alerts/output formatExplainResult", () => {
       ].join("\n"),
     );
   });
+
+  describe("review status", () => {
+    const unavailable = { available: false } as const;
+    const section = (text: string): string[] => {
+      const lines = text.split("\n");
+      const start = lines.indexOf("Semantic review:");
+      return lines.slice(start + 1, lines.indexOf("", start));
+    };
+
+    it("says a retried review is not reviewed yet, with its attempts and last failure", () => {
+      const text = formatExplainResult(
+        fullExplanation({
+          semantic: unavailable,
+          decision: { zone: "amber", category: "financial-relevance", why: "x" },
+          review: { status: "retrying", attempts: 2, lastReason: "timeout" },
+        }),
+      );
+      expect(section(text)).toEqual([
+        "  - unavailable — no reviewer verdict recorded",
+        "  - Status: not reviewed yet: the AI reviewer was unavailable, Mail Sentinel will try again",
+        "  - Attempts: 2",
+        "  - Last failure: timeout",
+      ]);
+      expect(text).toContain("  - Confidence: unknown");
+    });
+
+    it.each(["exhausted", "stopped"] as const)("asks the operator to look when %s", (status) => {
+      const text = formatExplainResult(
+        fullExplanation({
+          semantic: unavailable,
+          review: { status, attempts: 7, recoveryAttempted: true },
+        }),
+      );
+      expect(section(text)).toEqual([
+        "  - unavailable — no reviewer verdict recorded",
+        "  - Status: not reviewed: please look at this one yourself",
+        "  - Attempts: 7, including the one recovery attempt",
+      ]);
+    });
+
+    it("says a late verdict was checked again", () => {
+      const text = formatExplainResult(
+        fullExplanation({ review: { status: "reviewed", attempts: 3, lastReason: "connection" } }),
+      );
+      expect(section(text).slice(-3)).toEqual([
+        "  - Status: checked again: the verdict came in on a later scan",
+        "  - Attempts: 3",
+        "  - Last failure: connection",
+      ]);
+    });
+  });
 });

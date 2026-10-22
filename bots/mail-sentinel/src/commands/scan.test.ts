@@ -1597,6 +1597,8 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
 
   const entry = (runtime: ReturnType<typeof setupRuntimeForScan>, uid: number) =>
     runtime.ledger.entries[`imap:-:${String(uid)}`];
+  const alertFor = (runtime: ReturnType<typeof setupRuntimeForScan>, uid: number): StoredAlert =>
+    runtime.state.alerts.find((alert) => alert.uid === uid) as StoredAlert;
 
   beforeEach(() => {
     resetFakeRuntime();
@@ -1622,20 +1624,27 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     const { runtime, runner } = await setup([10, 20, 30, 40, 50], refuseConnection);
     await settle(scan({ instance: "ms-core" }));
     expect(runner).toHaveBeenCalledTimes(4);
+    // Each stays in progress for a re-review on a later scan; the alert keeps
+    // the reason of its last call.
     for (const uid of [10, 20]) {
       expect(entry(runtime, uid)).toMatchObject({
-        state: "no-verdict:reviewer-unavailable",
-        reason: "connection",
+        state: "deferred",
+        reason: "review-retry",
         attempts: 1,
+      });
+      expect(alertFor(runtime, uid).review).toMatchObject({
+        attempts: 1,
+        lastReason: "connection",
       });
     }
     // Postponed: never sent, so no attempt is counted for them.
     for (const uid of [30, 40, 50]) {
       expect(entry(runtime, uid)).toMatchObject({
-        state: "no-verdict:reviewer-unavailable",
-        reason: "postponed",
+        state: "deferred",
+        reason: "review-retry",
         attempts: 0,
       });
+      expect(alertFor(runtime, uid).review).toMatchObject({ attempts: 0, lastReason: "postponed" });
     }
     // They still count as reviewer failures, so the scan degrades.
     expect(runtime.state.lastScanCandidates).toBe(5);
@@ -1650,10 +1659,8 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     );
     await settle(scan({ instance: "ms-core" }));
     expect(runner).toHaveBeenCalledTimes(2);
-    expect(entry(runtime, 10)).toMatchObject({
-      state: "no-verdict:reviewer-unavailable",
-      reason: "timeout",
-    });
+    expect(entry(runtime, 10)).toMatchObject({ state: "deferred", reason: "review-retry" });
+    expect(alertFor(runtime, 10).review).toMatchObject({ lastReason: "timeout" });
     expect(entry(runtime, 20)).toMatchObject({ state: "red", review: "reviewer" });
   });
 
@@ -1700,10 +1707,52 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     await settle(scan({ instance: "ms-core" }));
     expect(runner).toHaveBeenCalledTimes(1);
     expect(entry(runtime, 20)).toMatchObject({
-      state: "no-verdict:reviewer-unavailable",
-      reason: "postponed",
+      state: "deferred",
+      reason: "review-retry",
       attempts: 0,
     });
+    expect(alertFor(runtime, 20).review).toMatchObject({ attempts: 0, lastReason: "postponed" });
     expect(runtime.state.lastScanLlmFailures).toBe(1);
+  });
+
+  // Six attempts of at most two calls each, plus one recovery attempt of at
+  // most two calls once the reviewer works again: 14 calls for one mail, ever.
+  it("caps the AI calls for one mail at 14 over its whole life", async () => {
+    const perScan: number[] = [];
+    let script: Runner[] = [];
+    const { runtime, runner } = await setup([10], (...args) =>
+      (script.shift() ?? refuseConnection)(...args),
+    );
+    for (let offset = 0; offset <= 13 * 60 * 60 * 1000; offset += 30 * 60 * 1000) {
+      vi.setSystemTime(SCAN_START + offset);
+      const before = runner.mock.calls.length;
+      await settle(scan({ instance: "ms-core" }));
+      perScan.push(runner.mock.calls.length - before);
+    }
+    expect(perScan.filter((calls) => calls > 0)).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(alertFor(runtime, 10).review).toMatchObject({ status: "exhausted", attempts: 6 });
+    // The reviewer answers new mail again: UID 10 gets its one recovery
+    // attempt, which fails fast twice.
+    const search = runtime.searchMail;
+    for (const [index, uid] of [20, 30, 40].entries()) {
+      runtime.searchMail = async (limit) => {
+        const result = await search(limit);
+        return {
+          ...result,
+          messages: [
+            ...result.messages,
+            { uid, size: 1000, messageId: `<m${String(uid)}@ex>`, from: [], subject: "x" },
+          ],
+        };
+      };
+      script = [answer];
+      vi.setSystemTime(SCAN_START + 14 * 60 * 60 * 1000 + index * 30 * 60 * 1000);
+      const before = runner.mock.calls.length;
+      await settle(scan({ instance: "ms-core" }));
+      perScan.push(runner.mock.calls.length - before);
+    }
+    expect(perScan.slice(-3)).toEqual([3, 1, 1]);
+    expect(perScan.reduce((sum, calls) => sum + calls, 0) - 3).toBe(14);
+    expect(entry(runtime, 10)).toMatchObject({ reason: "recovery-failed", attempts: 7 });
   });
 });

@@ -1,15 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFakeRuntime, resetFakeRuntime } from "../__fixtures__/fake-runtime.js";
+import { sampleRules } from "../__fixtures__/inputs.js";
 import { createLedger, type LedgerEntry, localDay, recordOutcome } from "../ledger/ledger.js";
 
 vi.mock("../config/runtime.js", async () => {
   const actual =
     await vi.importActual<typeof import("../config/runtime.js")>("../config/runtime.js");
-  return { ...actual, resolveToolRuntime: async () => getFakeRuntime() };
+  return {
+    ...actual,
+    resolveToolRuntime: async () => getFakeRuntime(),
+    checkToolAvailability: async () => ({
+      ok: true,
+      executable: "/usr/local/bin/sovereign-tool",
+      source: "default",
+    }),
+  };
+});
+
+vi.mock("../state/io.js", async () => {
+  const actual = await vi.importActual<typeof import("../state/io.js")>("../state/io.js");
+  return {
+    ...actual,
+    withLockedState: async <T>(_p: string, action: () => Promise<T>) => action(),
+  };
 });
 
 const { DEFAULT_INTEGRITY_DAYS, formatIntegrityResult, integrity } = await import("./integrity.js");
+const { scan } = await import("./scan.js");
 
 const NOW = new Date("2026-04-08T12:00:00.000Z");
 const minutesAgo = (count: number): Date => new Date(NOW.getTime() - count * 60 * 1000);
@@ -126,6 +144,91 @@ describe("commands/integrity", () => {
       "· could not be read (timeout) · Alice <alice@example.com> · Invoice 42",
     );
     expect(text).toMatch(/- \d{4}-\d{2}-\d{2} \d{2}:\d{2} · /u);
+  });
+
+  it("counts a mail whose review failed as in progress, then as checked once a later scan reviews it", async () => {
+    const runtime = getFakeRuntime();
+    runtime.rules = sampleRules;
+    runtime.searchMail = async () => ({
+      messages: [
+        {
+          uid: 10,
+          size: 1000,
+          messageId: "<m10@ex>",
+          from: ["Alice <alice@example.com>"],
+          subject: "Invoice #10",
+        },
+      ],
+    });
+    runtime.readMail = async () => ({
+      message: {
+        uid: 10,
+        messageId: "<m10@ex>",
+        from: ["Alice <alice@example.com>"],
+        subject: "Invoice #10",
+        text: "Please pay $500 for invoice.",
+        headers: [],
+      },
+    });
+    runtime.classifyCandidate = async () => {
+      throw new Error("llm down");
+    };
+    await scan({ instance: "ms-core" });
+    expect((await integrity({ instance: "ms-core" })).days[0]).toMatchObject({
+      checked: 0,
+      notChecked: 0,
+      inProgress: 1,
+    });
+    runtime.classifyCandidate = async () => ({
+      decisionRequired: true,
+      financialRelevance: true,
+      riskEscalation: false,
+      confidence: 95,
+      urgency: "high",
+      reason: "Payment is overdue.",
+      deadlineDetected: true,
+      amountDetected: true,
+      suggestedZone: "red",
+    });
+    vi.setSystemTime(new Date(NOW.getTime() + 30 * 60 * 1000));
+    await scan({ instance: "ms-core" });
+    const result = await integrity({ instance: "ms-core" });
+    expect(result.days[0]).toMatchObject({ checked: 1, notChecked: 0, inProgress: 0 });
+    expect(result.unaccounted).toEqual([]);
+  });
+
+  it("asks the operator to look at a mail whose re-reviews ran out", async () => {
+    const ledger = createLedger();
+    recordOutcome(
+      ledger,
+      "imap:1:1",
+      { state: "deferred", reason: "review-retry" },
+      minutesAgo(10),
+    );
+    recordOutcome(
+      ledger,
+      "imap:1:2",
+      { state: "no-verdict:reviewer-unavailable", reason: "retries-exhausted" },
+      minutesAgo(20),
+    );
+    recordOutcome(
+      ledger,
+      "imap:1:3",
+      { state: "no-verdict:reviewer-unavailable", reason: "recovery-failed" },
+      minutesAgo(30),
+    );
+    getFakeRuntime().ledger = ledger;
+    const result = await integrity({ instance: "ms-core" });
+    expect(result.days[0]).toMatchObject({ checked: 0, notChecked: 2, inProgress: 1 });
+    expect(result.unaccounted.map((message) => message.reason)).toEqual([
+      "retries-exhausted",
+      "recovery-failed",
+    ]);
+    const text = formatIntegrityResult(result);
+    expect(text).toContain(
+      "· not reviewed: please look at this one yourself (retries-exhausted) ·",
+    );
+    expect(text).toContain("· not reviewed: please look at this one yourself (recovery-failed) ·");
   });
 
   it("caps the list at 20 messages", async () => {

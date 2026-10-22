@@ -23,6 +23,56 @@ describe("state/schema", () => {
     expect(migrateState({})).toEqual(loadGolden("migrateState.empty"));
   });
 
+  it("keeps a well-formed review retry on an alert and drops a malformed one", () => {
+    const review = {
+      status: "retrying",
+      attempts: 1,
+      firstFailedAt: "2026-04-08T10:00:00Z",
+      ledgerKey: "imap:-:10",
+    };
+    const migrated = migrateState({
+      alerts: [
+        { alertId: "kept", sentAt: "2026-04-08T10:00:00Z", zone: "amber", review },
+        {
+          alertId: "status",
+          sentAt: "2026-04-08T10:00:00Z",
+          zone: "amber",
+          review: { ...review, status: "odd" },
+        },
+        {
+          alertId: "attempts",
+          sentAt: "2026-04-08T10:00:00Z",
+          zone: "amber",
+          review: { ...review, attempts: -1 },
+        },
+        {
+          alertId: "time",
+          sentAt: "2026-04-08T10:00:00Z",
+          zone: "amber",
+          review: { ...review, firstFailedAt: 5 },
+        },
+        {
+          alertId: "key",
+          sentAt: "2026-04-08T10:00:00Z",
+          zone: "amber",
+          review: { ...review, ledgerKey: null },
+        },
+        { alertId: "scalar", sentAt: "2026-04-08T10:00:00Z", zone: "amber", review: "retrying" },
+        { alertId: "none", sentAt: "2026-04-08T10:00:00Z", zone: "amber" },
+      ],
+    });
+    expect(migrated.alerts.map((alert) => [alert.alertId, alert.review])).toEqual([
+      ["kept", review],
+      ["status", undefined],
+      ["attempts", undefined],
+      ["time", undefined],
+      ["key", undefined],
+      ["scalar", undefined],
+      ["none", undefined],
+    ]);
+    expect(migrated.alerts[6]).not.toHaveProperty("review");
+  });
+
   it("matches the migrateState.partial golden fixture", () => {
     expect(
       migrateState({
