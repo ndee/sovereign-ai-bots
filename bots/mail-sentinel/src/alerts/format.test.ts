@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { sampleAlert } from "../__fixtures__/inputs.js";
 import { loadGolden } from "../__fixtures__/load.js";
-import type { StoredAlert } from "../types.js";
+import type { ReviewRetryState, StoredAlert } from "../types.js";
+import { formatLocalDateTime } from "../util/time.js";
 import {
   buildDigestMessage,
   buildRedAlertMessage,
@@ -418,5 +419,79 @@ describe("alerts/format", () => {
       "12h",
     );
     expect(message).toEqual(loadGolden("buildDigestMessage.many"));
+  });
+});
+
+describe("alerts/format > review status", () => {
+  const review = (status: ReviewRetryState["status"]): ReviewRetryState => ({
+    status,
+    attempts: 1,
+    firstFailedAt: "2026-04-08T08:00:00.000Z",
+    ledgerKey: "imap:-:42",
+  });
+  const waiting: StoredAlert = {
+    ...sampleAlert,
+    zone: "amber",
+    confidence: null,
+    llmResult: null,
+    review: review("retrying"),
+  };
+  const NOT_YET =
+    "Review: not reviewed yet: the AI reviewer was unavailable, Mail Sentinel will try again";
+  const LOOK = "Review: not reviewed: please look at this one yourself";
+
+  it("renders a missing confidence as unknown and says the mail is not reviewed yet", () => {
+    const message = buildDigestMessage([waiting], "12h");
+    expect(message.body).toContain("Financial Relevance · unknown");
+    expect(message.body).toContain(NOT_YET);
+    expect(message.formattedBody).toContain(
+      "<strong>Review:</strong> not reviewed yet: the AI reviewer was unavailable, Mail Sentinel will try again",
+    );
+    expect(mapAlertToSummary(waiting).confidence).toBeUndefined();
+  });
+
+  it.each([
+    "exhausted",
+    "stopped",
+  ] as const)("asks the operator to look at it once the review is %s", (status) => {
+    const message = buildDigestMessage([{ ...waiting, review: review(status) }], "12h");
+    expect(message.body).toContain(LOOK);
+    expect(message.body).not.toContain("not reviewed yet");
+  });
+
+  it("still renders a real 0 as low (0%), without a review line", () => {
+    const message = buildDigestMessage([{ ...sampleAlert, zone: "amber", confidence: 0 }], "12h");
+    expect(message.body).toContain("Financial Relevance · low (0%)");
+    expect(message.body).not.toContain("Review:");
+  });
+
+  it("drops the review line once a verdict came in", () => {
+    const message = buildDigestMessage(
+      [{ ...sampleAlert, zone: "amber", review: review("reviewed") }],
+      "12h",
+    );
+    expect(message.body).not.toContain("Review:");
+  });
+
+  it("shows the review line on a red alert that is still waiting for its review", () => {
+    const message = buildRedAlertMessage({ ...waiting, zone: "red" }, "new-alert");
+    expect(message.body).toContain("Confidence: unknown");
+    expect(message.body).toContain(NOT_YET);
+    expect(message.formattedBody).toContain("<strong>Review:</strong> not reviewed yet");
+  });
+
+  it("marks a late red and says when the mail was first seen", () => {
+    const late = { ...sampleAlert, review: review("reviewed") };
+    const message = buildRedAlertMessage(late, "late");
+    const firstSeen = formatLocalDateTime(sampleAlert.sentAt);
+    expect(message.body.split("\n")[0]).toBe("🔴 RED · Financial Relevance · late");
+    expect(message.body).toContain(
+      `Checked again: first seen ${firstSeen}, while the AI reviewer was unavailable.`,
+    );
+    expect(message.body).not.toContain("Review:");
+    expect(message.formattedBody).toContain(
+      `<strong>Checked again:</strong> first seen ${firstSeen}, while the AI reviewer was unavailable.`,
+    );
+    expect(message.formattedBody).toContain("RED · Financial Relevance · late");
   });
 });

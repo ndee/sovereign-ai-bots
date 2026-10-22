@@ -14,6 +14,7 @@ import {
   isLlmRoutingRefusedError,
   isToolUnavailableError,
   resolveToolRuntime,
+  reviewAttemptsOf,
   TOOL_UNAVAILABLE_ERROR_CODE,
 } from "../config/runtime.js";
 import {
@@ -21,6 +22,8 @@ import {
   DEFAULT_IMAP_SEARCH_ATTEMPTS,
   DEFAULT_IMAP_SEARCH_LIMIT,
   DEFAULT_SCAN_BUDGET_MS,
+  LLM_REVIEW_BREAKER_FAILURES,
+  REVIEW_RETRY_WINDOW_MS,
 } from "../constants.js";
 import { deriveDegradationState } from "../health/degradation.js";
 import { announceDegradationIfChanged } from "../health/notice.js";
@@ -31,6 +34,7 @@ import {
   buildLedgerKey,
   flagDay,
   isUnaccountedState,
+  LATE_VERDICT_REASON,
   localDay,
   type MailLedger,
   markOutageAffected,
@@ -39,12 +43,21 @@ import {
   type Outcome,
   pendingGraceMs,
   pruneLedger,
+  REVIEW_RETRY_REASON,
   recordOutcome,
   resolveOverduePending,
+  resolveStuckReviewRetries,
 } from "../ledger/ledger.js";
 import { announceUnaccountedIfDue } from "../ledger/notice.js";
 import { buildCoverageLine, summarizeIntegrity } from "../ledger/reconcile.js";
 import { evaluatePolicy } from "../policy/engine.js";
+import {
+  hasOperatorFeedback,
+  isPastRecoveryHorizon,
+  isReviewRetryOver,
+  selectReviewRecoveries,
+  selectReviewRetries,
+} from "../review/retry.js";
 import { detectBulkSignals } from "../scoring/bulk.js";
 import { scoreMessage } from "../scoring/heuristics.js";
 import {
@@ -60,8 +73,11 @@ import type {
   AlertSummary,
   CommandOptions,
   IntegrityDetail,
+  LlmCandidate,
   LlmResult,
   MailSentinelState,
+  PolicyEvaluationResult,
+  ReviewRetryState,
   StoredAlert,
   StoredMessage,
 } from "../types.js";
@@ -136,6 +152,24 @@ const createInterruptedError = (signal: NodeJS.Signals): Error =>
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+// Zones a late verdict when a stored review lost its policy evaluation (a
+// hand-edited state file): as if no policy had matched.
+const NO_POLICY_MATCH: PolicyEvaluationResult = {
+  scoreModifier: 0,
+  zoneFloor: null,
+  zoneCeiling: null,
+  muted: false,
+  minConfidence: null,
+  reasons: [],
+  matchedPolicyIds: [],
+};
+
+/** Once no further attempt can follow, the mail content kept for it goes. */
+const dropReviewPayload = (review: ReviewRetryState): void => {
+  delete review.candidate;
+  delete review.policy;
+};
 
 /** Degradation states during which newly seen mail is marked outage-affected. */
 const OUTAGE_STATES = new Set<string>(["classification-degraded", "scans-failing"]);
@@ -503,6 +537,15 @@ export const scan = async (
       // re-sending other mail would not change it. Every candidate that would
       // have been reviewed still counts as a failure so the scan degrades.
       let llmRoutingRefused: string | undefined;
+      // Reviews in a row that ended without a verdict. At the breaker limit the
+      // reviewer is taken to be down for the rest of the scan: the remaining
+      // candidates are postponed instead of each waiting out its own calls.
+      let consecutiveReviewFailures = 0;
+      // A reply the zone logic can use, from new mail or a re-review. Only such
+      // a scan shows the reviewer is back, so only it runs the recovery pass.
+      let reviewerAnswered = false;
+      // Alerts opened by this scan's new mail: their next review is on a later scan.
+      const openedThisScan = new Set<string>();
       const alerts: AlertSummary[] = [...reminderAlerts];
       // Watermark only ever advances past mail we actually reckoned with —
       // messages processed this scan or already seen in a prior one. Messages
@@ -646,6 +689,12 @@ export const scan = async (
         let llmResult: LlmResult | null = null;
         let reviewSkippedReason: string | undefined;
         let reviewRefused = false;
+        // Never sent to the reviewer, so no review attempt is counted for it.
+        let reviewPostponed = false;
+        let reviewFailureReason: string | undefined;
+        const reviewCandidate = buildLlmCandidate(parsed, scored, {
+          senderDetail: runtime.llmSenderDetail,
+        });
         if (policyResult.muted) {
           // determineZone returns gray for a muted mail regardless of the
           // reviewer, so nothing is lost by not asking.
@@ -656,12 +705,28 @@ export const scan = async (
           llmCandidates += 1;
           llmFailures += 1;
           reviewRefused = true;
+        } else if (
+          consecutiveReviewFailures >= LLM_REVIEW_BREAKER_FAILURES ||
+          Date.now() >= scanDeadline
+        ) {
+          // Postponed mail still counts as a reviewer failure, so a scan whose
+          // reviewer is down degrades even when most of it was never sent.
+          llmCandidates += 1;
+          llmFailures += 1;
+          reviewPostponed = true;
+          if (consecutiveReviewFailures < LLM_REVIEW_BREAKER_FAILURES) {
+            warnings.push(
+              `Scan time budget (${String(Math.round(DEFAULT_SCAN_BUDGET_MS / 1000))}s) exhausted before the semantic review of UID ${String(parsed.uid)}; review postponed.`,
+            );
+          }
         } else {
           llmCandidates += 1;
           try {
-            llmResult = await runtime.classifyCandidate(
-              buildLlmCandidate(parsed, scored, { senderDetail: runtime.llmSenderDetail }),
-            );
+            llmResult = await runtime.classifyCandidate(reviewCandidate, {
+              deadline: scanDeadline,
+            });
+            consecutiveReviewFailures = 0;
+            reviewerAnswered ||= !isDefaultedLlmResult(llmResult);
           } catch (error) {
             llmFailures += 1;
             const message = error instanceof Error ? error.message : String(error);
@@ -672,7 +737,14 @@ export const scan = async (
                 `Semantic review refused by the model provider under the configured privacy routing; no further mail is sent to the reviewer this scan: ${message}`,
               );
             } else {
+              consecutiveReviewFailures += 1;
+              reviewFailureReason = reviewAttemptsOf(error)?.at(-1)?.reason;
               warnings.push(`Semantic review failed for UID ${String(parsed.uid)}: ${message}`);
+              if (consecutiveReviewFailures === LLM_REVIEW_BREAKER_FAILURES) {
+                warnings.push(
+                  `Semantic review failed for ${String(LLM_REVIEW_BREAKER_FAILURES)} messages in a row; no further mail is sent to the reviewer this scan.`,
+                );
+              }
             }
           }
         }
@@ -692,20 +764,35 @@ export const scan = async (
           zone: zoneDecision.zone,
           reason: zoneDecision.reasons[0] as string,
         });
+        // The reviewer gave no verdict and nothing excludes the mail: later
+        // scans review it again. A fallback gray opens no alert, and no
+        // verdict could lift it (the threshold or a policy ceiling holds it).
+        const retryReview =
+          llmResult === null &&
+          !policyResult.muted &&
+          !bulk.isBulk &&
+          !reviewRefused &&
+          zoneDecision.zone !== "gray";
         // A fallback zone still drives the alert as before, but without a
-        // review verdict it is counted as `no-verdict:*`, never as a verdict.
+        // review verdict it is counted as `no-verdict:*` (or in progress while
+        // it is retried), never as a verdict.
         const outcome: Outcome = policyResult.muted
           ? { state: zoneDecision.zone, review: "policy-skipped" }
           : bulk.isBulk
             ? { state: zoneDecision.zone, review: "rules-only" }
             : reviewRefused
               ? { state: "no-verdict:refused" }
-              : llmResult === null
-                ? { state: "no-verdict:reviewer-unavailable" }
-                : isDefaultedLlmResult(llmResult)
-                  ? { state: "no-verdict:defaulted" }
-                  : { state: zoneDecision.zone, review: "reviewer" };
-        record(key, outcome, true);
+              : retryReview
+                ? { state: "deferred", reason: REVIEW_RETRY_REASON }
+                : llmResult === null
+                  ? {
+                      state: "no-verdict:reviewer-unavailable",
+                      reason: reviewPostponed ? "postponed" : reviewFailureReason,
+                    }
+                  : isDefaultedLlmResult(llmResult)
+                    ? { state: "no-verdict:defaulted" }
+                    : { state: zoneDecision.zone, review: "reviewer" };
+        record(key, outcome, !reviewPostponed);
         if (isUnaccountedState(outcome.state)) {
           integrityDetails[key] = { from: parsed.from, subject: parsed.subject };
         }
@@ -749,9 +836,24 @@ export const scan = async (
           feedbackState: "pending",
           policyModifiers: policyResult.reasons,
           llmResult,
-          confidence: llmResult?.confidence ?? 0,
+          confidence: llmResult?.confidence ?? null,
+          ...(retryReview
+            ? {
+                review: {
+                  status: "retrying" as const,
+                  attempts: reviewPostponed ? 0 : 1,
+                  firstFailedAt: scanAt,
+                  ...(reviewPostponed ? {} : { lastAttemptAt: scanAt }),
+                  lastReason: reviewPostponed ? "postponed" : reviewFailureReason,
+                  ledgerKey: key,
+                  candidate: reviewCandidate,
+                  policy: policyResult,
+                },
+              }
+            : {}),
         };
         state.alerts.push(alert);
+        openedThisScan.add(alert.alertId);
         const storedMessage = state.messages[parsed.key];
         if (storedMessage !== undefined) {
           storedMessage.alertId = alert.alertId;
@@ -766,6 +868,183 @@ export const scan = async (
           amberQueued += 1;
         }
       }
+
+      const canSendReview = (): boolean =>
+        llmRoutingRefused === undefined &&
+        consecutiveReviewFailures < LLM_REVIEW_BREAKER_FAILURES &&
+        Date.now() < scanDeadline;
+      const noteUnchecked = (alert: StoredAlert, key: string): void => {
+        integrityDetails[key] = { from: alert.from, subject: alert.subject };
+      };
+      const exhaustReview = (alert: StoredAlert, review: ReviewRetryState, attempt: boolean) => {
+        review.status = "exhausted";
+        record(
+          review.ledgerKey,
+          { state: "no-verdict:reviewer-unavailable", reason: "retries-exhausted" },
+          attempt,
+        );
+        noteUnchecked(alert, review.ledgerKey);
+        warnings.push(
+          `No semantic review verdict for UID ${String(alert.uid)} after ${String(review.attempts)} attempt(s); it stays not reviewed until the reviewer answers again.`,
+        );
+      };
+
+      // A late verdict updates the alert it belongs to in place: same alertId,
+      // same short ref. Only a change to red is announced, once; a downgrade
+      // is silent and just leaves the pending digest.
+      const applyLateVerdict = async (
+        alert: StoredAlert,
+        review: ReviewRetryState,
+        result: LlmResult,
+      ): Promise<void> => {
+        const decision = determineZone({
+          scored: {
+            score: alert.score ?? 0,
+            categoryScores: alert.categoryScores ?? {},
+            category: alert.category,
+          },
+          policyResult: review.policy ?? NO_POLICY_MATCH,
+          llmResult: result,
+          rules,
+        });
+        const previousZone = alert.zone;
+        alert.zone = decision.zone;
+        alert.adjustedScore = decision.adjustedScore;
+        alert.why = buildUserFacingWhy(decision, result);
+        alert.llmResult = result;
+        alert.confidence = result.confidence;
+        review.status = "reviewed";
+        dropReviewPayload(review);
+        state.zoneHistory.push({
+          at: nowIso(),
+          messageKey: alert.messageKey ?? review.ledgerKey,
+          zone: decision.zone,
+          reason: decision.reasons[0] as string,
+        });
+        const outcome: Outcome = isDefaultedLlmResult(result)
+          ? { state: "no-verdict:defaulted" }
+          : { state: decision.zone, review: "reviewer", reason: LATE_VERDICT_REASON };
+        record(review.ledgerKey, outcome, true);
+        if (isUnaccountedState(outcome.state)) {
+          noteUnchecked(alert, review.ledgerKey);
+        }
+        if (decision.zone !== "amber") {
+          state.digest.pendingAmber = state.digest.pendingAmber.filter(
+            (alertId) => alertId !== alert.alertId,
+          );
+        }
+        if (decision.zone === "red" && previousZone !== "red") {
+          await runtime.sendMatrixRoomMessage(buildRedAlertMessage(alert, "late"));
+          redAlertsSent += 1;
+          state.lastAlertAt = scanAt;
+          alerts.push(mapAlertToSummary(alert, "late"));
+        }
+      };
+
+      const reviewAgain = async (alert: StoredAlert, recovery: boolean): Promise<void> => {
+        const review = alert.review as ReviewRetryState;
+        // Counted and written before the call, so a scan that dies in the
+        // call (even by SIGKILL) has still used up the attempt.
+        review.attempts += 1;
+        review.lastAttemptAt = nowIso();
+        if (recovery) {
+          review.recoveryAttempted = true;
+        }
+        await runtime.writeState(state);
+        llmCandidates += 1;
+        let result: LlmResult;
+        try {
+          result = await runtime.classifyCandidate(review.candidate as LlmCandidate, {
+            deadline: scanDeadline,
+          });
+        } catch (error) {
+          throwIfInterrupted();
+          llmFailures += 1;
+          const message = describeError(error);
+          if (isLlmRoutingRefusedError(error)) {
+            llmRoutingRefused = message;
+            warnings.push(
+              `Semantic review refused by the model provider under the configured privacy routing; no further mail is sent to the reviewer this scan: ${message}`,
+            );
+            review.status = "stopped";
+            dropReviewPayload(review);
+            record(review.ledgerKey, { state: "no-verdict:refused" }, true);
+            noteUnchecked(alert, review.ledgerKey);
+            return;
+          }
+          consecutiveReviewFailures += 1;
+          review.lastReason = reviewAttemptsOf(error)?.at(-1)?.reason;
+          warnings.push(
+            `Semantic review failed again for UID ${String(alert.uid)} (attempt ${String(review.attempts)}): ${message}`,
+          );
+          if (consecutiveReviewFailures === LLM_REVIEW_BREAKER_FAILURES) {
+            warnings.push(
+              `Semantic review failed for ${String(LLM_REVIEW_BREAKER_FAILURES)} messages in a row; no further mail is sent to the reviewer this scan.`,
+            );
+          }
+          if (recovery) {
+            dropReviewPayload(review);
+            record(
+              review.ledgerKey,
+              { state: "no-verdict:reviewer-unavailable", reason: "recovery-failed" },
+              true,
+            );
+            noteUnchecked(alert, review.ledgerKey);
+          } else if (isReviewRetryOver(review, new Date())) {
+            exhaustReview(alert, review, true);
+          } else {
+            record(review.ledgerKey, { state: "deferred", reason: REVIEW_RETRY_REASON }, true);
+          }
+          return;
+        }
+        consecutiveReviewFailures = 0;
+        reviewerAnswered ||= !isDefaultedLlmResult(result);
+        await applyLateVerdict(alert, review, result);
+      };
+
+      // Close what can no longer be retried before choosing what to send.
+      for (const alert of state.alerts) {
+        const review = alert.review;
+        if (review === undefined || openedThisScan.has(alert.alertId)) {
+          continue;
+        }
+        const now = new Date();
+        if (review.status === "exhausted" && isPastRecoveryHorizon(review, now)) {
+          dropReviewPayload(review);
+        } else if (review.status === "retrying" && hasOperatorFeedback(alert)) {
+          review.status = "stopped";
+          dropReviewPayload(review);
+          record(review.ledgerKey, {
+            state: "no-verdict:reviewer-unavailable",
+            reason: "operator-feedback",
+          });
+          noteUnchecked(alert, review.ledgerKey);
+        } else if (review.status === "retrying" && isReviewRetryOver(review, now)) {
+          exhaustReview(alert, review, false);
+        }
+      }
+      // Re-reviews come after the new mail and share its breaker and budget.
+      for (const alert of selectReviewRetries(state.alerts, new Date(), openedThisScan)) {
+        throwIfInterrupted();
+        if (!canSendReview()) {
+          break;
+        }
+        await reviewAgain(alert, false);
+      }
+      if (reviewerAnswered) {
+        for (const alert of selectReviewRecoveries(state.alerts, new Date())) {
+          throwIfInterrupted();
+          if (!canSendReview()) {
+            break;
+          }
+          await reviewAgain(alert, true);
+        }
+      }
+      resolveStuckReviewRetries(
+        ledger,
+        new Date(),
+        REVIEW_RETRY_WINDOW_MS + durationMsOr(runtime.pollInterval, "30m"),
+      );
 
       // Last checkpoint before the success write: an interrupt that landed
       // during the final read must not turn into a "healthy" scan record.

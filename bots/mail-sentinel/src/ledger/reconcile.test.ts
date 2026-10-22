@@ -186,6 +186,34 @@ describe("ledger/reconcile > reconcileLedger", () => {
   });
 });
 
+describe("ledger/reconcile > late verdicts", () => {
+  it("counts verdicts that arrived on a later scan per day and in the totals", () => {
+    const ledger = createLedger();
+    recordOutcome(ledger, key(1), { state: "red", review: "reviewer", reason: "late" }, NOON);
+    recordOutcome(ledger, key(2), { state: "gray", review: "reviewer", reason: "late" }, NOON);
+    recordOutcome(ledger, key(3), { state: "amber", review: "reviewer" }, NOON);
+    recordOutcome(ledger, key(4), { state: "deferred", reason: "review-retry" }, NOON);
+    recordOutcome(
+      ledger,
+      key(5),
+      { state: "red", review: "reviewer", reason: "late" },
+      at(-DAY_MS),
+    );
+    const report = reconcileLedger(ledger, NOON);
+    expect(report.days.map((day) => day.lateVerdicts)).toEqual([2, 1]);
+    expect(report.totals.lateVerdicts).toBe(3);
+    expect(report.days[0]).toMatchObject({ verdict: 3, inFlight: 1, unaccounted: 0 });
+    expect(summarizeIntegrity(ledger, NOON).days[TODAY]).toMatchObject({ lateVerdicts: 2 });
+  });
+
+  it("leaves lateVerdicts out of the persisted integrity block on a day without any", () => {
+    const ledger = createLedger();
+    recordOutcome(ledger, key(1), { state: "red", review: "reviewer" }, NOON);
+    expect(reconcileLedger(ledger, NOON).days[0]?.lateVerdicts).toBe(0);
+    expect(summarizeIntegrity(ledger, NOON).days[TODAY]).not.toHaveProperty("lateVerdicts");
+  });
+});
+
 describe("ledger/reconcile > deliberate discrepancies", () => {
   it("shows a deleted entry as residual 1 on its day", () => {
     const ledger = fullLedger(3);

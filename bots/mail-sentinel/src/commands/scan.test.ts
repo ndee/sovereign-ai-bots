@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFakeRuntime, resetFakeRuntime } from "../__fixtures__/fake-runtime.js";
 import { sampleRules } from "../__fixtures__/inputs.js";
-import type { LlmResult, StoredAlert } from "../types.js";
+import type { LlmResult, ReviewRetryState, StoredAlert } from "../types.js";
 
 // Controllable tool-availability verdict (#324). Hoisted so the mock factory
 // below can close over it; reset to "available" in beforeEach.
@@ -45,8 +45,14 @@ vi.mock("node:crypto", async () => {
 });
 
 const { flushDigestIfDue, scan } = await import("./scan.js");
-const { createLlmRoutingRefusedError, createToolUnavailableError, TOOL_UNAVAILABLE_ERROR_CODE } =
-  await import("../config/runtime.js");
+const {
+  createLlmRoutingRefusedError,
+  createToolUnavailableError,
+  MailSentinelRuntime,
+  TOOL_UNAVAILABLE_ERROR_CODE,
+} = await import("../config/runtime.js");
+const { setExecFileAsync } = await import("../imap/exec.js");
+const { DEFAULT_LLM_TIMEOUT_MS } = await import("../constants.js");
 
 const TOOL_UNAVAILABLE_REASON =
   "IMAP tool unavailable: /usr/local/bin/sovereign-tool not found. " +
@@ -62,6 +68,8 @@ const makeToolUnavailable = () => {
 };
 
 const FIXED_NOW = new Date("2026-04-08T12:00:00.000Z");
+// Captured before any test installs fake timers, which replace setImmediate.
+const realSetImmediate = globalThis.setImmediate;
 
 const makeLlm = (overrides: Partial<LlmResult> = {}): LlmResult => ({
   decisionRequired: true,
@@ -925,8 +933,12 @@ describe("commands/scan", () => {
       await scan({ instance: "ms-core" });
       expect(runtime.state.degradationState).toBe("classification-degraded");
 
-      // Next tick: nothing new in the mailbox, reviewer still broken.
+      // Next tick: nothing new in the mailbox, reviewer still broken, and the
+      // re-review of the first mail is not due yet.
       runtime.searchMail = async () => ({ messages: [] });
+      const review = runtime.state.alerts[0]?.review as ReviewRetryState;
+      review.attempts = 2;
+      review.lastAttemptAt = new Date().toISOString();
       await scan({ instance: "ms-core" });
       expect(runtime.state.lastScanCandidates).toBe(0);
       expect(runtime.state.lastScanLlmFailures).toBe(0);
@@ -1358,20 +1370,12 @@ describe("commands/scan > watermark reads, time budget, and interruption", () =>
     runtime.state.mailbox.lastSeenUid = 5;
     runtime.searchMail = async () => threeMessages();
     const read = readMailFor(runtime);
-    read.mockImplementationOnce(async (selector: unknown) => {
-      // The first read is slow enough to burn the whole budget.
+    runtime.classifyCandidate = async () => {
+      // The first review is slow enough to burn the whole budget. (A read that
+      // burns it leaves its own review postponed, which is pinned elsewhere.)
       vi.setSystemTime(new Date(FIXED_NOW.getTime() + 181_000));
-      return {
-        message: {
-          uid: Number(selector),
-          messageId: `<m${String(selector)}@ex>`,
-          from: ["Alice <alice@example.com>"],
-          subject: "Invoice #10",
-          text: "Please pay $500 for invoice.",
-          headers: [],
-        },
-      };
-    });
+      return makeLlm();
+    };
     const result = await scan({ instance: "ms-core" });
     expect(read.mock.calls.map(([selector]) => selector)).toEqual([10]);
     expect(result.deferredMessages).toBe(2);
@@ -1501,5 +1505,266 @@ describe("commands/scan > watermark reads, time budget, and interruption", () =>
     };
     await expect(scan({ instance: "ms-core" })).rejects.toThrow("disk full");
     expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
+  });
+});
+
+describe("commands/scan > semantic review window, breaker and budget guard", () => {
+  type Runner = Parameters<typeof setExecFileAsync>[0];
+  const SCAN_START = FIXED_NOW.getTime();
+  const verdict = {
+    stdout: JSON.stringify([{ details: { json: { confidence: 95, suggested_zone: "red" } } }]),
+    stderr: "",
+  };
+  // The reviewer stalls until the client kills it at the exec timeout.
+  const stall: Runner = async (_file, _args, options) => {
+    vi.setSystemTime(Date.now() + Number((options as { timeout?: number }).timeout));
+    throw Object.assign(new Error("Command failed: lobster"), {
+      killed: true,
+      signal: "SIGKILL",
+      stdout: "",
+      stderr: "",
+    });
+  };
+  const refuseConnection: Runner = async () => {
+    throw Object.assign(new Error("Command failed: lobster"), {
+      stdout: "",
+      stderr: "TypeError: fetch failed",
+    });
+  };
+  const answer: Runner = async () => verdict;
+
+  let previousRunner: Runner | undefined;
+
+  /**
+   * Drive the fake clock until the scan settles, firing every pause it
+   * schedules. Each turn also yields to the real event loop: the review writes
+   * its payload to a real temp file, and a pause scheduled after that I/O
+   * would otherwise be left waiting once the turns ran out.
+   */
+  const settle = async <T>(promise: Promise<T>): Promise<T> => {
+    let pending = true;
+    promise.then(
+      () => {
+        pending = false;
+      },
+      () => {
+        pending = false;
+      },
+    );
+    while (pending) {
+      await vi.runAllTimersAsync();
+      await new Promise((resolve) => realSetImmediate(resolve));
+    }
+    return promise;
+  };
+
+  /**
+   * A scan over `uids` whose semantic review runs through the real runtime's
+   * `classifyCandidate`, with `runner` standing in for the lobster process.
+   * `readMs` makes a read of that UID take that long on the fake clock.
+   */
+  const setup = async (
+    uids: number[],
+    runner: Runner,
+    readMs: Record<number, number> = {},
+  ): Promise<{
+    runtime: ReturnType<typeof setupRuntimeForScan>;
+    runner: ReturnType<typeof vi.fn>;
+  }> => {
+    const runtime = setupRuntimeForScan();
+    runtime.searchMail = async () => ({
+      messages: uids.map((uid) => ({
+        uid,
+        size: 1000,
+        messageId: `<m${String(uid)}@ex>`,
+        from: ["Alice <alice@example.com>"],
+        subject: `Invoice #${String(uid)}`,
+      })),
+    });
+    runtime.readMail = async (selector: unknown) => {
+      vi.setSystemTime(Date.now() + (readMs[Number(selector)] ?? 0));
+      return {
+        message: {
+          uid: Number(selector),
+          messageId: `<m${String(selector)}@ex>`,
+          from: ["Alice <alice@example.com>"],
+          subject: `Invoice #${String(selector)}`,
+          text: "Please pay $500 for invoice.",
+          headers: [],
+        },
+      };
+    };
+    const reviewer = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
+    reviewer.workspaceDir = await mkdtemp(join(tmpdir(), "ms-scan-review-"));
+    reviewer.scanAgentId = "mail-sentinel-scan";
+    reviewer.openclawUrl = "http://127.0.0.1:18789";
+    reviewer.openclawToken = undefined;
+    reviewer.llmTimeoutMs = DEFAULT_LLM_TIMEOUT_MS;
+    runtime.classifyCandidate = (...args: unknown[]) =>
+      reviewer.classifyCandidate(...(args as Parameters<typeof reviewer.classifyCandidate>));
+    const spy = vi.fn(runner);
+    previousRunner = setExecFileAsync(spy);
+    return { runtime, runner: spy };
+  };
+
+  const entry = (runtime: ReturnType<typeof setupRuntimeForScan>, uid: number) =>
+    runtime.ledger.entries[`imap:-:${String(uid)}`];
+  const alertFor = (runtime: ReturnType<typeof setupRuntimeForScan>, uid: number): StoredAlert =>
+    runtime.state.alerts.find((alert) => alert.uid === uid) as StoredAlert;
+
+  beforeEach(() => {
+    resetFakeRuntime();
+    toolAvailabilityRef.current = {
+      ok: true,
+      executable: "/usr/local/bin/sovereign-tool",
+      source: "default",
+    };
+    process.env.SOVEREIGN_LOBSTER_EXECUTABLE = "lobster";
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+  afterEach(() => {
+    if (previousRunner !== undefined) {
+      setExecFileAsync(previousRunner);
+      previousRunner = undefined;
+    }
+    delete process.env.SOVEREIGN_LOBSTER_EXECUTABLE;
+    vi.useRealTimers();
+  });
+
+  it("stops sending candidates after two reviews in a row fail: at most 4 calls for 5 candidates", async () => {
+    const { runtime, runner } = await setup([10, 20, 30, 40, 50], refuseConnection);
+    await settle(scan({ instance: "ms-core" }));
+    expect(runner).toHaveBeenCalledTimes(4);
+    // Each stays in progress for a re-review on a later scan; the alert keeps
+    // the reason of its last call.
+    for (const uid of [10, 20]) {
+      expect(entry(runtime, uid)).toMatchObject({
+        state: "deferred",
+        reason: "review-retry",
+        attempts: 1,
+      });
+      expect(alertFor(runtime, uid).review).toMatchObject({
+        attempts: 1,
+        lastReason: "connection",
+      });
+    }
+    // Postponed: never sent, so no attempt is counted for them.
+    for (const uid of [30, 40, 50]) {
+      expect(entry(runtime, uid)).toMatchObject({
+        state: "deferred",
+        reason: "review-retry",
+        attempts: 0,
+      });
+      expect(alertFor(runtime, uid).review).toMatchObject({ attempts: 0, lastReason: "postponed" });
+    }
+    // They still count as reviewer failures, so the scan degrades.
+    expect(runtime.state.lastScanCandidates).toBe(5);
+    expect(runtime.state.lastScanLlmFailures).toBe(5);
+    expect(runtime.state.degradationState).toBe("classification-degraded");
+  });
+
+  it("does not let one timed-out review postpone the next candidate", async () => {
+    const calls = [stall, answer];
+    const { runtime, runner } = await setup([10, 20], (...args) =>
+      (calls.shift() ?? answer)(...args),
+    );
+    await settle(scan({ instance: "ms-core" }));
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(entry(runtime, 10)).toMatchObject({ state: "deferred", reason: "review-retry" });
+    expect(alertFor(runtime, 10).review).toMatchObject({ lastReason: "timeout" });
+    expect(entry(runtime, 20)).toMatchObject({ state: "red", review: "reviewer" });
+  });
+
+  it("only trips the breaker on consecutive failures", async () => {
+    const calls = [stall, answer, stall, answer];
+    const { runtime, runner } = await setup([10, 20, 30, 40], (...args) =>
+      (calls.shift() ?? answer)(...args),
+    );
+    await settle(scan({ instance: "ms-core" }));
+    expect(runner).toHaveBeenCalledTimes(4);
+    expect(entry(runtime, 40)).toMatchObject({ state: "red", review: "reviewer" });
+  });
+
+  // The scan unit runs under a 300 s limit. No review may start after the 180 s
+  // budget, so the loop ends by 180 s + one client kill (75 s) = 255 s at most,
+  // which leaves time for the writes.
+  it.each([
+    [
+      "a review that starts just inside the budget stalls",
+      { 10: 59_500, 20: 59_500, 30: 59_500 },
+      2,
+    ],
+    [
+      "a read that starts just inside the budget is followed by a stalling reviewer",
+      { 10: 60_000, 20: 60_000, 30: 59_000, 40: 60_000 },
+      3,
+    ],
+  ])("ends the message loop by 255 s when %s", async (_label, readMs, answered) => {
+    let calls = 0;
+    await setup(
+      [10, 20, 30, 40],
+      (...args) => {
+        calls += 1;
+        return (calls <= answered ? answer : stall)(...args);
+      },
+      readMs,
+    );
+    await settle(scan({ instance: "ms-core" }));
+    expect(Date.now() - SCAN_START).toBeLessThanOrEqual(255_000);
+  });
+
+  it("postpones the review of a message read after the budget is spent", async () => {
+    const { runtime, runner } = await setup([10, 20], answer, { 10: 0, 20: 181_000 });
+    await settle(scan({ instance: "ms-core" }));
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(entry(runtime, 20)).toMatchObject({
+      state: "deferred",
+      reason: "review-retry",
+      attempts: 0,
+    });
+    expect(alertFor(runtime, 20).review).toMatchObject({ attempts: 0, lastReason: "postponed" });
+    expect(runtime.state.lastScanLlmFailures).toBe(1);
+  });
+
+  // Six attempts of at most two calls each, plus one recovery attempt of at
+  // most two calls once the reviewer works again: 14 calls for one mail, ever.
+  it("caps the AI calls for one mail at 14 over its whole life", async () => {
+    const perScan: number[] = [];
+    let script: Runner[] = [];
+    const { runtime, runner } = await setup([10], (...args) =>
+      (script.shift() ?? refuseConnection)(...args),
+    );
+    for (let offset = 0; offset <= 13 * 60 * 60 * 1000; offset += 30 * 60 * 1000) {
+      vi.setSystemTime(SCAN_START + offset);
+      const before = runner.mock.calls.length;
+      await settle(scan({ instance: "ms-core" }));
+      perScan.push(runner.mock.calls.length - before);
+    }
+    expect(perScan.filter((calls) => calls > 0)).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(alertFor(runtime, 10).review).toMatchObject({ status: "exhausted", attempts: 6 });
+    // The reviewer answers new mail again: UID 10 gets its one recovery
+    // attempt, which fails fast twice.
+    const search = runtime.searchMail;
+    for (const [index, uid] of [20, 30, 40].entries()) {
+      runtime.searchMail = async (limit) => {
+        const result = await search(limit);
+        return {
+          ...result,
+          messages: [
+            ...result.messages,
+            { uid, size: 1000, messageId: `<m${String(uid)}@ex>`, from: [], subject: "x" },
+          ],
+        };
+      };
+      script = [answer];
+      vi.setSystemTime(SCAN_START + 14 * 60 * 60 * 1000 + index * 30 * 60 * 1000);
+      const before = runner.mock.calls.length;
+      await settle(scan({ instance: "ms-core" }));
+      perScan.push(runner.mock.calls.length - before);
+    }
+    expect(perScan.slice(-3)).toEqual([3, 1, 1]);
+    expect(perScan.reduce((sum, calls) => sum + calls, 0) - 3).toBe(14);
+    expect(entry(runtime, 10)).toMatchObject({ reason: "recovery-failed", attempts: 7 });
   });
 });

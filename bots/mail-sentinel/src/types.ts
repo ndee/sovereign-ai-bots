@@ -141,13 +141,45 @@ export interface StoredAlert {
   digestSentAt?: string | undefined;
   policyModifiers?: string[] | undefined;
   llmResult?: LlmResult | null | undefined;
-  confidence?: number | undefined;
+  /** The reviewer's confidence; `null` while there is no verdict to take it from. */
+  confidence?: number | null | undefined;
+  /** Present when the first review gave no verdict and later scans review it again. */
+  review?: ReviewRetryState | undefined;
+}
+
+/**
+ * - `retrying` — later scans review the mail again within the bounds.
+ * - `exhausted` — the bounds are used up; one recovery attempt may still follow.
+ * - `reviewed` — a later scan got the reviewer's reply.
+ * - `stopped` — no longer eligible: the operator gave feedback or the provider refused.
+ */
+export type ReviewRetryStatus = "retrying" | "exhausted" | "reviewed" | "stopped";
+
+export interface ReviewRetryState {
+  status: ReviewRetryStatus;
+  /** Scans that sent this mail to the reviewer, the first one included; counted before the call. */
+  attempts: number;
+  /** When the first review failed or was postponed; the retry window starts here. */
+  firstFailedAt: string;
+  lastAttemptAt?: string | undefined;
+  /** How the last attempt ended without a verdict (a call's reason, or `postponed`). */
+  lastReason?: string | undefined;
+  /** The one recovery attempt after exhaustion has been spent. */
+  recoveryAttempted?: boolean | undefined;
+  ledgerKey: string;
+  /**
+   * The minimised payload of the first review, sent again unchanged. Dropped
+   * once no further attempt can follow.
+   */
+  candidate?: LlmCandidate | undefined;
+  /** The policy evaluation of the first scan, so a late verdict is zoned the same way. */
+  policy?: PolicyEvaluationResult | undefined;
 }
 
 export interface AlertSummary {
   alertId: string;
   shortRef: string;
-  kind: "new-alert" | "reminder" | "digest";
+  kind: "new-alert" | "reminder" | "digest" | "late";
   zone: Zone;
   category: Category;
   subject: string;

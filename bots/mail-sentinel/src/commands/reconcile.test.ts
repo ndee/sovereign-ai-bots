@@ -143,6 +143,16 @@ describe("commands/reconcile", () => {
       expect(text).toContain(`${yesterday} (full): 0 = 0 verdict`);
     });
 
+    it("names the verdicts that arrived late, and returns them per day in the JSON", async () => {
+      const ledger = createLedger();
+      recordOutcome(ledger, "imap:1:1", { state: "red", review: "reviewer", reason: "late" }, NOW);
+      getFakeRuntime().ledger = ledger;
+      const report = await reconcile({ instance: "ms-core" });
+      expect(report.days[0]?.lateVerdicts).toBe(1);
+      expect(report.totals.lateVerdicts).toBe(1);
+      expect(formatReconcileResult(report)).toContain("  late verdicts 1");
+    });
+
     it("omits the breakdown line for a day with no counted outcome", async () => {
       const ledger = createLedger();
       ledger.days[localDay(NOW)] = { recorded: 1, inventoried: 0, inventoryRuns: 0 };

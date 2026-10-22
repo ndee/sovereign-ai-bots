@@ -22,7 +22,7 @@ Each entry is keyed by `<protocol>:<uidValidity>:<uid>` and holds:
 | `key` | Message identifier. Identifiers never match across key spaces, so a UIDVALIDITY change starts a new one. |
 | `firstSeenAt` | When the scan or the inventory first recorded it. |
 | `state` | Exactly one outcome state (below). |
-| `reason` | Sub-cause where known, e.g. `timeout` for a read that hit the tool deadline. |
+| `reason` | Sub-cause where known, e.g. `timeout` for a read that hit the tool deadline or a review call the bot killed. |
 | `review` | For verdicts: `reviewer`, `rules-only`, `policy-skipped` or `duplicate`. |
 | `attempts` | Read or review attempts the scan made. |
 | `updatedAt` | Last state change. |
@@ -40,17 +40,44 @@ history stays visible.
 | Group | State | Meaning |
 |---|---|---|
 | Verdict | `red`, `amber`, `gray` | A zone was decided. `review` says how: by the semantic reviewer, by local rules only (below the candidate threshold, or bulk mail), skipped by a mute policy, or inherited from a duplicate Message-ID. |
-| No verdict | `no-verdict:reviewer-unavailable` | The semantic reviewer failed. The alert still shows the fallback zone (usually amber) in the digest, but the ledger does **not** count it as an amber verdict. |
+| No verdict | `no-verdict:reviewer-unavailable` | The semantic reviewer gave no verdict and later scans will not try again. The alert still shows the fallback zone (usually amber) in the digest, but the ledger does **not** count it as an amber verdict. `reason` is `retries-exhausted` (the re-reviews below ran out), `recovery-failed` (the one recovery attempt failed too), `operator-feedback` (the operator gave feedback while it was retried), or, for a fallback gray that opened no alert and is never retried, how the last review call failed (`timeout`, `gateway-timeout`, `connection`, `http` or `invalid-reply`) or `postponed`. |
 | | `no-verdict:refused` | The model provider refused the review under the configured privacy routing. |
 | | `no-verdict:defaulted` | The reviewer replied without a usable confidence or zone, so defaults filled the gaps. |
 | Not processed | `read-failed` | The message could not be read. `reason` is `timeout` or `other`. |
 | | `too-large` | Above the read size limit, so never read. |
 | | `not-returned` | Listed by the inventory, but no search returned it within the grace period. `reason` is `truncated` (the search matched more than it returned), `baseline` (the mail tool marks it as pre-existing), `outside-window` (it arrived during a long inventory gap, possibly before the search window) or `below-watermark` (returned only below the scan watermark, so skipped unread). |
 | In flight | `pending` | Listed by the inventory and younger than 2 × `pollInterval` + 10 minutes. |
-| | `deferred` | The scan's time budget ran out before it was read. The next scan picks it up. |
+| | `deferred` | The scan's time budget ran out before it was read; the next scan picks it up. With reason `review-retry`: it was read, but its review gave no verdict (a failed call, or postponed because the reviewer had failed twice in a row or the time budget was spent), and later scans review it again (below). |
 
 Each identifier is in exactly one state at a time. A later scan can move it,
 for example from `read-failed` to a verdict when a re-read succeeds.
+
+### Review on later scans
+
+A mail whose review gave no verdict is reviewed again on later scans, with the
+same minimised payload, after the new mail and under the same breaker and time
+budget:
+
+- At most 6 attempts, the first included, within 12 h of the first failure.
+  The next attempt waits at least 0, 1, 2, 4 and 4 h after the previous one
+  (5 minutes of slack), so on a 30-minute timer they fall at about 0, 0.5,
+  1.5, 3.5, 7.5 and 11.5 h. At most 5 re-reviews per scan, oldest first.
+- `attempts` counts every attempt; a postponed review counts none. The
+  attempt is written to the state file before the call is made.
+- A verdict moves the entry in place to `red`, `amber` or `gray` with
+  `review: reviewer` and reason `late`. The alert keeps its id and short
+  reference. A change to red sends one red message marked late; amber and
+  gray change nothing visible except the alert itself.
+- When the bounds are used up the entry becomes
+  `no-verdict:reviewer-unavailable` (`retries-exhausted`). In the first scan
+  in which the reviewer returns a real verdict again, every such mail up to 7
+  days old gets exactly one recovery attempt (at most 5 per scan). A verdict
+  then moves it to the verdict with reason `late`; otherwise the reason
+  becomes `recovery-failed` and it stays not checked.
+- Never retried: routing refusals, bulk and muted mail, a fallback gray, and
+  an alert the operator has already given feedback on.
+- An entry still `deferred` (`review-retry`) 12 h plus one poll interval after
+  the scan first acted on it is closed as `retries-exhausted`.
 
 ## Coverage and the independent inventory
 
@@ -109,7 +136,7 @@ mail may be counted under new keys), `search-truncated`, `ledger-reset`.
 
 | Command | Output |
 |---|---|
-| `mail-sentinel.js reconcile --instance <id> [--limit <days>] [--json]` | The equation per day (default: the last 7 days with activity) and the totals. Counts only, safe to share for support. |
+| `mail-sentinel.js reconcile --instance <id> [--limit <days>] [--json]` | The equation per day (default: the last 7 days with activity) and the totals, plus `lateVerdicts` per day and in the totals (verdicts that a later scan's review produced). Counts only, safe to share for support. |
 | `mail-sentinel.js integrity --instance <id> [--limit <days>] [--json]` | For the operator's own room: per-day received / checked / not checked / in progress, and the unaccounted messages with arrival time, state, and sender and subject where the scan saw them. Never put this output in an export. |
 
 ## The `integrity` block in the state file
@@ -142,8 +169,8 @@ skew it. It contains counts only:
 `states` folds a known sub-cause into the name (`read-failed:timeout`,
 `not-returned:truncated`). On a partial day `inventory` is the ledger's own
 record count. Optional per-day fields appear only when non-zero: `residual`,
-`unaccounted`, `inFlight`, `outageAffected`, `seenNotInventoried`, `uidGaps`,
-`flags`.
+`unaccounted`, `inFlight`, `outageAffected`, `lateVerdicts`,
+`seenNotInventoried`, `uidGaps`, `flags`.
 
 The state file also keeps `integrityDetails` (sender and subject of messages
 that are currently unaccounted for), only so that `integrity` can name them.

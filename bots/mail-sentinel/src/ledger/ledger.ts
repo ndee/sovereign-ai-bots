@@ -540,6 +540,35 @@ export const resolveOverduePending = (ledger: MailLedger, now: Date, graceMs: nu
   }
 };
 
+/** `reason` of a `deferred` entry whose review gave no verdict yet and is tried again. */
+export const REVIEW_RETRY_REASON = "review-retry";
+/** `reason` of a verdict that a later scan's review produced. */
+export const LATE_VERDICT_REASON = "late";
+
+/**
+ * A review retry is closed by the scan that exhausts it. This catches the ones
+ * nothing closes any more (the alert was pruned, or the state file was
+ * replaced), so no entry stays in progress for good.
+ */
+export const resolveStuckReviewRetries = (
+  ledger: MailLedger,
+  now: Date,
+  maxAgeMs: number,
+): void => {
+  const at = now.toISOString();
+  for (const entry of Object.values(ledger.entries)) {
+    if (
+      entry.state === "deferred" &&
+      entry.reason === REVIEW_RETRY_REASON &&
+      now.getTime() - new Date(entry.scannedAt ?? entry.firstSeenAt).getTime() > maxAgeMs
+    ) {
+      entry.state = "no-verdict:reviewer-unavailable";
+      entry.reason = "retries-exhausted";
+      entry.updatedAt = at;
+    }
+  }
+};
+
 export const markOutageAffected = (ledger: MailLedger, keys: Iterable<string>): void => {
   for (const key of keys) {
     const entry = ledger.entries[key];

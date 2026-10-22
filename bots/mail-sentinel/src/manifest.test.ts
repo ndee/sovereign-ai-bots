@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { parseArgs } from "./config/args.js";
+import { DEFAULT_LLM_TIMEOUT_MS, DEFAULT_SCAN_BUDGET_MS } from "./constants.js";
 
 type Param = {
   type: "string" | "boolean";
@@ -162,5 +163,29 @@ describe("Mail Sentinel typed tool manifest", () => {
         }
       }
     }
+  });
+});
+
+describe("Mail Sentinel review latency budget", () => {
+  const shipped = JSON.parse(
+    readFileSync(join(import.meta.dirname, "..", "sovereign-bot.json"), "utf8"),
+  ) as {
+    configDefaults: { llmTimeoutMs?: unknown };
+    hostResources: Array<{ id: string; spec: { timeoutStartSec?: number } }>;
+  };
+
+  it("ships a 60 s gateway-side review limit, the same as the runtime default", () => {
+    expect(shipped.configDefaults.llmTimeoutMs).toBe(60_000);
+    expect(DEFAULT_LLM_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("ends the worst-case scan loop by 255 s, leaving at least 45 s of the unit limit", () => {
+    const scanUnit = shipped.hostResources.find((resource) => resource.id === "scan-service");
+    const unitLimitMs = (scanUnit?.spec.timeoutStartSec ?? 0) * 1000;
+    // No review starts after the budget; the last one ends at the client kill,
+    // 15 s after the gateway-side limit.
+    const loopEndMs = DEFAULT_SCAN_BUDGET_MS + DEFAULT_LLM_TIMEOUT_MS + 15_000;
+    expect(loopEndMs).toBeLessThanOrEqual(255_000);
+    expect(unitLimitMs - loopEndMs).toBeGreaterThanOrEqual(45_000);
   });
 });
