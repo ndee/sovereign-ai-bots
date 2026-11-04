@@ -1,3 +1,8 @@
+---
+name: node-operator-core
+description: Node Operator checklist for health checks, atomic node commands, and operator-only Matrix user onboarding.
+---
+
 # node-operator-core
 
 Checklist:

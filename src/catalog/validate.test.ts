@@ -501,6 +501,9 @@ describe("catalog validator", () => {
             source: "workspace/skills/open/SKILL.md",
           }),
           managedFile("missing-doc", "/docs/MISSING.md", { source: "workspace/MISSING.md" }),
+          managedFile("skill-undescribed", "/docs/skills/terse/SKILL.md", {
+            source: "workspace/skills/terse/SKILL.md",
+          }),
           managedFile(
             "opaque-path",
             { join: [{ from: "agent.workspace" }] },
@@ -520,6 +523,11 @@ describe("catalog validator", () => {
       rootDir,
       "bots/docs/workspace/skills/misnamed/SKILL.md",
       "---\nname: other\ndescription:   \n---\n# misnamed\n",
+    );
+    await ensureFile(
+      rootDir,
+      "bots/docs/workspace/skills/terse/SKILL.md",
+      "---\nname: terse\n---\n# terse\n",
     );
     await ensureFile(
       rootDir,
@@ -559,6 +567,7 @@ describe("catalog validator", () => {
       "bots/docs/sovereign-bot.json: hostResources[4] (workspace/skills/bare/SKILL.md) must start with frontmatter naming 'bare' and a description",
       "bots/docs/sovereign-bot.json: hostResources[5] (workspace/skills/misnamed/SKILL.md) must start with frontmatter naming 'misnamed' and a description",
       "bots/docs/sovereign-bot.json: hostResources[6] (workspace/skills/open/SKILL.md) must start with frontmatter naming 'open' and a description",
+      "bots/docs/sovereign-bot.json: hostResources[8] (workspace/skills/terse/SKILL.md) must start with frontmatter naming 'terse' and a description",
     ]);
   });
 

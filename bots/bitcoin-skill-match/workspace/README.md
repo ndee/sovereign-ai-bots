@@ -7,7 +7,7 @@ This agent helps a local Bitcoin community track member profiles, offers, and re
 State model:
 - Canonical state: private and only accessible through `guarded_json_state`
 - Guard policy: `data/community-state.policy.json`
-- Safe mutations go through the guarded JSON state tool documented in `TOOLS.md`
+- Safe mutations go through the guarded JSON state tool documented in `AGENTS.md`
 
 Ownership model:
 - Every human may query all stored entries
