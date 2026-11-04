@@ -1,3 +1,8 @@
+---
+name: mail-sentinel-core
+description: Mail Sentinel checklist for alerts, digests, feedback, policy changes, and mail-check integrity through the mail_sentinel tool.
+---
+
 # mail-sentinel-core
 
 Checklist:

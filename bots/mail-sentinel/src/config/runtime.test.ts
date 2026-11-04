@@ -42,9 +42,12 @@ const {
   createToolUnavailableError,
   describesLlmRoutingRefusal,
   isLlmRoutingRefusedError,
+  isScanAgentMissingError,
   isToolUnavailableError,
   resolveToolExecutable,
   resolveToolRuntime,
+  reviewAttemptsOf,
+  SCAN_AGENT_MISSING_ERROR_CODE,
   TOOL_UNAVAILABLE_ERROR_CODE,
 } = await import("./runtime.js");
 const { setExecFileAsync } = await import("../imap/exec.js");
@@ -93,6 +96,7 @@ const makeRuntimeConfig = (overrides: Record<string, unknown> = {}) => ({
         id: "ms-core",
         config: {
           agentId: "mail-sentinel",
+          scanAgentId: "mail-sentinel-scan",
           imapConfigured: "true",
           imapInstanceId: "ms-imap",
           statePath: "data/state.json",
@@ -907,7 +911,7 @@ describe("config/runtime", () => {
         const [executable, lobsterArgs] = firstCall as [string, readonly string[]];
         expect(executable).toBe("lobster");
         const pipeline = lobsterArgs[0];
-        expect(pipeline).toContain('--session-key "agent:mail-sentinel:main"');
+        expect(pipeline).toContain('--session-key "agent:mail-sentinel-scan:main"');
         expect(pipeline).toContain("--tool llm-task");
         expect(pipeline).toContain("--action json");
         expect(pipeline).toMatch(/^exec --json=true cat "[^"]+\.json" \| clawd\.invoke/);
@@ -915,6 +919,55 @@ describe("config/runtime", () => {
       } finally {
         setExecFileAsync(previous);
       }
+    });
+
+    // A tool config without `scanAgentId` comes from a node that predates the
+    // dedicated scan agent. The chat agent's tool policy has no llm-task, so a
+    // review sent there can only fail, and fail as an unrelated 404.
+    it.each([
+      ["missing", undefined],
+      ["empty", ""],
+      ["blank", "   "],
+      ["not a string", 42],
+    ])("fails loudly without calling the gateway when scanAgentId is %s", async (_label, value) => {
+      const runtime = await loadRuntime({ scanAgentId: value });
+      expect(runtime.scanAgentId).toBeUndefined();
+      const runner = vi.fn().mockResolvedValue({ stdout: "[]", stderr: "" });
+      const previous = setExecFileAsync(runner);
+      try {
+        const failure = (await runtime
+          .classifyCandidate(sampleCandidate)
+          .catch((error: unknown) => error)) as Error & { code?: string };
+        expect(failure).toBeInstanceOf(Error);
+        expect(failure.code).toBe(SCAN_AGENT_MISSING_ERROR_CODE);
+        expect(SCAN_AGENT_MISSING_ERROR_CODE).toBe("MAIL_SENTINEL_SCAN_AGENT_MISSING");
+        expect(isScanAgentMissingError(failure)).toBe(true);
+        expect(failure.message).toContain("MAIL_SENTINEL_SCAN_AGENT_MISSING");
+        expect(failure.message).toContain("'ms-core'");
+        expect(failure.message).toContain("/tmp/config.json5");
+        expect(failure.message).toContain("scanAgentId");
+        expect(reviewAttemptsOf(failure)).toEqual([
+          { reason: "scan-agent-missing", elapsedMs: 0, message: failure.message },
+        ]);
+        expect(runner).not.toHaveBeenCalled();
+        // Mail content never reaches disk for a review that cannot run.
+        expect(mkdtemp).not.toHaveBeenCalled();
+        expect(writeFile).not.toHaveBeenCalled();
+      } finally {
+        setExecFileAsync(previous);
+      }
+    });
+
+    it("keeps loading without a scan agent so chat operations still work", async () => {
+      const runtime = await loadRuntime({ scanAgentId: undefined });
+      expect(runtime.agent.id).toBe("mail-sentinel");
+      expect(runtime.workspaceDir).toBe("/tmp/ms-workspace");
+    });
+
+    it("does not mistake other errors for a missing scan agent", () => {
+      expect(isScanAgentMissingError(new Error("x"))).toBe(false);
+      expect(isScanAgentMissingError(createLlmRoutingRefusedError("refused"))).toBe(false);
+      expect(isScanAgentMissingError("MAIL_SENTINEL_SCAN_AGENT_MISSING")).toBe(false);
     });
 
     it("runs the review in the dedicated scan agent's session when the node names one", async () => {

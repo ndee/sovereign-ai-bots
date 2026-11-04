@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -393,6 +393,8 @@ function validatePackageInvariants(rootDir: string, pkg: ParsedPackage): string[
     errors.push(`${manifestPath}: hostResources source paths must be unique`);
   }
 
+  errors.push(...validateWorkspaceDocuments(manifestPath, pkg));
+
   if (
     pkg.manifest.matrixRouting?.defaultAccount &&
     pkg.manifest.matrixIdentity.mode !== "dedicated-account"
@@ -451,6 +453,73 @@ function validateTypedToolTemplates(manifestPath: string, pkg: ParsedPackage): s
     }
   }
   return errors;
+}
+
+const SKILL_SOURCE_PATTERN = /^workspace\/skills\/([^/]+)\/SKILL\.md$/u;
+const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n/u;
+
+/**
+ * OpenClaw 2026.8 bootstraps an agent from AGENTS.md (with SOUL, IDENTITY,
+ * USER, BOOTSTRAP, MEMORY) and no longer reads TOOLS.md, and it skips a
+ * SKILL.md without `name`/`description` frontmatter. 2026.3 accepts the same
+ * layout, so one catalog serves both.
+ */
+function validateWorkspaceDocuments(manifestPath: string, pkg: ParsedPackage): string[] {
+  const errors: string[] = [];
+  for (const [index, resource] of pkg.manifest.hostResources.entries()) {
+    if (resource.kind !== "managedFile") {
+      continue;
+    }
+    const source = typeof resource.spec.source === "string" ? resource.spec.source : undefined;
+    const target = managedFileTargetName(resource.spec.path);
+    if (target === "TOOLS.md" || (source !== undefined && basename(source) === "TOOLS.md")) {
+      errors.push(
+        `${manifestPath}: hostResources[${index}] must not ship TOOLS.md; OpenClaw 2026.8 no longer loads it`,
+      );
+      continue;
+    }
+    if (source === undefined || extname(source) !== ".md") {
+      continue;
+    }
+    const sourcePath = join(pkg.dir, source);
+    if (!existsSyncLike(sourcePath)) {
+      continue;
+    }
+    const content = readFileSync(sourcePath, "utf8");
+    const label = `${manifestPath}: hostResources[${index}] (${source})`;
+    if (basename(source) === "AGENTS.md" && !content.includes("{{TOOL_SECTION}}")) {
+      errors.push(
+        `${label} must contain {{TOOL_SECTION}}; OpenClaw 2026.8 loads the tool list only from AGENTS.md`,
+      );
+    }
+    if (content.includes("TOOLS.md")) {
+      errors.push(`${label} must not refer to TOOLS.md; the tool list lives in AGENTS.md`);
+    }
+    const skillName = SKILL_SOURCE_PATTERN.exec(source)?.[1];
+    if (skillName !== undefined && !hasSkillFrontmatter(content, skillName)) {
+      errors.push(`${label} must start with frontmatter naming '${skillName}' and a description`);
+    }
+  }
+  return errors;
+}
+
+function managedFileTargetName(path: unknown): string | undefined {
+  if (typeof path === "string") {
+    return basename(path);
+  }
+  const parts = (path as { join?: unknown } | undefined)?.join;
+  const last = Array.isArray(parts) ? parts.at(-1) : undefined;
+  return typeof last === "string" ? basename(last) : undefined;
+}
+
+function hasSkillFrontmatter(content: string, skillName: string): boolean {
+  const frontmatter = FRONTMATTER_PATTERN.exec(content)?.[1];
+  if (frontmatter === undefined) {
+    return false;
+  }
+  const field = (name: string) =>
+    (new RegExp(`^${name}:[ \\t]*(.*)$`, "mu").exec(frontmatter)?.[1] ?? "").trim();
+  return field("name") === skillName && field("description") !== "";
 }
 
 function validateRepoInvariants(packages: readonly ParsedPackage[]): string[] {

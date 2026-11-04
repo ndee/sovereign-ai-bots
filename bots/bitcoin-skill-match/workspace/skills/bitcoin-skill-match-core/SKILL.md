@@ -1,3 +1,8 @@
+---
+name: bitcoin-skill-match-core
+description: Bitcoin Skill Match workflows for profiles, offers, requests, deletes, and match queries through guarded_json_state.
+---
+
 # bitcoin-skill-match-core
 
 Profile and offer workflow:

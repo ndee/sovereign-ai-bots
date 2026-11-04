@@ -110,7 +110,8 @@ export type ReviewFailureReason =
   | "gateway-timeout"
   | "connection"
   | "http"
-  | "invalid-reply";
+  | "invalid-reply"
+  | "scan-agent-missing";
 
 export interface ReviewAttempt {
   reason: ReviewFailureReason;
@@ -148,9 +149,32 @@ const createReviewFailedError = (attempts: readonly ReviewAttempt[]): Error =>
     reviewAttempts: attempts,
   });
 
+/**
+ * The tool config names no `scanAgentId`: it was rendered by a node that
+ * predates the dedicated scan agent. The review is refused instead of falling
+ * back to the chat agent, whose tool policy has no llm-task, so the operator
+ * sees the configuration defect rather than an unrelated gateway 404. It is
+ * still a review failure, so the mail stays queued for a re-review once the
+ * node renders the scan agent.
+ */
+export const SCAN_AGENT_MISSING_ERROR_CODE = "MAIL_SENTINEL_SCAN_AGENT_MISSING";
+
+const createScanAgentMissingError = (instanceId: string, configPath: string): Error => {
+  const message = `${SCAN_AGENT_MISSING_ERROR_CODE}: tool instance '${instanceId}' in ${configPath} names no scanAgentId; the semantic review runs only in the node's dedicated scan agent and is never sent to the chat agent. Re-apply the node configuration so it renders the scan agent.`;
+  return Object.assign(new Error(message), {
+    code: SCAN_AGENT_MISSING_ERROR_CODE,
+    reviewAttempts: [{ reason: "scan-agent-missing", elapsedMs: 0, message }],
+  });
+};
+
+export const isScanAgentMissingError = (error: unknown): boolean =>
+  error instanceof Error && (error as NodeJS.ErrnoException).code === SCAN_AGENT_MISSING_ERROR_CODE;
+
 /** The calls of a failed review, newest last; undefined for any other error. */
 export const reviewAttemptsOf = (error: unknown): readonly ReviewAttempt[] | undefined =>
-  error instanceof Error && (error as NodeJS.ErrnoException).code === LLM_REVIEW_FAILED_ERROR_CODE
+  error instanceof Error &&
+  ((error as NodeJS.ErrnoException).code === LLM_REVIEW_FAILED_ERROR_CODE ||
+    isScanAgentMissingError(error))
     ? (error as Error & { reviewAttempts: readonly ReviewAttempt[] }).reviewAttempts
     : undefined;
 
@@ -277,11 +301,11 @@ export class MailSentinelRuntime {
     : never;
   workspaceDir!: string;
   /**
-   * Agent whose session the semantic review runs in. Nodes that render a
-   * dedicated tool-less scan agent name it in the tool config; elsewhere the
-   * review falls back to the chat agent.
+   * Agent whose session the semantic review runs in: the node's dedicated
+   * scan agent. Undefined when the tool config names none; the review then
+   * fails with `SCAN_AGENT_MISSING_ERROR_CODE`.
    */
-  scanAgentId!: string;
+  scanAgentId: string | undefined;
   statePath!: string;
   rulesPath!: string;
   policyPath!: string;
@@ -338,7 +362,10 @@ export class MailSentinelRuntime {
     this.agent = agent as this["agent"];
     this.tool = tool as this["tool"];
     this.workspaceDir = agent.workspace;
-    this.scanAgentId = (toolConfig.scanAgentId as string | undefined) ?? agentId;
+    this.scanAgentId =
+      typeof toolConfig.scanAgentId === "string" && toolConfig.scanAgentId.trim() !== ""
+        ? toolConfig.scanAgentId
+        : undefined;
     this.statePath = resolveRelativeToBase(
       (toolConfig.statePath as string | undefined) ?? DEFAULT_STATE_PATH,
       this.workspaceDir,
@@ -679,6 +706,9 @@ export class MailSentinelRuntime {
     candidate: LlmCandidate,
     options: ClassifyOptions = {},
   ): Promise<LlmResult> {
+    if (this.scanAgentId === undefined) {
+      throw createScanAgentMissingError(this.instanceId, this.configPath);
+    }
     const args = {
       prompt: buildLlmPrompt(),
       timeoutMs: this.llmTimeoutMs,

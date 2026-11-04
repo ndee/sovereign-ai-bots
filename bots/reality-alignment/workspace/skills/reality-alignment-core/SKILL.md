@@ -1,3 +1,8 @@
+---
+name: reality-alignment-core
+description: Reality Alignment checklist for wishes, check-ins, resistance patterns, next aligned acts, and weekly reviews.
+---
+
 # reality-alignment-core
 
 Working in Frederick Dodson's reality-creation frame: every wish lives at a level; alignment is closing the gap between current and desired state; aligned action is small action matched to the desired state.

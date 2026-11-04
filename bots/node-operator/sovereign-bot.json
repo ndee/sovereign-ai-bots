@@ -63,22 +63,6 @@
       }
     },
     {
-      "id": "workspace-tools",
-      "kind": "managedFile",
-      "spec": {
-        "path": {
-          "join": [
-            {
-              "from": "agent.workspace"
-            },
-            "/TOOLS.md"
-          ]
-        },
-        "source": "workspace/TOOLS.md",
-        "writePolicy": "always"
-      }
-    },
-    {
       "id": "workspace-skill",
       "kind": "managedFile",
       "spec": {

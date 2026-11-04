@@ -1,3 +1,8 @@
+---
+name: project-sentinel-core
+description: Project Sentinel checklist for scans, status, digests, source control, and feedback.
+---
+
 # project-sentinel-core
 
 Checklist:
