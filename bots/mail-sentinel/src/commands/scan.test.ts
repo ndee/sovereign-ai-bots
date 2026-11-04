@@ -1567,7 +1567,8 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     uids: number[],
     runner: Runner,
     readMs: Record<number, number> = {},
-    scanAgentId: string | undefined = "mail-sentinel-scan",
+    // null: a tool config from a node that renders no scan agent.
+    scanAgentId: string | null = "mail-sentinel-scan",
   ): Promise<{
     runtime: ReturnType<typeof setupRuntimeForScan>;
     runner: ReturnType<typeof vi.fn>;
@@ -1597,7 +1598,7 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     };
     const reviewer = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
     reviewer.workspaceDir = await mkdtemp(join(tmpdir(), "ms-scan-review-"));
-    reviewer.scanAgentId = scanAgentId;
+    reviewer.scanAgentId = scanAgentId ?? undefined;
     reviewer.openclawUrl = "http://127.0.0.1:18789";
     reviewer.openclawToken = undefined;
     reviewer.llmTimeoutMs = DEFAULT_LLM_TIMEOUT_MS;
@@ -1666,7 +1667,7 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
   });
 
   it("never sends a review to the chat agent when the node names no scan agent", async () => {
-    const { runtime, runner } = await setup([10, 20, 30], refuseConnection, {}, undefined);
+    const { runtime, runner } = await setup([10, 20, 30], refuseConnection, {}, null);
     const result = await settle(scan({ instance: "ms-core" }));
     expect(runner).not.toHaveBeenCalled();
     expect(result.note).toContain("Semantic review failed for UID 10");
