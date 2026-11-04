@@ -465,6 +465,103 @@ describe("catalog validator", () => {
     ]);
   });
 
+  it("reports workspace document errors that OpenClaw 2026.8 would expose", async () => {
+    const rootDir = await createCatalogRoot();
+    const managedFile = (id: string, path: unknown, spec: Record<string, unknown>) => ({
+      id,
+      kind: "managedFile",
+      spec: { path, ...spec },
+    });
+    const readme = createValidManifest("docs").hostResources[0];
+    await writeCanonicalJson(
+      join(rootDir, "bots", "docs", "sovereign-bot.json"),
+      createValidManifest("docs", {
+        hostResources: [
+          readme,
+          managedFile(
+            "workspace-agents",
+            { join: [{ from: "agent.workspace" }, "/AGENTS.md"] },
+            { source: "workspace/AGENTS.md" },
+          ),
+          managedFile(
+            "workspace-tools",
+            { join: [{ from: "agent.workspace" }, "/TOOLS.md"] },
+            { source: "workspace/TOOLS.md" },
+          ),
+          managedFile("inline-tools", "/docs/TOOLS.md", { inlineContent: "{{TOOL_SECTION}}" }),
+          managedFile(
+            "skill-bare",
+            { join: [{ from: "agent.workspace" }, "/skills/bare/SKILL.md"] },
+            { source: "workspace/skills/bare/SKILL.md" },
+          ),
+          managedFile("skill-misnamed", "/docs/skills/misnamed/SKILL.md", {
+            source: "workspace/skills/misnamed/SKILL.md",
+          }),
+          managedFile("skill-unterminated", "/docs/skills/open/SKILL.md", {
+            source: "workspace/skills/open/SKILL.md",
+          }),
+          managedFile("missing-doc", "/docs/MISSING.md", { source: "workspace/MISSING.md" }),
+          managedFile(
+            "opaque-path",
+            { join: [{ from: "agent.workspace" }] },
+            {
+              inlineContent: "x",
+            },
+          ),
+          managedFile("numeric-path", 7, { inlineContent: "x" }),
+        ],
+      }),
+    );
+    const workspace = join(rootDir, "bots", "docs", "workspace");
+    await writeFile(join(workspace, "AGENTS.md"), "# Docs\n\nUse the tools in TOOLS.md.\n");
+    await writeFile(join(workspace, "TOOLS.md"), "{{TOOL_SECTION}}\n");
+    await ensureFile(rootDir, "bots/docs/workspace/skills/bare/SKILL.md", "# bare\n");
+    await ensureFile(
+      rootDir,
+      "bots/docs/workspace/skills/misnamed/SKILL.md",
+      "---\nname: other\ndescription:   \n---\n# misnamed\n",
+    );
+    await ensureFile(
+      rootDir,
+      "bots/docs/workspace/skills/open/SKILL.md",
+      "---\nname: open\ndescription: Open\n",
+    );
+
+    await writeCanonicalJson(
+      join(rootDir, "bots", "good", "sovereign-bot.json"),
+      createValidManifest("good", {
+        hostResources: [
+          readme,
+          managedFile("workspace-agents", "/good/AGENTS.md", { source: "workspace/AGENTS.md" }),
+          managedFile("skill", "/good/skills/good-core/SKILL.md", {
+            source: "workspace/skills/good-core/SKILL.md",
+          }),
+        ],
+      }),
+    );
+    await writeFile(
+      join(rootDir, "bots", "good", "workspace", "AGENTS.md"),
+      "# Good\n\n{{TOOL_SECTION}}\n",
+    );
+    await ensureFile(
+      rootDir,
+      "bots/good/workspace/skills/good-core/SKILL.md",
+      '---\nname: good-core\ndescription: "Good: core rules"\n---\n# good-core\n',
+    );
+
+    const result = await testCatalog(rootDir);
+    expect(result.errors).toEqual([
+      "bots/docs/sovereign-bot.json: hostResources[7].spec.source 'workspace/MISSING.md' does not exist",
+      "bots/docs/sovereign-bot.json: hostResources[1] (workspace/AGENTS.md) must contain {{TOOL_SECTION}}; OpenClaw 2026.8 loads the tool list only from AGENTS.md",
+      "bots/docs/sovereign-bot.json: hostResources[1] (workspace/AGENTS.md) must not refer to TOOLS.md; the tool list lives in AGENTS.md",
+      "bots/docs/sovereign-bot.json: hostResources[2] must not ship TOOLS.md; OpenClaw 2026.8 no longer loads it",
+      "bots/docs/sovereign-bot.json: hostResources[3] must not ship TOOLS.md; OpenClaw 2026.8 no longer loads it",
+      "bots/docs/sovereign-bot.json: hostResources[4] (workspace/skills/bare/SKILL.md) must start with frontmatter naming 'bare' and a description",
+      "bots/docs/sovereign-bot.json: hostResources[5] (workspace/skills/misnamed/SKILL.md) must start with frontmatter naming 'misnamed' and a description",
+      "bots/docs/sovereign-bot.json: hostResources[6] (workspace/skills/open/SKILL.md) must start with frontmatter naming 'open' and a description",
+    ]);
+  });
+
   it("runs the catalog CLI and reports usage errors", async () => {
     expect(parseCatalogCommand(["lint"])).toBe("lint");
     expect(() => parseCatalogCommand([])).toThrow(

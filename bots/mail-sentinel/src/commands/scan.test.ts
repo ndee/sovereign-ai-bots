@@ -1567,6 +1567,7 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     uids: number[],
     runner: Runner,
     readMs: Record<number, number> = {},
+    scanAgentId: string | undefined = "mail-sentinel-scan",
   ): Promise<{
     runtime: ReturnType<typeof setupRuntimeForScan>;
     runner: ReturnType<typeof vi.fn>;
@@ -1596,7 +1597,7 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     };
     const reviewer = new MailSentinelRuntime("ms-core", "/tmp/config.json5");
     reviewer.workspaceDir = await mkdtemp(join(tmpdir(), "ms-scan-review-"));
-    reviewer.scanAgentId = "mail-sentinel-scan";
+    reviewer.scanAgentId = scanAgentId;
     reviewer.openclawUrl = "http://127.0.0.1:18789";
     reviewer.openclawToken = undefined;
     reviewer.llmTimeoutMs = DEFAULT_LLM_TIMEOUT_MS;
@@ -1661,6 +1662,22 @@ describe("commands/scan > semantic review window, breaker and budget guard", () 
     // They still count as reviewer failures, so the scan degrades.
     expect(runtime.state.lastScanCandidates).toBe(5);
     expect(runtime.state.lastScanLlmFailures).toBe(5);
+    expect(runtime.state.degradationState).toBe("classification-degraded");
+  });
+
+  it("never sends a review to the chat agent when the node names no scan agent", async () => {
+    const { runtime, runner } = await setup([10, 20, 30], refuseConnection, {}, undefined);
+    const result = await settle(scan({ instance: "ms-core" }));
+    expect(runner).not.toHaveBeenCalled();
+    expect(result.note).toContain("Semantic review failed for UID 10");
+    expect(result.note).toContain("MAIL_SENTINEL_SCAN_AGENT_MISSING");
+    // Re-reviewed once the node renders the scan agent, never dropped.
+    for (const uid of [10, 20]) {
+      expect(entry(runtime, uid)).toMatchObject({ state: "deferred", reason: "review-retry" });
+      expect(alertFor(runtime, uid).review).toMatchObject({ lastReason: "scan-agent-missing" });
+    }
+    expect(entry(runtime, 30)).toMatchObject({ state: "deferred", reason: "review-retry" });
+    expect(runtime.state.lastScanLlmFailures).toBe(3);
     expect(runtime.state.degradationState).toBe("classification-degraded");
   });
 
