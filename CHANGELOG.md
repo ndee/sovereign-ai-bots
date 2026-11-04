@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.4.1](https://github.com/ndee/sovereign-ai-bots/compare/v2.4.0...v2.4.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* prepare the bots for OpenClaw 2026.8.x ([#190](https://github.com/ndee/sovereign-ai-bots/issues/190)) ([d2217f0](https://github.com/ndee/sovereign-ai-bots/commit/d2217f0a1473862e04db6aa754b569b85997c266))
+
 ## [2.4.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.3.0...v2.4.0) (2026-10-22)
 
 
