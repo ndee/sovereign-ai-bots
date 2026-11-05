@@ -465,6 +465,90 @@ describe("catalog validator", () => {
     ]);
   });
 
+  it("reports slash commands a node could not answer without the model", async () => {
+    const rootDir = await createCatalogRoot();
+    const read = (name: string, extra: Record<string, unknown> = {}) => ({
+      name,
+      description: name,
+      effect: "read",
+      argv: [name, "--json"],
+      ...extra,
+    });
+    await writeCanonicalJson(
+      join(rootDir, "bots", "slash", "sovereign-bot.json"),
+      createValidManifest("slash", {
+        toolTemplates: [
+          createToolTemplate({
+            openclawTypedTool: {
+              name: "slash_tool",
+              description: "Slash",
+              script: "workspace/README.md",
+              operations: [
+                read("version", { slashCommand: "version" }),
+                read("about", { slashCommand: "version" }),
+                read("status", { slashCommand: "status" }),
+                read("confirmed", { slashCommand: "confirm" }),
+                read("shout", { slashCommand: "Shout-Now" }),
+                read("lookup", {
+                  slashCommand: "lookup",
+                  params: {
+                    query: { type: "string", description: "Query", argv: ["--query", "{value}"] },
+                  },
+                }),
+                {
+                  name: "apply",
+                  description: "Apply",
+                  effect: "change",
+                  argv: ["apply", "<tool-instance-id>"],
+                  slashCommand: "apply",
+                },
+              ],
+            },
+          }),
+        ],
+      }),
+    );
+
+    const result = await testCatalog(rootDir);
+    expect(result.errors).toEqual([
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool slash commands must use unique names",
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'status' slash command 'status' is reserved by the runtime",
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'confirmed' slash command 'confirm' is reserved by the runtime",
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'shout' slash command 'Shout-Now' must match ^[a-z][a-z0-9_]{0,31}$",
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'lookup' slash command must take no parameters",
+      "bots/slash/sovereign-bot.json: toolTemplates[0].openclawTypedTool operation 'apply' slash command must be a read operation",
+    ]);
+  });
+
+  it("accepts a slash command on a parameterless read operation", async () => {
+    const rootDir = await createCatalogRoot();
+    await writeCanonicalJson(
+      join(rootDir, "bots", "slash", "sovereign-bot.json"),
+      createValidManifest("slash", {
+        toolTemplates: [
+          createToolTemplate({
+            openclawTypedTool: {
+              name: "slash_tool",
+              description: "Slash",
+              script: "workspace/README.md",
+              operations: [
+                {
+                  name: "version",
+                  description: "Version",
+                  effect: "read",
+                  argv: ["version", "--json"],
+                  slashCommand: "version",
+                },
+              ],
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect((await testCatalog(rootDir)).errors).toEqual([]);
+  });
+
   it("reports workspace document errors that OpenClaw 2026.8 would expose", async () => {
     const rootDir = await createCatalogRoot();
     const managedFile = (id: string, path: unknown, spec: Record<string, unknown>) => ({

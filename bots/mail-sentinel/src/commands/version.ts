@@ -28,20 +28,29 @@ export interface VersionCommandResult {
   readonly reportedAt: string;
   /** False when any build field is `unknown` — surfaced, never hidden. */
   readonly identityComplete: boolean;
+  /**
+   * The chat rendering of the fields above. A node that answers `/version`
+   * without the model replies with this note, so the reply is the build the
+   * process reports, verbatim.
+   */
+  readonly note: string;
 }
 
 export const version = (
   now: Date = new Date(),
   info: BuildInfo = getBuildInfo(),
-): VersionCommandResult => ({
-  component: info.component,
-  version: info.version,
-  commit: info.commit,
-  releaseId: info.releaseId,
-  buildTimestamp: info.buildTimestamp,
-  reportedAt: now.toISOString(),
-  identityComplete: isBuildIdentityComplete(info),
-});
+): VersionCommandResult => {
+  const fields = {
+    component: info.component,
+    version: info.version,
+    commit: info.commit,
+    releaseId: info.releaseId,
+    buildTimestamp: info.buildTimestamp,
+    reportedAt: now.toISOString(),
+    identityComplete: isBuildIdentityComplete(info),
+  };
+  return { ...fields, note: formatVersionResult(fields) };
+};
 
 /** `2026-07-25 14:32 UTC` — matches the project's UTC-everywhere convention. */
 const formatUtcMinute = (iso: string): string => {
@@ -62,7 +71,7 @@ const formatUtcMinute = (iso: string): string => {
  * deliberately reports when this answer was produced rather than a process
  * uptime or a "running" claim, either of which would be fabricated.
  */
-export const formatVersionResult = (result: VersionCommandResult): string => {
+export const formatVersionResult = (result: Omit<VersionCommandResult, "note">): string => {
   const lines = [
     `Mail Sentinel ${result.version}`,
     `Release: ${result.releaseId}`,

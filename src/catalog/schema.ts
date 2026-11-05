@@ -60,6 +60,7 @@ const typedToolOperationSchema = z
       ])
       .optional(),
     confirmPreviewArgv: z.array(nonEmptyStringSchema).min(1).optional(),
+    slashCommand: z.string().optional(),
   })
   .passthrough();
 const typedToolSchema = z
