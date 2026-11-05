@@ -194,6 +194,62 @@ describe("commands/explain explainAlert", () => {
     expect(result.candidates.map((c) => c.subject)).toEqual(["One", "Two"]);
   });
 
+  it("resolves the short ref shown in the room when it is passed as alertId", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(
+      alert({ alertId: "abcdef00-0000-0000-0000-000000000000", shortRef: "abcdef" }),
+    );
+    const result = await explainAlert({ instance: "ms-core", alertId: "abcdef" });
+    if (isAmbiguousExplain(result)) {
+      throw new Error("expected a resolved explanation");
+    }
+    expect(result.alertId).toBe("abcdef00-0000-0000-0000-000000000000");
+  });
+
+  it("returns candidates when an alertId prefix matches several short refs", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(
+      alert({
+        alertId: "aa000000-0000-0000-0000-000000000000",
+        shortRef: "aa0000",
+        subject: "One",
+      }),
+      alert({
+        alertId: "aa111111-0000-0000-0000-000000000000",
+        shortRef: "aa1111",
+        subject: "Two",
+      }),
+    );
+    const result = await explainAlert({ instance: "ms-core", alertId: "aa" });
+    if (!isAmbiguousExplain(result)) {
+      throw new Error("expected an ambiguous result");
+    }
+    expect(result.ref).toBe("aa");
+    expect(result.candidates.map((c) => c.shortRef)).toEqual(["aa0000", "aa1111"]);
+  });
+
+  it("never matches an alertId against the subject or the sender", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(alert({ subject: "Invoice overdue" }));
+    await expect(explainAlert({ instance: "ms-core", alertId: "Invoice" })).rejects.toThrow(
+      "No matching Mail Sentinel alert was found",
+    );
+    await expect(explainAlert({ instance: "ms-core", alertId: "billing" })).rejects.toThrow(
+      "No matching Mail Sentinel alert was found",
+    );
+  });
+
+  it("carries the zone and category display labels", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts.push(alert({ zone: "amber", category: "financial-relevance" }));
+    const result = await explainAlert({ instance: "ms-core", latest: true });
+    if (isAmbiguousExplain(result)) {
+      throw new Error("expected a resolved explanation");
+    }
+    expect(result.decision.zoneLabel).toBe("AMBER");
+    expect(result.decision.categoryLabel).toBe("Financial Relevance");
+  });
+
   it("throws when a --ref matches nothing in any modality", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts.push(alert());

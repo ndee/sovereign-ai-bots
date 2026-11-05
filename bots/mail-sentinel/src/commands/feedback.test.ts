@@ -442,6 +442,50 @@ describe("commands/feedback", () => {
       expect(runtime.state.feedback).toHaveLength(0);
     });
 
+    it("resolves the short ref shown in the room when it is passed as alertId", async () => {
+      const runtime = getFakeRuntime();
+      runtime.state.alerts = [
+        baseAlert({ alertId: "a1b2c3d4-0000-0000-0000-000000000000", shortRef: "a1b2c3" }),
+      ];
+      const result = applied(
+        await applyFeedback({ instance: "ms-core", alertId: "a1b2c3", action: "important" }),
+      );
+      expect(result.alertId).toBe("a1b2c3d4-0000-0000-0000-000000000000");
+      expect(runtime.state.alerts[0]?.feedbackState).toBe("important");
+    });
+
+    it("returns candidates and writes nothing for an ambiguous alertId prefix", async () => {
+      const runtime = getFakeRuntime();
+      runtime.state.alerts = [
+        baseAlert({ alertId: "a1b2c3d4-0000-0000-0000-000000000000", shortRef: "a1b2c3" }),
+        baseAlert({ alertId: "a1b2ffff-0000-0000-0000-000000000000", shortRef: "a1b2ff" }),
+      ];
+      const result = await applyFeedback({
+        instance: "ms-core",
+        alertId: "a1b2",
+        action: "important",
+      });
+      if (!isAmbiguousFeedback(result)) {
+        throw new Error("expected an ambiguous result");
+      }
+      expect(result.changed).toBe(false);
+      expect(result.ref).toBe("a1b2");
+      expect(result.candidates.map((c) => c.shortRef)).toEqual(["a1b2c3", "a1b2ff"]);
+      expect(runtime.state.alerts.every((a) => a.feedbackState === "pending")).toBe(true);
+      expect(runtime.state.feedback).toHaveLength(0);
+    });
+
+    it("never matches an alertId against the subject or the sender", async () => {
+      const runtime = getFakeRuntime();
+      runtime.state.alerts = [baseAlert({ subject: "Invoice overdue", shortRef: "aaaaaa" })];
+      for (const alertId of ["Invoice", "alice"]) {
+        await expect(
+          applyFeedback({ instance: "ms-core", alertId, action: "important" }),
+        ).rejects.toThrow("No matching Mail Sentinel alert was found");
+      }
+      expect(runtime.state.feedback).toHaveLength(0);
+    });
+
     it("throws no-match when a ref resolves to nothing", async () => {
       const runtime = getFakeRuntime();
       runtime.state.alerts = [baseAlert({ shortRef: "aaaaaa" })];

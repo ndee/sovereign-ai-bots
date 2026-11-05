@@ -123,7 +123,17 @@ describe("Mail Sentinel typed tool manifest", () => {
       "reduce",
       "digest-only",
     ]);
-    expect(operation("feedback").exactlyOneOf).toEqual([["alertId", "latest"]]);
+    expect(operation("feedback").exactlyOneOf).toEqual([["alertId", "latest", "ref"]]);
+  });
+
+  it("lets feedback and explain take the short reference shown in the room", () => {
+    for (const name of ["feedback", "explain"]) {
+      const params = operation(name).params ?? {};
+      expect(params.alertId?.description).toBe("Alert id or the short reference shown in the room");
+      expect(new RegExp(params.alertId?.pattern ?? "", "u").test("[a1b2c3]")).toBe(true);
+      expect(params.ref?.argv).toEqual(["--ref", "{value}"]);
+      expect(params.ref?.maxLength).toBe(64);
+    }
   });
 
   it("bounds the reminder delay", () => {
