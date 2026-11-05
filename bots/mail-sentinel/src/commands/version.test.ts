@@ -25,7 +25,22 @@ describe("commands/version", () => {
       buildTimestamp: "2026-07-25T09:15:00.000Z",
       reportedAt: "2026-07-25T14:32:09.000Z",
       identityComplete: true,
+      note: [
+        "Mail Sentinel 2.0.4-test.1",
+        "Release: 2.9.2-test",
+        "Commit: a1b2c3d",
+        "Built: 2026-07-25 09:15 UTC",
+        "Reported: 2026-07-25 14:32 UTC",
+      ].join("\n"),
     });
+  });
+
+  // A reply relayed without the model carries the JSON `note`, so it must be
+  // the same text the CLI prints and never drift from the build fields.
+  it("carries the calm rendering as its note", () => {
+    const result = version(NOW, makeInfo({ releaseId: UNKNOWN_BUILD_VALUE }));
+    expect(result.note).toBe(formatVersionResult(result));
+    expect(result.note).toContain("Build identity is incomplete");
   });
 
   it("flags incomplete identity instead of hiding missing metadata", () => {
@@ -47,6 +62,7 @@ describe("commands/version", () => {
       "commit",
       "component",
       "identityComplete",
+      "note",
       "releaseId",
       "reportedAt",
       "version",

@@ -83,7 +83,8 @@
             "argv": [
               "version",
               "--json"
-            ]
+            ],
+            "slashCommand": "version"
           },
           {
             "name": "status",

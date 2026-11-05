@@ -24,6 +24,11 @@ available from chat; it runs on its timer.
   `digest-only` and removing a policy) are only recorded at first. The bot shows
   what would change and a code; the change applies after the operator sends
   `/confirm <code>` within 15 minutes.
+- The `version` operation declares the slash command `/version`. A node that
+  supports typed-tool slash commands answers it straight from the operation's
+  `note`, without the chat model, so the reply is the running build even when
+  the chat model is unavailable. On other nodes, `version` is still reachable
+  through the chat model.
 
 ## Outcome ledger: was every message checked?
 

@@ -439,6 +439,7 @@ function validateTypedToolTemplates(manifestPath: string, pkg: ParsedPackage): s
           );
         }
       }
+      errors.push(...validateSlashCommands(`${at}.openclawTypedTool`, typedTool.operations));
     }
     const loadedPlugins = new Set([
       ...template.openclawPlugins,
@@ -450,6 +451,113 @@ function validateTypedToolTemplates(manifestPath: string, pkg: ParsedPackage): s
           `${at}.openclawScanAgent tool '${toolName}' must come from a plugin the template enables`,
         );
       }
+    }
+  }
+  return errors;
+}
+
+const SLASH_COMMAND_PATTERN = /^[a-z][a-z0-9_]{0,31}$/u;
+
+// Built-in chat commands of the OpenClaw runtimes nodes run (2026.3 and 2026.8,
+// names and text aliases) plus the node's own `/confirm`. A slash command with
+// one of these names would be shadowed or renamed by the runtime.
+const RESERVED_SLASH_COMMANDS: ReadonlySet<string> = new Set([
+  "acp",
+  "activation",
+  "agents",
+  "allowlist",
+  "approve",
+  "bash",
+  "btw",
+  "commands",
+  "compact",
+  "config",
+  "confirm",
+  "context",
+  "debug",
+  "diagnostics",
+  "elev",
+  "elevated",
+  "exec",
+  "export",
+  "fast",
+  "focus",
+  "goal",
+  "help",
+  "id",
+  "kill",
+  "learn",
+  "login",
+  "loop",
+  "mcp",
+  "model",
+  "models",
+  "name",
+  "new",
+  "openclaw",
+  "plugin",
+  "plugins",
+  "queue",
+  "reason",
+  "reasoning",
+  "reset",
+  "restart",
+  "send",
+  "session",
+  "side",
+  "skill",
+  "status",
+  "steer",
+  "stop",
+  "subagents",
+  "t",
+  "tasks",
+  "tell",
+  "think",
+  "thinking",
+  "tools",
+  "trace",
+  "trajectory",
+  "tts",
+  "unfocus",
+  "usage",
+  "v",
+  "verbose",
+  "whoami",
+]);
+
+type SlashCommandOperation = {
+  name: string;
+  effect: "read" | "change";
+  params?: Record<string, unknown> | undefined;
+  slashCommand?: string | undefined;
+};
+
+/**
+ * A slash command is answered by the node without the chat model, from the
+ * operation's own output. That is only sound for a read that needs nothing
+ * from the user: the runtime passes the command's free text, not typed params.
+ */
+function validateSlashCommands(at: string, operations: readonly SlashCommandOperation[]): string[] {
+  const errors: string[] = [];
+  const declared = operations.flatMap((operation) =>
+    operation.slashCommand === undefined ? [] : [{ operation, command: operation.slashCommand }],
+  );
+  if (!hasUniqueValues(declared.map((entry) => entry.command))) {
+    errors.push(`${at} slash commands must use unique names`);
+  }
+  for (const { operation, command } of declared) {
+    const label = `${at} operation '${operation.name}' slash command`;
+    if (!SLASH_COMMAND_PATTERN.test(command)) {
+      errors.push(`${label} '${command}' must match ${SLASH_COMMAND_PATTERN.source}`);
+    } else if (RESERVED_SLASH_COMMANDS.has(command)) {
+      errors.push(`${label} '${command}' is reserved by the runtime`);
+    }
+    if (Object.keys(operation.params ?? {}).length > 0) {
+      errors.push(`${label} must take no parameters`);
+    }
+    if (operation.effect !== "read") {
+      errors.push(`${label} must be a read operation`);
     }
   }
   return errors;
