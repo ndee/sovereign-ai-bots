@@ -60,6 +60,28 @@ describe("commands/list-alerts", () => {
     expect(result.alerts[0]?.alertId).toBe("today-1");
   });
 
+  it("carries the zone and category display labels for each alert", async () => {
+    const runtime = getFakeRuntime();
+    runtime.state.alerts = [
+      {
+        alertId: "today-1",
+        zone: "red",
+        category: "risk-escalation",
+        subject: "today",
+        from: "a@b",
+        why: "why",
+        sentAt: "2026-04-08T09:00:00.000Z",
+      },
+    ];
+    const result = await listAlerts({ instance: "ms-core", view: "today" });
+    expect(result.alerts[0]).toMatchObject({
+      zone: "red",
+      zoneLabel: "RED",
+      category: "risk-escalation",
+      categoryLabel: "Risk / Escalation",
+    });
+  });
+
   it("returns all non-gray alerts in the 'recent' view", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts = [

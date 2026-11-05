@@ -2,6 +2,7 @@ import { alertShortRef } from "../alerts/format.js";
 import { scoreSenderCandidate } from "../policy/sender.js";
 import type { MailSentinelState, StoredAlert } from "../types.js";
 import { compactText, normalizeThreadSubject } from "../util/normalize.js";
+import { sortAlertsNewestFirst } from "../util/time.js";
 
 /** A disambiguation candidate — the minimum a user needs to pick the right item. */
 export interface AlertTargetCandidate {
@@ -127,4 +128,58 @@ export const resolveAlertTarget = (
     }
   }
   return { status: "none" };
+};
+
+/**
+ * Resolve a value the caller passed as an alert id: the full `alertId` or a
+ * unique `shortRef` prefix, nothing looser. Chat models copy the short handle
+ * the room shows into the id field, so it must resolve there — but a value
+ * meant as an id must never land on an alert by subject, sender or position.
+ */
+export const resolveAlertIdOrShortRef = (
+  state: MailSentinelState,
+  ref: string,
+): ResolveAlertTargetResult => {
+  const normalized = normalizeRef(ref);
+  if (normalized.length === 0) {
+    return { status: "none" };
+  }
+  return (
+    decide(matchByAlertId(state, normalized)) ??
+    decide(matchByShortRef(state, normalized)) ?? { status: "none" }
+  );
+};
+
+export type SelectAlertResult =
+  | { status: "ok"; alert: StoredAlert }
+  | { status: "ambiguous"; ref: string; candidates: AlertTargetCandidate[] }
+  | { status: "none" };
+
+/**
+ * The selector shared by the single-alert commands, in precedence order: an
+ * `alertId` (full id or unique short ref), then `latest`, then a free-form
+ * `ref` through the full {@link resolveAlertTarget} resolver. An ambiguous
+ * match echoes the value the caller passed so it can re-prompt.
+ */
+export const selectAlert = (
+  state: MailSentinelState,
+  options: { alertId?: string | undefined; latest?: boolean | undefined; ref?: string | undefined },
+): SelectAlertResult => {
+  let asked: string;
+  let resolution: ResolveAlertTargetResult;
+  if (typeof options.alertId === "string") {
+    asked = options.alertId;
+    resolution = resolveAlertIdOrShortRef(state, asked);
+  } else if (options.latest === true) {
+    const newest = sortAlertsNewestFirst(state.alerts)[0];
+    return newest === undefined ? { status: "none" } : { status: "ok", alert: newest };
+  } else if (typeof options.ref === "string") {
+    asked = options.ref;
+    resolution = resolveAlertTarget(state, asked);
+  } else {
+    return { status: "none" };
+  }
+  return resolution.status === "ambiguous"
+    ? { status: "ambiguous", ref: asked, candidates: resolution.candidates }
+    : resolution;
 };

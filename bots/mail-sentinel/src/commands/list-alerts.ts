@@ -1,4 +1,4 @@
-import { mapAlertToSummary } from "../alerts/format.js";
+import { categoryLabel, mapAlertToSummary, zoneLabel } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import type { AlertSummary, CommandOptions } from "../types.js";
 import { clampLimit, isSameLocalDay, sortAlertsNewestFirst } from "../util/time.js";
@@ -7,7 +7,13 @@ export interface ListAlertsCommandResult {
   instanceId: string;
   view: "today" | "recent" | string;
   count: number;
-  alerts: AlertSummary[];
+  alerts: ListedAlert[];
+}
+
+/** A listed alert plus the display labels replies copy instead of deriving. */
+export interface ListedAlert extends AlertSummary {
+  zoneLabel: string;
+  categoryLabel: string;
 }
 
 export const listAlerts = async (
@@ -23,7 +29,11 @@ export const listAlerts = async (
     .filter((alert) => alert.zone !== "gray")
     .filter((alert) => options.view === "recent" || isSameLocalDay(alert.sentAt, new Date()))
     .slice(0, limit)
-    .map((alert) => mapAlertToSummary(alert));
+    .map((alert) => ({
+      ...mapAlertToSummary(alert),
+      zoneLabel: zoneLabel(alert.zone),
+      categoryLabel: categoryLabel(alert.category),
+    }));
   return {
     instanceId: runtime.instanceId,
     view: options.view ?? "today",

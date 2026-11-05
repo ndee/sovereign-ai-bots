@@ -8,6 +8,7 @@ import { DEFAULT_LLM_TIMEOUT_MS, DEFAULT_SCAN_BUDGET_MS } from "./constants.js";
 
 type Param = {
   type: "string" | "boolean";
+  description?: string;
   enum?: string[];
   pattern?: string;
   maxLength?: number;
@@ -123,7 +124,17 @@ describe("Mail Sentinel typed tool manifest", () => {
       "reduce",
       "digest-only",
     ]);
-    expect(operation("feedback").exactlyOneOf).toEqual([["alertId", "latest"]]);
+    expect(operation("feedback").exactlyOneOf).toEqual([["alertId", "latest", "ref"]]);
+  });
+
+  it("lets feedback and explain take the short reference shown in the room", () => {
+    for (const name of ["feedback", "explain"]) {
+      const params = operation(name).params ?? {};
+      expect(params.alertId?.description).toBe("Alert id or the short reference shown in the room");
+      expect(new RegExp(params.alertId?.pattern ?? "", "u").test("[a1b2c3]")).toBe(true);
+      expect(params.ref?.argv).toEqual(["--ref", "{value}"]);
+      expect(params.ref?.maxLength).toBe(64);
+    }
   });
 
   it("bounds the reminder delay", () => {
@@ -187,5 +198,23 @@ describe("Mail Sentinel review latency budget", () => {
     const loopEndMs = DEFAULT_SCAN_BUDGET_MS + DEFAULT_LLM_TIMEOUT_MS + 15_000;
     expect(loopEndMs).toBeLessThanOrEqual(255_000);
     expect(unitLimitMs - loopEndMs).toBeGreaterThanOrEqual(45_000);
+  });
+});
+
+describe("Mail Sentinel chat skill", () => {
+  const skill = readFileSync(
+    join(import.meta.dirname, "..", "workspace", "skills", "mail-sentinel-core", "SKILL.md"),
+    "utf8",
+  );
+
+  it("tells the model to copy zone and category labels from the tool", () => {
+    expect(skill).toContain("`zoneLabel` and `categoryLabel`");
+  });
+
+  it("answers an unknown or out-of-scope request with one line pointing to help", () => {
+    expect(skill).toContain(
+      'An unknown or out-of-scope request gets one line: "I can help with alerts, digest, feedback and policy — send `help`."',
+    );
+    expect(skill).toContain("Never answer it with `NO_REPLY` or nothing.");
   });
 });

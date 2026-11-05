@@ -6,10 +6,12 @@ import { formatLocalDateTime } from "../util/time.js";
 import {
   buildDigestMessage,
   buildRedAlertMessage,
+  categoryLabel,
   cleanSubjectForDisplay,
   formatAlertLine,
   formatSenderDisplay,
   mapAlertToSummary,
+  zoneLabel,
 } from "./format.js";
 
 describe("alerts/format", () => {
@@ -493,5 +495,17 @@ describe("alerts/format > review status", () => {
       `<strong>Checked again:</strong> first seen ${firstSeen}, while the AI reviewer was unavailable.`,
     );
     expect(message.formattedBody).toContain("RED · Financial Relevance · late");
+  });
+});
+
+describe("alerts/format display labels", () => {
+  it("maps known categories to their label and passes unknown ones through", () => {
+    expect(categoryLabel("decision-required")).toBe("Decision Required");
+    expect(categoryLabel("something-new")).toBe("something-new");
+  });
+
+  it("upper-cases the zone and treats a missing zone as red", () => {
+    expect(zoneLabel("amber")).toBe("AMBER");
+    expect(zoneLabel(undefined)).toBe("RED");
   });
 });

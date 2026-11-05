@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultState } from "../state/schema.js";
 import type { MailSentinelState, StoredAlert } from "../types.js";
-import { resolveAlertTarget } from "./resolve.js";
+import { resolveAlertIdOrShortRef, resolveAlertTarget } from "./resolve.js";
 
 const alert = (overrides: Partial<StoredAlert> = {}): StoredAlert => ({
   alertId: "11111111-1111-1111-1111-111111111111",
@@ -260,5 +260,38 @@ describe("commands/resolve resolveAlertTarget", () => {
       status: "ok",
       alert: expect.objectContaining({ subject: "Has addr" }),
     });
+  });
+});
+
+describe("commands/resolve resolveAlertIdOrShortRef", () => {
+  it("resolves a full alertId and a unique short-ref prefix, stripping brackets", () => {
+    const state = stateWith([alert()]);
+    expect(resolveAlertIdOrShortRef(state, "11111111-1111-1111-1111-111111111111")).toEqual({
+      status: "ok",
+      alert: expect.objectContaining({ shortRef: "111111" }),
+    });
+    expect(resolveAlertIdOrShortRef(state, "[111111]").status).toBe("ok");
+  });
+
+  it("returns ambiguous for a short-ref prefix shared by several alerts", () => {
+    const state = stateWith([
+      alert({ alertId: "aa000000-0000-0000-0000-000000000000", shortRef: "aa0000" }),
+      alert({ alertId: "aa111111-0000-0000-0000-000000000000", shortRef: "aa1111" }),
+    ]);
+    const result = resolveAlertIdOrShortRef(state, "aa00");
+    expect(result.status).toBe("ok");
+    const ambiguous = resolveAlertIdOrShortRef(state, "aa");
+    expect(ambiguous.status).toBe("ambiguous");
+  });
+
+  it("never matches by position, subject or sender", () => {
+    const state = stateWith(
+      [alert({ alertId: "abcdef00-0000-0000-0000-000000000000", shortRef: "abcdef" })],
+      ["abcdef00-0000-0000-0000-000000000000"],
+    );
+    expect(resolveAlertIdOrShortRef(state, "1").status).toBe("none");
+    expect(resolveAlertIdOrShortRef(state, "Invoice").status).toBe("none");
+    expect(resolveAlertIdOrShortRef(state, "billing").status).toBe("none");
+    expect(resolveAlertIdOrShortRef(state, " [] ").status).toBe("none");
   });
 });

@@ -1,8 +1,7 @@
-import { alertShortRef } from "../alerts/format.js";
+import { alertShortRef, categoryLabel, zoneLabel } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import type { CommandOptions, LlmResult, ReviewRetryStatus, StoredAlert, Zone } from "../types.js";
-import { sortAlertsNewestFirst } from "../util/time.js";
-import { type AlertTargetCandidate, resolveAlertTarget } from "./resolve.js";
+import { type AlertTargetCandidate, selectAlert } from "./resolve.js";
 
 /**
  * The heuristic + policy half of the explanation: everything the deterministic
@@ -40,7 +39,11 @@ export interface SemanticExplanation {
 /** The final routing outcome the operator sees: zone, category, confidence. */
 export interface ZoneDecisionExplanation {
   zone: Zone;
+  /** Display label for `zone`; replies copy it instead of deriving their own. */
+  zoneLabel: string;
   category: string;
+  /** Display label for `category`; replies copy it instead of deriving their own. */
+  categoryLabel: string;
   confidence?: number | undefined;
   /** The user-facing one-liner shown on the alert itself (`alert.why`). */
   why: string;
@@ -110,7 +113,9 @@ const explainAlertEntry = (instanceId: string, alert: StoredAlert): ExplainComma
   },
   decision: {
     zone: alert.zone,
+    zoneLabel: zoneLabel(alert.zone),
     category: alert.category,
+    categoryLabel: categoryLabel(alert.category),
     ...(typeof alert.confidence === "number" ? { confidence: alert.confidence } : {}),
     why: alert.why,
   },
@@ -131,11 +136,9 @@ const explainAlertEntry = (instanceId: string, alert: StoredAlert): ExplainComma
  * modifiers, the semantic reviewer's verdict, and the final routing decision.
  * Read-only — never mutates state.
  *
- * Selection precedence mirrors {@link applyFeedback}: an explicit `--alert-id`,
- * then `--latest`, then a free-form `--ref` routed through the central
- * {@link resolveAlertTarget} resolver. The resolver is the single seam that can
- * report ambiguity (and the one that also lets a digest item be addressed by
- * its position), so explain works for both alerts and digest entries.
+ * Selection is {@link selectAlert}, shared with {@link applyFeedback}: a
+ * free-form `--ref` can also address a digest item by its position, so explain
+ * works for both alerts and digest entries.
  */
 export const explainAlert = async (
   options: Pick<CommandOptions, "instance" | "configPath" | "alertId" | "ref" | "latest">,
@@ -145,27 +148,17 @@ export const explainAlert = async (
   }
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   const state = await runtime.readState();
-  let alert: StoredAlert | undefined;
-  if (typeof options.alertId === "string") {
-    alert = state.alerts.find((entry) => entry.alertId === options.alertId);
-  } else if (options.latest === true) {
-    alert = sortAlertsNewestFirst(state.alerts)[0];
-  } else if (typeof options.ref === "string") {
-    const resolution = resolveAlertTarget(state, options.ref);
-    if (resolution.status === "ambiguous") {
-      return {
-        instanceId: runtime.instanceId,
-        status: "ambiguous" as const,
-        ref: options.ref,
-        candidates: resolution.candidates,
-      };
-    }
-    if (resolution.status === "ok") {
-      alert = resolution.alert;
-    }
+  const selection = selectAlert(state, options);
+  if (selection.status === "ambiguous") {
+    return {
+      instanceId: runtime.instanceId,
+      status: "ambiguous" as const,
+      ref: selection.ref,
+      candidates: selection.candidates,
+    };
   }
-  if (alert === undefined) {
+  if (selection.status === "none") {
     throw new Error("No matching Mail Sentinel alert was found");
   }
-  return explainAlertEntry(runtime.instanceId, alert);
+  return explainAlertEntry(runtime.instanceId, selection.alert);
 };
