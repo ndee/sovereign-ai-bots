@@ -200,3 +200,21 @@ describe("Mail Sentinel review latency budget", () => {
     expect(unitLimitMs - loopEndMs).toBeGreaterThanOrEqual(45_000);
   });
 });
+
+describe("Mail Sentinel chat skill", () => {
+  const skill = readFileSync(
+    join(import.meta.dirname, "..", "workspace", "skills", "mail-sentinel-core", "SKILL.md"),
+    "utf8",
+  );
+
+  it("tells the model to copy zone and category labels from the tool", () => {
+    expect(skill).toContain("`zoneLabel` and `categoryLabel`");
+  });
+
+  it("answers an unknown or out-of-scope request with one line pointing to help", () => {
+    expect(skill).toContain(
+      'An unknown or out-of-scope request gets one line: "I can help with alerts, digest, feedback and policy — send `help`."',
+    );
+    expect(skill).toContain("Never answer it with `NO_REPLY` or nothing.");
+  });
+});
