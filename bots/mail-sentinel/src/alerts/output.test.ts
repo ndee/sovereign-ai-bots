@@ -492,7 +492,9 @@ describe("alerts/output formatExplainResult", () => {
     },
     decision: {
       zone: "red",
+      zoneLabel: "RED",
       category: "financial-relevance",
+      categoryLabel: "Financial Relevance",
       confidence: 82,
       why: "Payment failure may lock the account within 48 hours.",
     },
@@ -535,7 +537,9 @@ describe("alerts/output formatExplainResult", () => {
         semantic: { available: false },
         decision: {
           zone: "amber",
+          zoneLabel: "AMBER",
           category: "decision-required",
+          categoryLabel: "Decision Required",
           why: "Flagged by Mail Sentinel.",
         },
       }),
@@ -671,7 +675,13 @@ describe("alerts/output formatExplainResult", () => {
       const text = formatExplainResult(
         fullExplanation({
           semantic: unavailable,
-          decision: { zone: "amber", category: "financial-relevance", why: "x" },
+          decision: {
+            zone: "amber",
+            zoneLabel: "AMBER",
+            category: "financial-relevance",
+            categoryLabel: "Financial Relevance",
+            why: "x",
+          },
           review: { status: "retrying", attempts: 2, lastReason: "timeout" },
         }),
       );

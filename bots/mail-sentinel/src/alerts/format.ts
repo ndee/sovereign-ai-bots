@@ -60,9 +60,9 @@ const pendingReviewLabel = (alert: Pick<StoredAlert, "review">): string | undefi
 const DIGEST_SUBJECT_MAX = 120;
 export const DIGEST_VISIBLE_LIMIT = 10;
 
-const categoryLabel = (category: string): string => CATEGORY_LABELS[category] ?? category;
+export const categoryLabel = (category: string): string => CATEGORY_LABELS[category] ?? category;
 
-const zoneLabel = (zone: unknown): string => String(zone ?? "red").toUpperCase();
+export const zoneLabel = (zone: unknown): string => String(zone ?? "red").toUpperCase();
 
 const DEFAULT_ZONE_EMOJI = "🔴";
 

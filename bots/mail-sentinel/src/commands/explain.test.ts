@@ -89,7 +89,9 @@ describe("commands/explain explainAlert", () => {
     expect(result.semantic).toEqual({ available: true, result: llm() });
     expect(result.decision).toEqual({
       zone: "red",
+      zoneLabel: "RED",
       category: "financial-relevance",
+      categoryLabel: "Financial Relevance",
       confidence: 82,
       why: "Payment failure may lock the account within 48 hours.",
     });
@@ -297,7 +299,9 @@ describe("commands/explain explainAlert", () => {
     expect(result.semantic).toEqual({ available: false });
     expect(result.decision).toEqual({
       zone: "amber",
+      zoneLabel: "AMBER",
       category: "decision-required",
+      categoryLabel: "Decision Required",
       why: "Flagged by Mail Sentinel.",
     });
   });

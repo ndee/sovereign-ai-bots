@@ -1,4 +1,4 @@
-import { alertShortRef } from "../alerts/format.js";
+import { alertShortRef, categoryLabel, zoneLabel } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
 import type { CommandOptions, LlmResult, ReviewRetryStatus, StoredAlert, Zone } from "../types.js";
 import { type AlertTargetCandidate, selectAlert } from "./resolve.js";
@@ -39,7 +39,11 @@ export interface SemanticExplanation {
 /** The final routing outcome the operator sees: zone, category, confidence. */
 export interface ZoneDecisionExplanation {
   zone: Zone;
+  /** Display label for `zone`; replies copy it instead of deriving their own. */
+  zoneLabel: string;
   category: string;
+  /** Display label for `category`; replies copy it instead of deriving their own. */
+  categoryLabel: string;
   confidence?: number | undefined;
   /** The user-facing one-liner shown on the alert itself (`alert.why`). */
   why: string;
@@ -109,7 +113,9 @@ const explainAlertEntry = (instanceId: string, alert: StoredAlert): ExplainComma
   },
   decision: {
     zone: alert.zone,
+    zoneLabel: zoneLabel(alert.zone),
     category: alert.category,
+    categoryLabel: categoryLabel(alert.category),
     ...(typeof alert.confidence === "number" ? { confidence: alert.confidence } : {}),
     why: alert.why,
   },
