@@ -286,8 +286,8 @@ describe("commands/resolve resolveAlertIdOrShortRef", () => {
 
   it("never matches by position, subject or sender", () => {
     const state = stateWith(
-      [alert({ subject: "Invoice overdue", from: "Billing <billing@example.com>" })],
-      ["11111111-1111-1111-1111-111111111111"],
+      [alert({ alertId: "abcdef00-0000-0000-0000-000000000000", shortRef: "abcdef" })],
+      ["abcdef00-0000-0000-0000-000000000000"],
     );
     expect(resolveAlertIdOrShortRef(state, "1").status).toBe("none");
     expect(resolveAlertIdOrShortRef(state, "Invoice").status).toBe("none");

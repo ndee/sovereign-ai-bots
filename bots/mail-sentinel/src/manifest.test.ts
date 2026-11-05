@@ -8,6 +8,7 @@ import { DEFAULT_LLM_TIMEOUT_MS, DEFAULT_SCAN_BUDGET_MS } from "./constants.js";
 
 type Param = {
   type: "string" | "boolean";
+  description?: string;
   enum?: string[];
   pattern?: string;
   maxLength?: number;

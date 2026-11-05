@@ -148,8 +148,8 @@
             "params": {
               "alertId": {
                 "type": "string",
-                "description": "Alert id from list-alerts",
-                "pattern": "^[A-Za-z0-9-]{1,64}$",
+                "description": "Alert id or the short reference shown in the room",
+                "pattern": "^\\[?[A-Za-z0-9-]{1,64}\\]?$",
                 "maxLength": 64,
                 "argv": [
                   "--alert-id",
@@ -228,8 +228,8 @@
             "params": {
               "alertId": {
                 "type": "string",
-                "description": "Alert id from list-alerts",
-                "pattern": "^[A-Za-z0-9-]{1,64}$",
+                "description": "Alert id or the short reference shown in the room",
+                "pattern": "^\\[?[A-Za-z0-9-]{1,64}\\]?$",
                 "maxLength": 64,
                 "argv": [
                   "--alert-id",
@@ -241,6 +241,15 @@
                 "description": "The newest alert",
                 "argv": [
                   "--latest"
+                ]
+              },
+              "ref": {
+                "type": "string",
+                "description": "Short alert reference shown in the room",
+                "maxLength": 64,
+                "argv": [
+                  "--ref",
+                  "{value}"
                 ]
               },
               "action": {
@@ -301,7 +310,8 @@
             "exactlyOneOf": [
               [
                 "alertId",
-                "latest"
+                "latest",
+                "ref"
               ]
             ],
             "confirm": {

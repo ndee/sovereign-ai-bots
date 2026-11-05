@@ -14,10 +14,9 @@ import type {
   DerivedPolicy,
   FeedbackAction,
   FeedbackScope,
-  StoredAlert,
 } from "../types.js";
-import { nowIso, parseDurationMs, sortAlertsNewestFirst } from "../util/time.js";
-import { type AlertTargetCandidate, resolveAlertTarget } from "./resolve.js";
+import { nowIso, parseDurationMs } from "../util/time.js";
+import { type AlertTargetCandidate, selectAlert } from "./resolve.js";
 
 const FEEDBACK_SCOPES: readonly FeedbackScope[] = [
   "item",
@@ -165,33 +164,21 @@ export const applyFeedback = async (
   const runtime = await resolveToolRuntime(options.instance, options.configPath);
   return withLockedState(runtime.statePath, async () => {
     const state = await runtime.readState();
-    // Selection precedence: an explicit alertId, then --latest, then a
-    // free-form --ref routed through the central resolver. The resolver is the
-    // single seam that can report ambiguity instead of silently picking one.
-    let alert: StoredAlert | undefined;
-    if (typeof options.alertId === "string") {
-      alert = state.alerts.find((entry) => entry.alertId === options.alertId);
-    } else if (options.latest === true) {
-      alert = sortAlertsNewestFirst(state.alerts)[0];
-    } else if (typeof options.ref === "string") {
-      const resolution = resolveAlertTarget(state, options.ref);
-      if (resolution.status === "ambiguous") {
-        // Do not mutate state: hand the candidates back for disambiguation.
-        return {
-          instanceId: runtime.instanceId,
-          status: "ambiguous" as const,
-          ref: options.ref,
-          changed: false as const,
-          candidates: resolution.candidates,
-        };
-      }
-      if (resolution.status === "ok") {
-        alert = resolution.alert;
-      }
+    const selection = selectAlert(state, options);
+    if (selection.status === "ambiguous") {
+      // Do not mutate state: hand the candidates back for disambiguation.
+      return {
+        instanceId: runtime.instanceId,
+        status: "ambiguous" as const,
+        ref: selection.ref,
+        changed: false as const,
+        candidates: selection.candidates,
+      };
     }
-    if (alert === undefined) {
+    if (selection.status === "none") {
       throw new Error("No matching Mail Sentinel alert was found");
     }
+    const alert = selection.alert;
 
     const action = options.action;
     // Derive the policy (if any) before mutating anything so a `--dry-run`

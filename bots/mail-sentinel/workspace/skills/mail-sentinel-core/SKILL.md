@@ -23,7 +23,8 @@ Checklist:
    - `not-important`, `less-often`, `reduce` and `digest-only` lower alerting: the tool only records them and returns a code plus a preview; the operator applies them by sending `/confirm <code>` — see "Changes that lower alerting" below.
    - The `feedback` operation echoes the interpreted action in plain words ("Interpreted as …"), the resolved scope, and the exact item/rule it applied to; relay that confirmation — never report silent success.
    - Ambiguous targets or ambiguous intent (an utterance implying more than one action) → ask the user to pick rather than guessing.
-5. Use the `explain` operation (`alertId`, `latest`, or `ref`) to show why an alert or digest item reached its zone — matched rules and policy modifiers, the semantic reviewer's verdict, and the final zone decision — when an operator asks to verify or debug a classification
+   - Target the alert with `alertId` (the full id or the short reference shown in the room, e.g. `a1b2c3`), `latest`, or `ref` (short reference, digest position, or words from the subject or sender). A `status: "ambiguous"` result changed nothing: show its `candidates` and ask which one.
+5. Use the `explain` operation (`alertId`, which takes the full id or the short reference shown in the room; `latest`; or `ref`) to show why an alert or digest item reached its zone — matched rules and policy modifiers, the semantic reviewer's verdict, and the final zone decision — when an operator asks to verify or debug a classification
 6. Use `policy-important-sender` with `query` for direct sender-importance requests without an alert reply context
 7. Use `policy-list`, `policy-add` and `policy-remove` for other sender/domain preference changes
 8. The direct sender operation posts its own visible confirmation/error into the alert room; do not assume silent success is acceptable
