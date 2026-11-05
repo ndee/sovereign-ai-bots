@@ -14,6 +14,14 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.5.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.4.1...v2.5.0) (2026-11-05)
+
+
+### Features
+
+* **mail-sentinel:** accept short refs as alertId, return display labels, never stay silent in chat ([#193](https://github.com/ndee/sovereign-ai-bots/issues/193)) ([ac0f1fa](https://github.com/ndee/sovereign-ai-bots/commit/ac0f1fa39078c3313c40953df2f844b2f4b0bd75))
+* **mail-sentinel:** declare /version as a slash command a node answers without the model ([#195](https://github.com/ndee/sovereign-ai-bots/issues/195)) ([4b03633](https://github.com/ndee/sovereign-ai-bots/commit/4b03633afa39aa44d052abc7ea9d8772e98b5301)), closes [#194](https://github.com/ndee/sovereign-ai-bots/issues/194)
+
 ## [2.4.1](https://github.com/ndee/sovereign-ai-bots/compare/v2.4.0...v2.4.1) (2026-11-04)
 
 
