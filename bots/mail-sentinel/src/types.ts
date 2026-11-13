@@ -136,6 +136,12 @@ export interface StoredAlert {
   matchedRuleIds?: string[] | undefined;
   feedbackState?: FeedbackState | undefined;
   feedbackAt?: string | undefined;
+  /**
+   * What this alert's current feedback actually added to the learned weights,
+   * after the caps. Changing the feedback reverses exactly this before the new
+   * contribution is applied. Absent on alerts rated before it was recorded.
+   */
+  learnedContribution?: LearnedContribution | undefined;
   reminderDueAt?: string | undefined;
   lastReminderAt?: string | undefined;
   digestSentAt?: string | undefined;
@@ -201,8 +207,38 @@ export interface FeedbackEntry {
 
 export interface LearningState {
   senderWeights: Record<string, number>;
+  /**
+   * Written by earlier versions only. Feedback no longer learns per domain and
+   * scoring no longer reads it; it stays on disk so a downgrade keeps it.
+   */
   domainWeights: Record<string, number>;
   ruleAdjustments: Record<string, number>;
+}
+
+export interface LearnedContribution {
+  sender: number;
+  rules: Record<string, number>;
+}
+
+export interface LearnedSenderChange {
+  address: string;
+  before: number;
+  after: number;
+  min: number;
+  max: number;
+}
+
+export interface LearnedRuleChange {
+  ruleId: string;
+  before: number;
+  after: number;
+}
+
+/** Every learned weight one feedback touched, so its confirmation can name them. */
+export interface LearnedFeedbackChange {
+  changed: boolean;
+  sender?: LearnedSenderChange | undefined;
+  rules: LearnedRuleChange[];
 }
 
 export interface DigestState {

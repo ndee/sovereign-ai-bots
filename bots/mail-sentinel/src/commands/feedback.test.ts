@@ -84,7 +84,7 @@ describe("commands/feedback", () => {
     );
   });
 
-  it("marks an alert as important and updates learning weights", async () => {
+  it("marks an alert as important and updates the sender and rule weights only", async () => {
     const runtime = getFakeRuntime();
     runtime.state.alerts = [baseAlert()];
     const result = applied(
@@ -97,7 +97,7 @@ describe("commands/feedback", () => {
     expect(result.note).toBe("Feedback applied. Alert marked as important.");
     expect(runtime.state.alerts[0]?.feedbackState).toBe("important");
     expect(runtime.state.learning.senderWeights["alice@example.com"]).toBe(2);
-    expect(runtime.state.learning.domainWeights["example.com"]).toBe(1);
+    expect(runtime.state.learning.domainWeights["example.com"]).toBeUndefined();
     expect(runtime.state.learning.ruleAdjustments["rule-invoice"]).toBe(1);
   });
 

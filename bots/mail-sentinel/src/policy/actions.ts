@@ -207,17 +207,22 @@ export const applyLearningAdjustment = (
   key: unknown,
   delta: number,
   floor?: number,
-): void => {
+  ceiling?: number,
+): number | undefined => {
   if (typeof key !== "string" || key.length === 0) {
-    return;
+    return undefined;
   }
   let next = (target[key] ?? 0) + delta;
   if (typeof floor === "number" && next < floor) {
     next = floor;
   }
+  if (typeof ceiling === "number" && next > ceiling) {
+    next = ceiling;
+  }
   if (next === 0) {
     delete target[key];
-    return;
+    return 0;
   }
   target[key] = next;
+  return next;
 };
