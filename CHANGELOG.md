@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.6.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.5.0...v2.6.0) (2026-11-13)
+
+
+### Features
+
+* **mail-sentinel:** learn feedback per sender address, bounded, idempotent and reported ([#197](https://github.com/ndee/sovereign-ai-bots/issues/197)) ([9a76a50](https://github.com/ndee/sovereign-ai-bots/commit/9a76a502a337dac02dfc0c62b5172c0a1c2317a1))
+
 ## [2.5.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.4.1...v2.5.0) (2026-11-05)
 
 
