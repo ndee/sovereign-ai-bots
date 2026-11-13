@@ -292,7 +292,15 @@ describe("policy/actions", () => {
 
   it("ignores non-string keys silently", () => {
     const target: Record<string, number> = { "a@b": 1 };
-    applyLearningAdjustment(target, undefined, 1);
+    expect(applyLearningAdjustment(target, undefined, 1)).toBeUndefined();
     expect(target).toEqual({ "a@b": 1 });
+  });
+
+  it("caps at the ceiling and returns the stored weight", () => {
+    const target: Record<string, number> = { "a@b": 3 };
+    expect(applyLearningAdjustment(target, "a@b", 2, -4, 4)).toBe(4);
+    expect(target).toEqual({ "a@b": 4 });
+    expect(applyLearningAdjustment(target, "a@b", -4, -4, 4)).toBe(0);
+    expect(target).toEqual({});
   });
 });

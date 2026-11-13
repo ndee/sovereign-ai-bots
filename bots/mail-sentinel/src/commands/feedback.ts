@@ -1,12 +1,8 @@
 import { alertShortRef } from "../alerts/format.js";
 import { resolveToolRuntime } from "../config/runtime.js";
-import { RULE_ADJUSTMENT_FLOOR } from "../constants.js";
-import {
-  addPolicyEntry,
-  applyLearningAdjustment,
-  derivePolicyFromFeedback,
-} from "../policy/actions.js";
+import { addPolicyEntry, derivePolicyFromFeedback } from "../policy/actions.js";
 import { feedbackActionLabel } from "../policy/feedback-vocab.js";
+import { type LearningTransition, transitionLearning } from "../scoring/learning.js";
 import { withLockedState } from "../state/io.js";
 import type {
   CommandOptions,
@@ -14,6 +10,8 @@ import type {
   DerivedPolicy,
   FeedbackAction,
   FeedbackScope,
+  FeedbackState,
+  LearnedFeedbackChange,
 } from "../types.js";
 import { nowIso, parseDurationMs } from "../util/time.js";
 import { type AlertTargetCandidate, selectAlert } from "./resolve.js";
@@ -59,9 +57,16 @@ export const resolveFeedbackScope = (
 export const toDerivedRule = (
   scope: FeedbackScope,
   derived: DerivedPolicy | null,
+  learnedChanged = false,
 ): DerivedFeedbackRule => {
   if (derived === null) {
-    return { type: "none", scope, reason: "Applies to this item only; no rule created." };
+    return {
+      type: "none",
+      scope,
+      reason: learnedChanged
+        ? "Applies to this item; learned weights changed (see learned)."
+        : "Applies to this item only; no rule created.",
+    };
   }
   const { match, pattern, scope: policyScope, minZone, maxZone, reason } = derived.entry;
   return {
@@ -96,6 +101,29 @@ export const summarizeDerivedRule = (rule: DerivedFeedbackRule): string => {
   return `${rule.type} ${rule.match ?? ""} -> ${zone}`;
 };
 
+const signed = (value: number): string => (value > 0 ? `+${String(value)}` : String(value));
+
+/** One line naming every learned weight a feedback changed, for the confirmation. */
+export const summarizeLearned = (learned: LearnedFeedbackChange): string => {
+  const parts: string[] = [];
+  if (learned.sender !== undefined) {
+    const { address, before, after, min, max } = learned.sender;
+    parts.push(
+      `future mail from ${address} weighs ${signed(before)} -> ${signed(after)} (limit ${signed(min)}..${signed(max)})`,
+    );
+  }
+  for (const rule of learned.rules) {
+    parts.push(`rule ${rule.ruleId} ${signed(rule.before)} -> ${signed(rule.after)}`);
+  }
+  return parts.length === 0 ? "No learned weight changed." : `Learned: ${parts.join("; ")}.`;
+};
+
+// These end a pending reminder, so repeating one while a reminder is due is
+// still a change.
+const CLEARS_REMINDER = new Set<FeedbackState>(["important", "not-important", "less-often"]);
+
+const NOTHING_LEARNED: LearnedFeedbackChange = { changed: false, rules: [] };
+
 export interface FeedbackCommandResult {
   instanceId: string;
   alertId: string;
@@ -115,6 +143,9 @@ export interface FeedbackCommandResult {
   note: string;
   derivedRule: DerivedFeedbackRule;
   ruleSummary: string;
+  /** Every learned weight this feedback changed (or would change, in a dry run). */
+  learned: LearnedFeedbackChange;
+  learnedSummary: string;
   dryRun?: boolean;
   nextReminderAt?: string;
   policyId?: string;
@@ -191,8 +222,26 @@ export const applyFeedback = async (
         throw new Error(`This alert does not contain enough information to derive a ${scope} rule`);
       }
     }
-    const derivedRule = toDerivedRule(scope, derived);
-    const ruleSummary = summarizeDerivedRule(derivedRule);
+    const ruleSummary = summarizeDerivedRule(toDerivedRule(scope, derived));
+
+    // Same feedback on the same alert again: nothing to learn twice. A scoped
+    // policy action still runs, since it writes a rule the user asked for.
+    const nextFeedbackState =
+      action === undefined || action === "remind-later" ? undefined : (action as FeedbackState);
+    const repeated =
+      nextFeedbackState !== undefined &&
+      alert.feedbackState === nextFeedbackState &&
+      derived === null &&
+      !(alert.reminderDueAt !== undefined && CLEARS_REMINDER.has(nextFeedbackState));
+    // Computed on a copy so a dry run can preview it without writing anything.
+    const nextLearning = structuredClone(state.learning);
+    const transition: LearningTransition | undefined =
+      nextFeedbackState === undefined || repeated
+        ? undefined
+        : transitionLearning(nextLearning, alert, nextFeedbackState);
+    const learned = transition?.learned ?? NOTHING_LEARNED;
+    const learnedSummary = summarizeLearned(learned);
+    const derivedRule = toDerivedRule(scope, derived, learned.changed);
 
     // Dry run: report exactly what would happen and write nothing (no state,
     // no policy). The control plane uses this to show the confirmation preview.
@@ -210,7 +259,28 @@ export const applyFeedback = async (
         note: "Dry run — no changes written.",
         derivedRule,
         ruleSummary,
+        learned,
+        learnedSummary,
         dryRun: true,
+      };
+    }
+
+    if (repeated) {
+      return {
+        instanceId: runtime.instanceId,
+        alertId: alert.alertId,
+        shortRef: alertShortRef(alert),
+        subject: alert.subject,
+        from: alert.from,
+        action: action as FeedbackAction,
+        actionLabel: feedbackActionLabel(action as FeedbackAction),
+        scope,
+        changed: false,
+        note: `Already recorded as "${feedbackActionLabel(action as FeedbackAction)}" for this alert. Nothing changed.`,
+        derivedRule,
+        ruleSummary,
+        learned,
+        learnedSummary,
       };
     }
 
@@ -222,31 +292,16 @@ export const applyFeedback = async (
       alert.feedbackState = "important";
       alert.feedbackAt = appliedAt;
       alert.reminderDueAt = undefined;
-      applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, 2);
-      applyLearningAdjustment(state.learning.domainWeights, alert.domain, 1);
-      for (const ruleId of alert.matchedRuleIds ?? []) {
-        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, 1);
-      }
       note = "Feedback applied. Alert marked as important.";
     } else if (action === "not-important") {
       alert.feedbackState = "not-important";
       alert.feedbackAt = appliedAt;
       alert.reminderDueAt = undefined;
-      applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -2);
-      applyLearningAdjustment(state.learning.domainWeights, alert.domain, -1);
-      for (const ruleId of alert.matchedRuleIds ?? []) {
-        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
-      }
       note = "Feedback applied. Alert marked as not important.";
     } else if (action === "less-often") {
       alert.feedbackState = "less-often";
       alert.feedbackAt = appliedAt;
       alert.reminderDueAt = undefined;
-      applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -4);
-      applyLearningAdjustment(state.learning.domainWeights, alert.domain, -2);
-      for (const ruleId of alert.matchedRuleIds ?? []) {
-        applyLearningAdjustment(state.learning.ruleAdjustments, ruleId, -1, RULE_ADJUSTMENT_FLOOR);
-      }
       note = "Feedback applied. Sender weight reduced.";
     } else if (action === "remind-later") {
       const delay = options.delay ?? runtime.defaultReminderDelay;
@@ -260,8 +315,8 @@ export const applyFeedback = async (
       action === "mute"
     ) {
       // `item` scope writes no policy — only the alert's feedbackState and (for
-      // reduce) the learning nudge change. Any other scope persists the derived
-      // rule computed above.
+      // reduce) the learned sender weight change. Any other scope persists the
+      // derived rule computed above.
       if (derived !== null) {
         const policy = await runtime.readPolicy();
         policyId = derived.entry.id;
@@ -278,14 +333,14 @@ export const applyFeedback = async (
       } else {
         note = "Feedback applied to this item only.";
       }
-      if (action === "reduce") {
-        applyLearningAdjustment(state.learning.senderWeights, alert.fromAddress, -2);
-        applyLearningAdjustment(state.learning.domainWeights, alert.domain, -1);
-      }
       alert.feedbackState = action;
       alert.feedbackAt = appliedAt;
     } else {
       throw new Error(`Unsupported action '${String(action)}'`);
+    }
+    if (transition !== undefined) {
+      state.learning = nextLearning;
+      alert.learnedContribution = transition.contribution;
     }
 
     state.feedback.push({
@@ -313,6 +368,8 @@ export const applyFeedback = async (
       note,
       derivedRule,
       ruleSummary,
+      learned,
+      learnedSummary,
       ...(nextReminderAt === undefined ? {} : { nextReminderAt }),
       ...(policyId === undefined ? {} : { policyId }),
     };

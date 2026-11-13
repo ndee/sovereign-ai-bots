@@ -73,6 +73,7 @@ Interpreting feedback:
 3. Hiding mail entirely (mute) is not available in chat
 4. If an utterance implies more than one action, or the target is ambiguous, ask the operator to pick instead of guessing
 5. The `feedback` operation echoes the interpreted action ("Interpreted as …"), the resolved scope, and the exact item or rule it applied to; relay that confirmation and never report silent success
+6. Feedback learns per sender address, never per domain; the result's `learnedSummary` names every learned weight it changed (before -> after); relay it with the confirmation and in a `preview`, and never say nothing changed when it lists a change. The same feedback again on the same alert changes nothing (`changed: false`)
 
 Confirm scope before applying a rule:
 1. A policy-deriving action (`always-like-this`, `reduce`, `digest-only`) must never silently pick how broadly it applies; confirm both the interpreted action and the scope before applying it

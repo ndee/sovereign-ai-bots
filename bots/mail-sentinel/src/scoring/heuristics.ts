@@ -7,6 +7,7 @@ import type {
   ScoredMessage,
 } from "../types.js";
 import { createRegex, normalizeThreadSubject } from "../util/normalize.js";
+import { learnedRuleAdjustment, learnedSenderWeight } from "./learning.js";
 
 export const summarizeReasons = (matches: readonly RuleMatch[]): string[] => {
   const unique = new Set<string>();
@@ -31,7 +32,7 @@ export const buildRuleMatches = (
   const matches: RuleMatch[] = [];
   const senderAdjustment =
     (rules.senderWeights[message.fromAddress ?? ""] ?? 0) +
-    (state.learning.senderWeights[message.fromAddress ?? ""] ?? 0);
+    learnedSenderWeight(state.learning, message.fromAddress ?? "");
   if (senderAdjustment !== 0 && message.fromAddress !== undefined) {
     matches.push({
       ruleId: `sender:${message.fromAddress}`,
@@ -44,9 +45,10 @@ export const buildRuleMatches = (
     });
   }
 
-  const domainAdjustment =
-    (rules.domainWeights[message.domain ?? ""] ?? 0) +
-    (state.learning.domainWeights[message.domain ?? ""] ?? 0);
+  // Learning is per sender address only: a learned domain weight would let one
+  // rating re-judge every sender at that domain, shared mail providers included.
+  // Only the operator's configured domain weights apply here.
+  const domainAdjustment = rules.domainWeights[message.domain ?? ""] ?? 0;
   if (domainAdjustment !== 0 && message.domain !== undefined) {
     matches.push({
       ruleId: `domain:${message.domain}`,
@@ -79,7 +81,7 @@ export const buildRuleMatches = (
     matches.push({
       ruleId: rule.id,
       reason: rule.reason,
-      weight: rule.weight + (state.learning.ruleAdjustments[rule.id] ?? 0),
+      weight: rule.weight + learnedRuleAdjustment(state.learning, rule.id),
       categories: Array.isArray(rule.categories) ? rule.categories : [],
     });
   }

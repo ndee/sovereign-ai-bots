@@ -64,6 +64,8 @@ export interface FeedbackResult {
   actionLabel?: string;
   scope?: FeedbackScope;
   ruleSummary?: string;
+  learned?: { changed: boolean };
+  learnedSummary?: string;
   dryRun?: boolean;
   nextReminderAt?: string;
   policyId?: string;
@@ -94,13 +96,23 @@ const describeTarget = (result: FeedbackResult): string => {
   return `Alert ${String(result.alertId)}`;
 };
 
+// Item scope that changed a learned weight affects later mail from the sender
+// too, so "this item only" would understate it.
+const scopeLabel = (result: FeedbackResult, scope: FeedbackScope): string =>
+  scope === "item" && result.learned?.changed === true
+    ? "this item; no policy rule"
+    : SCOPE_LABELS[scope];
+
+const describeLearned = (result: FeedbackResult): string =>
+  typeof result.learnedSummary === "string" ? ` ${result.learnedSummary}` : "";
+
 // "Scope: this sender. Created rule: …" — the explicit-scope half of the
 // confirmation. Item scope writes no rule, so it stops after the scope label.
 const describeScope = (result: FeedbackResult): string => {
   if (result.scope === undefined) {
     return "";
   }
-  const scopeLine = ` Scope: ${SCOPE_LABELS[result.scope]}.`;
+  const scopeLine = ` Scope: ${scopeLabel(result, result.scope)}.`;
   if (result.scope === "item" || result.ruleSummary === undefined) {
     return scopeLine;
   }
@@ -134,10 +146,11 @@ export const formatFeedbackResult = (result: FeedbackResult): string => {
       result.scope === "item" || result.ruleSummary === undefined
         ? ""
         : ` Rule: ${result.ruleSummary}.`;
-    const scopeLabel = result.scope === undefined ? "" : ` Scope: ${SCOPE_LABELS[result.scope]}.`;
-    return `${interpreted}Dry run — would apply to: ${target}.${scopeLabel}${rulePart} (nothing written)`;
+    const scopePart =
+      result.scope === undefined ? "" : ` Scope: ${scopeLabel(result, result.scope)}.`;
+    return `${interpreted}Dry run — would apply to: ${target}.${scopePart}${rulePart}${describeLearned(result)} (nothing written)`;
   }
-  const scopePart = describeScope(result);
+  const scopePart = `${describeScope(result)}${describeLearned(result)}`;
   if (result.policyId !== undefined) {
     return `${interpreted}${result.note} Applied to: ${target}.${scopePart} Policy ${result.policyId} created.`;
   }

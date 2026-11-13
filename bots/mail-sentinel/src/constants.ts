@@ -114,6 +114,10 @@ export const REVIEW_RECOVERY_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
 /** Default for `llmSenderDetail`: the bare address, never the display name. */
 export const DEFAULT_LLM_SENDER_DETAIL = "address";
 export const RULE_ADJUSTMENT_FLOOR = -1;
+// Two consistent ratings reach each limit; more of the same change nothing.
+export const RULE_ADJUSTMENT_CEILING = 2;
+export const LEARNED_SENDER_WEIGHT_MIN = -4;
+export const LEARNED_SENDER_WEIGHT_MAX = 4;
 export const MAX_PENDING_AMBER_ITEMS = 200;
 // Starting length of a minted short reference (a prefix of `alertId`). Chosen
 // for typeability in chat; the minter lengthens past this only when a shorter
