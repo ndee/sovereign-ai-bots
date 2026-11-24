@@ -387,6 +387,66 @@ describe("scoring/llm", () => {
     expect(result.zone).toBe("amber");
   });
 
+  describe("a confident model gray", () => {
+    const relevantRiskScore = {
+      score: 5,
+      categoryScores: {
+        "decision-required": 0,
+        "financial-relevance": 0,
+        "risk-escalation": 5,
+      },
+      category: "risk-escalation" as const,
+    };
+    const grayAt = (confidence: number, urgency: LlmResult["urgency"]): LlmResult =>
+      llmResult("Routine overview without anything to act on.", {
+        suggestedZone: "gray",
+        confidence,
+        urgency,
+        riskEscalation: true,
+      });
+
+    it("wins over the heuristic relevance floor at the amber confidence threshold", () => {
+      const result = determineZone({
+        scored: relevantRiskScore,
+        policyResult: neutralPolicy,
+        llmResult: grayAt(sampleRules.zoneThresholds.amberMinConfidence, "low"),
+        rules: sampleRules,
+      });
+      expect(result.zone).toBe("gray");
+      expect(result.reasons).toEqual(["Routine overview without anything to act on."]);
+    });
+
+    it("is not lifted to red by a high-confidence, non-low urgency reply", () => {
+      const result = determineZone({
+        scored: { ...relevantRiskScore, score: 12 },
+        policyResult: neutralPolicy,
+        llmResult: grayAt(90, "medium"),
+        rules: sampleRules,
+      });
+      expect(result.zone).toBe("gray");
+    });
+
+    it("keeps the heuristic floor when the gray is below the amber confidence threshold", () => {
+      const result = determineZone({
+        scored: relevantRiskScore,
+        policyResult: neutralPolicy,
+        llmResult: grayAt(sampleRules.zoneThresholds.amberMinConfidence - 1, "low"),
+        rules: sampleRules,
+      });
+      expect(result.zone).toBe("amber");
+    });
+
+    it("still yields to an explicit user policy floor", () => {
+      const result = determineZone({
+        scored: relevantRiskScore,
+        policyResult: { ...neutralPolicy, zoneFloor: "amber" },
+        llmResult: grayAt(90, "low"),
+        rules: sampleRules,
+      });
+      expect(result.zone).toBe("amber");
+    });
+  });
+
   it("returns amber from the no-LLM candidate branch when no rule relevance", () => {
     const result = determineZone({
       scored: {

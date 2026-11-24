@@ -4,10 +4,12 @@ import { loadGolden } from "../__fixtures__/load.js";
 import {
   buildMessageKey,
   compactText,
+  createFoldedRegex,
   createRegex,
   ensureTrailingSlash,
   escapeRegExp,
   extractDomain,
+  foldForMatching,
   matchGlob,
   normalizeEmailAddress,
   normalizeMessageId,
@@ -111,6 +113,30 @@ describe("util/normalize", () => {
     const regex = createRegex({ pattern: "hello" });
     expect(regex.test("HELLO WORLD")).toBe(true);
     expect(regex.flags).toBe("iu");
+  });
+
+  it("folds German umlauts and sharp s to their ASCII spellings", () => {
+    expect(foldForMatching("Rückmeldung zur Kündigung, Straße, Größe, Ärger")).toBe(
+      "Rueckmeldung zur Kuendigung, Strasse, Groesse, Aerger",
+    );
+    expect(foldForMatching("ÜBER ÖL ẞ")).toBe("UeBER OeL SS");
+  });
+
+  it("folds decomposed umlauts and strips other diacritics", () => {
+    expect(foldForMatching("Ru\u0308ckmeldung")).toBe("Rueckmeldung");
+    expect(foldForMatching("Café résumé")).toBe("Cafe resume");
+    expect(foldForMatching("plain ascii")).toBe("plain ascii");
+  });
+
+  it("builds a folded regex that matches folded text", () => {
+    const regex = createFoldedRegex({ pattern: "\\bkündigung\\b" });
+    expect(regex?.source).toBe("\\bkuendigung\\b");
+    expect(regex?.test("Kuendigung")).toBe(true);
+  });
+
+  it("returns no folded regex when folding breaks the pattern", () => {
+    expect(() => createRegex({ pattern: "[x-ä]" })).not.toThrow();
+    expect(createFoldedRegex({ pattern: "[x-ä]" })).toBeNull();
   });
 
   it("respects the flags override on createRegex", () => {

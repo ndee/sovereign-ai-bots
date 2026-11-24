@@ -60,8 +60,48 @@ export const matchGlob = (value: unknown, pattern: unknown): boolean => {
   return new RegExp(`^${escaped}$`, "iu").test(value);
 };
 
+const GERMAN_FOLDS: Readonly<Record<string, string>> = {
+  ä: "ae",
+  ö: "oe",
+  ü: "ue",
+  Ä: "Ae",
+  Ö: "Oe",
+  Ü: "Ue",
+  ß: "ss",
+  ẞ: "SS",
+};
+
+/**
+ * Rewrite text into the ASCII spelling the rule patterns use, so `\b` (which
+ * only knows ASCII word characters) sees "Rückmeldung" as one word and
+ * "rueckmeldung" matches it. German umlauts take their two-letter spelling;
+ * every other diacritic is dropped.
+ */
+export const foldForMatching = (value: string): string =>
+  value
+    .normalize("NFC")
+    .replace(/[äöüÄÖÜßẞ]/gu, (letter) => GERMAN_FOLDS[letter] as string)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+
 export const createRegex = (rule: { pattern: string; flags?: string | undefined }): RegExp =>
   new RegExp(rule.pattern, rule.flags ?? "iu");
+
+/**
+ * {@link createRegex} on the folded pattern. Folding can turn a valid character
+ * range into an invalid one (`[x-ä]` becomes `[x-ae]`); such a rule then keeps
+ * only its raw match instead of failing the whole scan.
+ */
+export const createFoldedRegex = (rule: {
+  pattern: string;
+  flags?: string | undefined;
+}): RegExp | null => {
+  try {
+    return createRegex({ ...rule, pattern: foldForMatching(rule.pattern) });
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Escape every regex metacharacter in user-supplied text so it can be used as a

@@ -24,7 +24,7 @@
     {
       "id": "decision-approval-subject",
       "field": "subject",
-      "pattern": "\\b(freigabe|approve|approval|entscheidung|decision|confirm|rueckmeldung|ruckmeldung)\\b",
+      "pattern": "\\b(?:[a-z]*freigabe|approve|approval|[a-z]*entscheidung|decision|confirm|rueckmeldung|ruckmeldung|[a-z]*genehmigung|zustimmung)\\b",
       "weight": 5,
       "categories": [
         "decision-required"
@@ -34,7 +34,7 @@
     {
       "id": "decision-question-text",
       "field": "text",
-      "pattern": "\\b(kannst du entscheiden|can you decide|please decide|bitte entscheiden|please confirm|bitte bestaetigen|bitte bestatigen)\\b",
+      "pattern": "\\b(?:kannst du entscheiden|can you decide|please decide|please approve|bitte entscheiden|please confirm|bitte bestaetigen|bitte bestatigen|bitte\\s+um\\s+(?:ihre\\s+|deine\\s+|eine\\s+)?(?:freigabe|genehmigung|zustimmung|entscheidung)|(?:koennen|koennten|koenntest|kannst)\\s+(?:sie|du)\\s+(?:(?:das|dies|bitte)\\s+)*(?:entscheiden|freigeben|genehmigen|zustimmen|bestaetigen))\\b",
       "weight": 4,
       "categories": [
         "decision-required"
@@ -42,9 +42,19 @@
       "reason": "body asks for a direct decision or confirmation"
     },
     {
+      "id": "decision-reply-text",
+      "field": "text",
+      "pattern": "\\b(?:(?:bitte|bitten|erbitte|erbitten)\\s+um\\s+(?:(?:ihre|deine|eine|kurze|baldige)\\s+)*(?:rueckmeldung|antwort|rueckruf|stellungnahme)|(?:rueckmeldung|antwort|stellungnahme)\\s+bis|bitte\\s+(?:rufen\\s+sie\\s+(?:mich\\s+|uns\\s+)?zurueck|ruf\\s+(?:mich\\s+|uns\\s+)?zurueck)|um\\s+(?:rueckmeldung|antwort)\\s+wird\\s+gebeten|awaiting\\s+your\\s+(?:reply|response|answer)|please\\s+(?:reply|respond|get\\s+back\\s+to\\s+(?:me|us)|call\\s+(?:me|us)\\s+back))\\b",
+      "weight": 3,
+      "categories": [
+        "decision-required"
+      ],
+      "reason": "body asks for a reply or a call back"
+    },
+    {
       "id": "financial-invoice-subject",
       "field": "subject",
-      "pattern": "\\b(rechnung|invoice|angebot|offer|zahlung|payment|vertrag|contract|preis|price|renewal|renewed|abonnement|subscription)\\b",
+      "pattern": "\\b(?:[a-z]*(?<!be)rechnung(?:en)?|invoice|angebot|offer|[a-z]*zahlung[a-z]*|payment|[a-z]*vertrag[a-z]*|contract|preis|preis(?:erhoehung|anpassung|aenderung)|price|renewal|renewed|abonnement|subscription|[a-z]*mahnung)\\b",
       "weight": 5,
       "categories": [
         "financial-relevance"
@@ -54,7 +64,7 @@
     {
       "id": "financial-payment-text",
       "field": "text",
-      "pattern": "\\b(betrag|amount\\s+(?:is\\s+|will\\s+be\\s+)?due|zahlbar|payment\\s+(?:is\\s+)?due|late\\s+fees?|ueberweisen|uberweisen|wire(?:d|\\s+transfer)|outstanding|rechnungssumme|invoice\\s+(?:total|number|overdue)|billing\\s+cycle|renewal\\s+date|auto[- ]?renew(?:al|s|ed)?|scheduled\\s+to\\s+renew)\\b",
+      "pattern": "\\b(?:[a-z]*betrag|[a-z]*betrages|[a-z]*betrags|[a-z]*betraege|amount\\s+(?:is\\s+|will\\s+be\\s+)?due|zahlbar|(?:ueber)?faellig(?:e[nrms]?|keit[a-z]*)?|payment\\s+(?:is\\s+)?due|late\\s+fees?|ueberweisen|uberweisen|ueberweisung|wire(?:d|\\s+transfer)|outstanding|rechnungssumme|[a-z]*mahnung(?:en)?|zahlungserinnerung|inkasso[a-z]*|ruecklastschrift|invoice\\s+(?:total|number|overdue)|billing\\s+cycle|renewal\\s+date|auto[- ]?renew(?:al|s|ed)?|scheduled\\s+to\\s+renew)\\b",
       "weight": 4,
       "categories": [
         "financial-relevance"
@@ -72,14 +82,54 @@
       "reason": "subject mentions escalation, security incidents, complaints, or payment failures"
     },
     {
+      "id": "risk-notice-subject",
+      "field": "subject",
+      "pattern": "\\b(?:[a-z]*(?<!an)kuendigung(?:en|s[a-z]*)?|gekuendigt|abmahnung|defekt[a-z]*|[a-z]*stoerung(?:en)?|[a-z]+schaden|[a-z]*maengel[a-z]*|reklamation|termination|outage|defect(?:s|ive)?)\\b",
+      "weight": 4,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "subject reports a termination, a defect, or an outage"
+    },
+    {
       "id": "risk-deadline-text",
       "field": "text",
-      "pattern": "\\b(frist|deadline|heute|today|morgen|tomorrow|urgent|eskalation|escalation|beschwerde|complaint|security incident|sicherheitsvorfall)\\b",
+      "pattern": "\\b(?:[a-z]*frist(?:en)?|frist(?:ablauf|ende|verlaengerung|setzung|ueberschreitung)[a-z]*|deadlines?|urgent|dringend[a-z]*|dringlich[a-z]*|eilt|eilig[a-z]*|unverzueglich|[a-z]*eskalation(?:en)?|escalation|[a-z]*beschwerden?|complaints?|security incident|[a-z]*sicherheitsvorfall|(?:bis|noch)\\s+(?:spaetestens\\s+)?(?:heute|morgen|uebermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|bis\\s+spaetestens|(?:heute|morgen)\\s+noch|(?:by|until|due|before)\\s+(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|end\\s+of\\s+(?:the\\s+)?(?:day|week)))\\b",
       "weight": 5,
       "categories": [
         "risk-escalation"
       ],
-      "reason": "body mentions urgency, deadlines, escalation, or complaints"
+      "reason": "body mentions urgency, a deadline, escalation, or complaints"
+    },
+    {
+      "id": "risk-day-word-text",
+      "field": "text",
+      "pattern": "\\b(?:heute|morgen|uebermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
+      "weight": 2,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "body names a day such as today, tomorrow, or a weekday"
+    },
+    {
+      "id": "risk-defect-text",
+      "field": "text",
+      "pattern": "\\b(?:defekt[a-z]*|[a-z]*maengel[a-z]*|mangelhaft[a-z]*|[a-z]*stoerung(?:en)?|beschaedig[a-z]*|kaputt[a-z]*|[a-z]+schaden|schadens(?:fall|meldung|anzeige)|reklamation(?:en)?|undicht[a-z]*|[a-z]*ausfall|funktionier(?:t|en)\\s+(?:leider\\s+)?nicht|defect(?:s|ive)?|damaged|malfunction(?:s|ing)?|not\\s+working|out\\s+of\\s+order|outage)\\b",
+      "weight": 4,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "body reports a defect, damage, or an outage"
+    },
+    {
+      "id": "risk-termination-text",
+      "field": "text",
+      "pattern": "\\b(?:[a-z]*(?<!an)kuendigung(?:en|s[a-z]*)?|kuendig(?:e|en|t|te|ten)\\s+(?:[a-z]+\\s+){0,4}?(?:[a-z]*vertrag[a-z]*|[a-z]*verhaeltnis|abo|abonnement|mitgliedschaft|konto)\\b|gekuendigt|fristlos[a-z]*|abmahnung(?:en)?|vertragsende|aufhebungsvertrag|termination|terminated|terminate\\s+(?:the|your|our)\\s+(?:contract|agreement|lease))\\b",
+      "weight": 4,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "body gives or announces a termination or a formal warning"
     },
     {
       "id": "risk-priority-header",

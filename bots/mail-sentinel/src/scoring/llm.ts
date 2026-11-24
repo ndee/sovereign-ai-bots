@@ -211,6 +211,14 @@ export const determineZone = (input: DetermineZoneInput): ZoneDecision => {
         `policy requires at least ${String(policyResult.minConfidence)}% confidence for this category`,
       );
     } else if (
+      llmResult.suggestedZone === "gray" &&
+      llmResult.confidence >= rules.zoneThresholds.amberMinConfidence
+    ) {
+      // The reviewer read the mail and is as sure it can wait as it must be to
+      // call amber, so the keyword score alone must not lift it to amber or red.
+      zone = "gray";
+      reasons.push(llmResult.reason);
+    } else if (
       llmResult.suggestedZone === "red" &&
       llmResult.confidence >= rules.zoneThresholds.redMinConfidence &&
       adjustedScore >= rules.zoneThresholds.redMinHeuristicScore &&

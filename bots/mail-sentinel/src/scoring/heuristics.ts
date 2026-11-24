@@ -6,7 +6,12 @@ import type {
   RulesDocument,
   ScoredMessage,
 } from "../types.js";
-import { createRegex, normalizeThreadSubject } from "../util/normalize.js";
+import {
+  createFoldedRegex,
+  createRegex,
+  foldForMatching,
+  normalizeThreadSubject,
+} from "../util/normalize.js";
 import { learnedRuleAdjustment, learnedSenderWeight } from "./learning.js";
 
 export const summarizeReasons = (matches: readonly RuleMatch[]): string[] => {
@@ -63,6 +68,7 @@ export const buildRuleMatches = (
 
   for (const rule of rules.rules) {
     const regex = createRegex(rule);
+    const foldedRegex = createFoldedRegex(rule);
     const candidate =
       rule.field === "subject"
         ? message.subject
@@ -75,7 +81,12 @@ export const buildRuleMatches = (
               : rule.field === "header"
                 ? (message.headers[String(rule.headerName ?? "").toLowerCase()] ?? "")
                 : "";
-    if (candidate.length === 0 || !regex.test(candidate)) {
+    // The raw match keeps every pattern working exactly as written; the folded
+    // match adds tolerance for umlauts and sharp s on either side.
+    if (
+      candidate.length === 0 ||
+      !(regex.test(candidate) || foldedRegex?.test(foldForMatching(candidate)) === true)
+    ) {
       continue;
     }
     matches.push({
