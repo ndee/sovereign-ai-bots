@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.7.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.6.0...v2.7.0) (2026-11-24)
+
+
+### Features
+
+* **mail-sentinel:** read German keywords with umlauts and compounds, keep bare day words and a confident model gray out of alerts ([#199](https://github.com/ndee/sovereign-ai-bots/issues/199)) ([ba7e060](https://github.com/ndee/sovereign-ai-bots/commit/ba7e0601c4680bcd278ad8018a94ff589f40a11a))
+
 ## [2.6.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.5.0...v2.6.0) (2026-11-13)
 
 
