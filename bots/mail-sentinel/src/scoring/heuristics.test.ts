@@ -146,6 +146,52 @@ describe("scoring/heuristics", () => {
     expect(ids).not.toContain("rule-unknown");
   });
 
+  describe("German spelling tolerance", () => {
+    const rulesWith = (pattern: string) => ({
+      ...sampleRules,
+      rules: [
+        {
+          id: "rule-folded",
+          field: "text" as const,
+          pattern,
+          weight: 3,
+          reason: "folded",
+        },
+      ],
+      senderWeights: {},
+      domainWeights: {},
+    });
+    const withText = (text: string) => ({ ...sampleMessage, text, subject: "Hallo" });
+    const matched = (pattern: string, text: string): boolean =>
+      buildRuleMatches(withText(text), sampleState, rulesWith(pattern)).some(
+        (match) => match.ruleId === "rule-folded",
+      );
+
+    it("matches an ASCII-spelled pattern against text written with umlauts", () => {
+      expect(matched("\\b(rueckmeldung|bestaetigen)\\b", "Bitte um Rückmeldung.")).toBe(true);
+      expect(matched("\\bbestaetigen\\b", "Können Sie das bestätigen?")).toBe(true);
+      expect(matched("\\bgross\\b", "Der Schaden ist groß.")).toBe(true);
+    });
+
+    it("matches a pattern written with umlauts against umlaut and ASCII text", () => {
+      expect(matched("\\bkündigung\\b", "Ihre Kündigung ist eingegangen.")).toBe(true);
+      expect(matched("\\bkündigung\\b", "Ihre Kuendigung ist eingegangen.")).toBe(true);
+    });
+
+    it("still matches patterns the raw text satisfies only before folding", () => {
+      expect(matched("ü{2}", "Das Wort hat üü darin.")).toBe(true);
+    });
+
+    it("keeps the raw match of a rule whose folded pattern is invalid", () => {
+      expect(matched("[x-ä]", "ä")).toBe(true);
+      expect(matched("[x-ä]", "abc")).toBe(false);
+    });
+
+    it("does not match unrelated text", () => {
+      expect(matched("\\brueckmeldung\\b", "Danke für den Hinweis.")).toBe(false);
+    });
+  });
+
   it("pushes a negative sender-weight rule match with the down-weight reason", () => {
     const matches = buildRuleMatches(sampleMessage, sampleState, {
       ...sampleRules,
