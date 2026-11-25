@@ -34,7 +34,7 @@
     {
       "id": "decision-question-text",
       "field": "text",
-      "pattern": "\\b(?:kannst du entscheiden|can you decide|please decide|please approve|bitte entscheiden|please confirm|bitte bestaetigen|bitte bestatigen|bitte\\s+um\\s+(?:ihre\\s+|deine\\s+|eine\\s+)?(?:freigabe|genehmigung|zustimmung|entscheidung)|(?:koennen|koennten|koenntest|kannst)\\s+(?:sie|du)\\s+(?:(?:das|dies|bitte)\\s+)*(?:entscheiden|freigeben|genehmigen|zustimmen|bestaetigen))\\b",
+      "pattern": "\\b(?:kannst du entscheiden|can you decide|please decide|please approve|bitte entscheiden|please confirm|bitte bestaetigen|bitte bestatigen|bitte\\s+um\\s+(?:ihre\\s+|deine\\s+|eine\\s+)?(?:freigabe|genehmigung|zustimmung|entscheidung)|zuzustimmen|zustimmung\\s+(?:zu\\s+)?(?:erklaeren|erteilen)|(?:erklaeren|erteilen)\\s+sie\\s+(?:[a-z0-9.]+\\s+){0,5}?(?:ihre\\s+)?zustimmung|(?:need|require|request)\\s+your\\s+(?:written\\s+)?(?:consent|agreement)|please\\s+(?:confirm\\s+(?:that\\s+)?you\\s+)?(?:agree|consent)\\s+to|please\\s+accept\\s+the\\s+(?:new|updated|revised|changed)\\s+(?:terms|conditions|prices|pricing|rent|contract|agreement)|(?:koennen|koennten|koenntest|kannst)\\s+(?:sie|du)\\s+(?:(?:das|dies|bitte)\\s+)*(?:entscheiden|freigeben|genehmigen|zustimmen|bestaetigen))\\b",
       "weight": 4,
       "categories": [
         "decision-required"
@@ -54,12 +54,12 @@
     {
       "id": "financial-invoice-subject",
       "field": "subject",
-      "pattern": "\\b(?:[a-z]*(?<!be)rechnung(?:en)?|invoice|angebot|offer|[a-z]*zahlung[a-z]*|payment|[a-z]*vertrag[a-z]*|contract|preis|preis(?:erhoehung|anpassung|aenderung)|price|renewal|renewed|abonnement|subscription|[a-z]*mahnung)\\b",
+      "pattern": "\\b(?:[a-z]*(?<!be)rechnung(?:en)?|invoice|angebot|offer|[a-z]*zahlung[a-z]*|payment|[a-z]*vertrag[a-z]*|contract|preis|[a-z]*(?:miet|preis|beitrags|tarif|gebuehren|entgelt|pacht|abschlags)(?:erhoehung|anpassung|aenderung)[a-z]*|(?:rent|price|fee|tariff|premium)\\s+(?:increase|change|adjustment|review)s?|(?:lease|tenancy)\\s+(?:agreement|renewal|amendment|extension)|changes?\\s+to\\s+your\\s+(?:contract|agreement|lease|tariff|plan)|price|renewal|renewed|abonnement|subscription|[a-z]*mahnung)\\b",
       "weight": 5,
       "categories": [
         "financial-relevance"
       ],
-      "reason": "subject mentions an invoice, offer, contract, payment, or subscription renewal"
+      "reason": "subject mentions an invoice, offer, contract, payment, subscription renewal, or a rent or price change"
     },
     {
       "id": "financial-payment-text",
@@ -70,6 +70,16 @@
         "financial-relevance"
       ],
       "reason": "body contains payment- or subscription-renewal wording"
+    },
+    {
+      "id": "financial-change-text",
+      "field": "text",
+      "pattern": "\\b(?:[a-z]*(?:miet|preis|beitrags|tarif|gebuehren|entgelt|pacht|abschlags)(?:erhoehung|anpassung)(?:en|s[a-z]*)?|erhoehung\\s+(?:der|ihrer|deiner|unserer|ihres|des)\\s+(?:[a-z]+\\s+)?(?:[a-z]*miete|preise?|beitraege?|beitrags|gebuehren|tarife?|abschlaege?|abschlags|entgelte?)|(?:aenderung|anpassung)(?:en)?\\s+(?:der|unserer|ihrer|ihres|des)\\s+(?:allgemeinen\\s+)?(?:geschaeftsbedingungen|vertragsbedingungen|agb|konditionen|preise|entgelte|tarife|beitraege|mietvertrags?)|(?:rent|price|fee|tariff|premium)\\s+(?:increase|adjustment|rise)s?|increase\\s+(?:in|of)\\s+(?:your|the)\\s+(?:monthly\\s+|annual\\s+)?(?:rent|price|fee|premium|tariff)s?)\\b",
+      "weight": 4,
+      "categories": [
+        "financial-relevance"
+      ],
+      "reason": "body announces a rent, price, fee or terms change"
     },
     {
       "id": "risk-escalation-subject",
@@ -84,7 +94,7 @@
     {
       "id": "risk-notice-subject",
       "field": "subject",
-      "pattern": "\\b(?:[a-z]*(?<!an)kuendigung(?:en|s[a-z]*)?|gekuendigt|abmahnung|defekt[a-z]*|[a-z]*stoerung(?:en)?|[a-z]+schaden|[a-z]*maengel[a-z]*|reklamation|termination|outage|defect(?:s|ive)?)\\b",
+      "pattern": "\\b(?:[a-z]*(?<!an)kuendigung(?:en|s[a-z]*)?|gekuendigt|abmahnung|defekt[a-z]*|[a-z]*stoerung(?:en|smeldung(?:en)?)?|[a-z]*ausfall|[a-z]*rohrbruch|[a-z]+schaden|[a-z]*maengel[a-z]*|reklamation|termination|outage|(?:power|heating|boiler|water|gas)\\s+(?:cut|failure|outage)s?|no\\s+(?:hot|running)\\s+water|defect(?:s|ive)?)\\b",
       "weight": 4,
       "categories": [
         "risk-escalation"
@@ -94,7 +104,7 @@
     {
       "id": "risk-deadline-text",
       "field": "text",
-      "pattern": "\\b(?:[a-z]*frist(?:en)?|frist(?:ablauf|ende|verlaengerung|setzung|ueberschreitung)[a-z]*|deadlines?|urgent|dringend[a-z]*|dringlich[a-z]*|eilt|eilig[a-z]*|unverzueglich|[a-z]*eskalation(?:en)?|escalation|[a-z]*beschwerden?|complaints?|security incident|[a-z]*sicherheitsvorfall|(?:bis|noch)\\s+(?:spaetestens\\s+)?(?:heute|morgen|uebermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|bis\\s+spaetestens|(?:heute|morgen)\\s+noch|(?:by|until|due|before)\\s+(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|end\\s+of\\s+(?:the\\s+)?(?:day|week)))\\b",
+      "pattern": "\\b(?:[a-z]*frist(?:en)?|frist(?:ablauf|ende|verlaengerung|setzung|ueberschreitung)[a-z]*|deadlines?|urgent|dringend[a-z]*|dringlich[a-z]*|eilt|eilig[a-z]*|unverzueglich|[a-z]*eskalation(?:en)?|escalation|[a-z]*beschwerden?|complaints?|security incident|[a-z]*sicherheitsvorfall|(?:bis|noch)\\s+(?:spaetestens\\s+)?(?:heute|morgen|uebermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|bis\\s+spaetestens|(?:innerhalb|binnen)\\s+(?:von\\s+)?(?:[a-z0-9]+\\s+){1,2}(?:tag(?:e|en)?|woche(?:n)?|monat(?:e|en|s)?)\\s+nach\\s+(?:zugang|zustellung|bekanntgabe)|(?:nach|ab)\\s+(?:zugang|zustellung|bekanntgabe)\\s+(?:dieses|des|dieser|der|ihres)\\s+(?:schreibens|bescheid(?:e?s)?|briefe?s|mitteilung)|(?:heute|morgen)\\s+noch|(?:by|until|due|before)\\s+(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|end\\s+of\\s+(?:the\\s+)?(?:day|week)))\\b",
       "weight": 5,
       "categories": [
         "risk-escalation"
@@ -114,12 +124,12 @@
     {
       "id": "risk-defect-text",
       "field": "text",
-      "pattern": "\\b(?:defekt[a-z]*|[a-z]*maengel[a-z]*|mangelhaft[a-z]*|[a-z]*stoerung(?:en)?|beschaedig[a-z]*|kaputt[a-z]*|[a-z]+schaden|schadens(?:fall|meldung|anzeige)|reklamation(?:en)?|undicht[a-z]*|[a-z]*ausfall|funktionier(?:t|en)\\s+(?:leider\\s+)?nicht|defect(?:s|ive)?|damaged|malfunction(?:s|ing)?|not\\s+working|out\\s+of\\s+order|outage)\\b",
+      "pattern": "\\b(?:defekt[a-z]*|[a-z]*maengel[a-z]*|mangelhaft[a-z]*|[a-z]*stoerung(?:en|smeldung(?:en)?)?|beschaedig[a-z]*|kaputt[a-z]*|[a-z]+schaden|schadens(?:fall|meldung|anzeige)|reklamation(?:en)?|undicht[a-z]*|[a-z]*ausfall|[a-z]*rohrbruch|leckage|funktionier(?:t|en)\\s+(?:(?:leider|auch|noch|immer|weiterhin|gar|ueberhaupt|schon|wieder)\\s+){0,3}nicht|(?:[a-z]*heizung[a-z]*|heizkoerper|therme|boiler|[a-z]*wasser[a-z]*|strom|gas(?:versorgung|leitung)?|aufzug|fahrstuhl|internet|telefon|netz)\\s+(?:[a-z0-9.]+\\s+){0,5}?ausgefallen|(?:[a-z]*heizung[a-z]*|heizkoerper|therme|[a-z]*wasser[a-z]*|strom|gas|aufzug|fahrstuhl|internet|netz)\\s+(?:[a-z]+\\s+){0,3}?faellt\\s+(?:[a-z]+\\s+){0,2}?aus|(?:heizung|heizkoerper|therme|warmwasser|aufzug|fahrstuhl)\\s+geht\\s+(?:[a-z]+\\s+){0,2}?nicht|heiz(?:ung|koerper)\\s+(?:[a-z]+\\s+){0,3}?(?:bleib(?:t|en)|ist|sind|wird|werden)\\s+(?:(?:immer|noch|ganz|eis|leider)\\s+){0,2}kalt|kein(?:e|en)?\\s+(?:warmwasser|warmes\\s+wasser|heisswasser|fliessendes\\s+wasser|strom|gas|heizung|internet)|(?:strom|wasser|gas|waerme|fernwaerme|versorgungs|netz)[a-z]*unterbrechung(?:en)?|(?:strom|wasser|gas)(?:sperre|abschaltung|abstellung)(?:en)?|(?:[a-z]*wasser|strom|gas|heizung)\\s+(?:[a-z0-9.]+\\s+){0,5}?abgestellt|defect(?:s|ive)?|damaged|malfunction(?:s|ing)?|not\\s+working|out\\s+of\\s+order|outage|(?:power|electricity|water|gas|heating|hot\\s+water)\\s+(?:cut|failure|interruption|shut-?off)s?|(?:heating|boiler|furnace|heat\\s+pump|water\\s+heater)\\s+(?:has\\s+|have\\s+)?(?:failed|broken\\s+down|stopped\\s+working|is\\s+(?:down|broken))|no\\s+(?:hot|running)\\s+water|(?:supply|service)\\s+interruption)\\b",
       "weight": 4,
       "categories": [
         "risk-escalation"
       ],
-      "reason": "body reports a defect, damage, or an outage"
+      "reason": "body reports a defect, damage, or an outage of heating, water, power or another supply"
     },
     {
       "id": "risk-termination-text",
@@ -130,6 +140,26 @@
         "risk-escalation"
       ],
       "reason": "body gives or announces a termination or a formal warning"
+    },
+    {
+      "id": "risk-authority-subject",
+      "field": "subject",
+      "pattern": "\\b(?:[a-z]*anhoerung[a-z]*|[a-z]*bussgeld[a-z]*|[a-z]*verwarn(?:ung|geld)[a-z]*|ordnungswidrigkeit(?:en)?|[a-z]+bescheid(?:e|es|s)?|[a-z]*vorladung(?:en)?|ladung\\s+(?:zu[mr]|als)|strafbefehl[a-z]*|[a-z]*vollstreckung[a-z]*|[a-z]*pfaendung[a-z]*|zwangsgeld[a-z]*|gerichtstermin[a-z]*|hauptverhandlung|muendlichen?\\s+verhandlung|(?:straf|gerichts|ermittlungs|klage)verfahren|summons|subpoena|penalty\\s+(?:notice|charge|proceedings?)|fixed\\s+penalty|notice\\s+of\\s+(?:hearing|intended\\s+prosecution|assessment|violation)|court\\s+(?:date|hearing|order|summons)|(?:speeding|parking|traffic)\\s+(?:fine|ticket|violation)s?)\\b",
+      "weight": 4,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "subject names an official notice, a hearing, a fine, or court proceedings"
+    },
+    {
+      "id": "risk-authority-text",
+      "field": "text",
+      "pattern": "\\b(?:[a-z]*anhoerung[a-z]*|[a-z]*bussgeld[a-z]*|[a-z]*verwarn(?:ung|geld)[a-z]*|ordnungswidrigkeit(?:en)?|[a-z]+bescheid(?:e|es|s)?|[a-z]*vorladung(?:en)?|ladung\\s+(?:zu[mr]|als)|strafbefehl[a-z]*|[a-z]*vollstreckung[a-z]*|[a-z]*pfaendung[a-z]*|zwangsgeld[a-z]*|gerichtstermin[a-z]*|hauptverhandlung|muendlichen?\\s+verhandlung|(?:straf|gerichts|ermittlungs|klage)verfahren|summons|subpoena|penalty\\s+(?:notice|charge|proceedings?)|fixed\\s+penalty|notice\\s+of\\s+(?:hearing|intended\\s+prosecution|assessment|violation)|court\\s+(?:date|hearing|order|summons)|(?:speeding|parking|traffic)\\s+(?:fine|ticket|violation)s?|(?:ihnen|dir|euch)\\s+wird\\s+(?:vorgeworfen|zur\\s+last\\s+gelegt)|gelegenheit\\s+zur\\s+(?:stellungnahme|aeusserung)|gelegenheit,?\\s+sich\\s+(?:[a-z0-9.,]+\\s+){0,12}?zu\\s+aeussern|(?:widerspruch|einspruch)\\s+(?:[a-z]+\\s+){0,3}?(?:einlegen|erheben)|rechtsbehelfsbelehrung)\\b",
+      "weight": 4,
+      "categories": [
+        "risk-escalation"
+      ],
+      "reason": "body comes from an authority or court: a hearing, a fine, an official decision, or a chance to respond"
     },
     {
       "id": "risk-priority-header",
