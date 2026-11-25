@@ -5,8 +5,4 @@
  * threshold fails the suite until it is removed here and asserted like every
  * other signal in `scoring/rules-recall.test.ts`.
  */
-export const KNOWN_GAPS: readonly { id: string; score: number }[] = [
-  { id: "signal-stoerungsmeldung-heizung", score: 2 },
-  { id: "signal-anhoerung-bussgeldverfahren", score: 0 },
-  { id: "signal-mieterhoehungsverlangen", score: 0 },
-];
+export const KNOWN_GAPS: readonly { id: string; score: number }[] = [];

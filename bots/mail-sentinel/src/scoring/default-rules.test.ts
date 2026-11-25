@@ -311,3 +311,214 @@ describe("default-rules.json: defects, termination and reply requests", () => {
     expect(scored.matchedRuleIds).not.toContain("decision-reply-text");
   });
 });
+
+const bulkHeaders = {
+  "list-unsubscribe": "<mailto:unsubscribe@example.test>",
+  precedence: "bulk",
+};
+
+describe("default-rules.json: official notices, hearings and fines", () => {
+  it.each([
+    ["Anhörung im Bußgeldverfahren", "risk-authority-subject"],
+    ["Ihr Bußgeldbescheid", "risk-authority-subject"],
+    ["Verwarnung mit Verwarnungsgeld", "risk-authority-subject"],
+    ["Steuerbescheid 2025", "risk-authority-subject"],
+    ["Vorladung als Zeuge", "risk-authority-subject"],
+    ["Ladung zur mündlichen Verhandlung", "risk-authority-subject"],
+    ["Notice of hearing", "risk-authority-subject"],
+    ["Penalty notice for your vehicle", "risk-authority-subject"],
+    ["Court summons", "risk-authority-subject"],
+  ])("reads the subject %s as an official notice", (subject, ruleId) => {
+    const scored = score(subject, "Guten Tag.");
+    expect(scored.matchedRuleIds).toContain(ruleId);
+    expect(scored.category).toBe("risk-escalation");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    "Bitte nutzen Sie den beigefügten Anhörungsbogen.",
+    "Ihnen wird vorgeworfen, zu schnell gefahren zu sein.",
+    "Sie haben Gelegenheit zur Stellungnahme.",
+    "Sie haben Gelegenheit, sich zu dem Vorwurf schriftlich zu äußern.",
+    "Gegen den Bescheid können Sie Widerspruch einlegen.",
+    "Anbei der Widerspruchsbescheid der Behörde.",
+    "Wegen einer Ordnungswidrigkeit wird ein Bußgeld festgesetzt.",
+    "Wir haben die Kontopfändung eingeleitet.",
+    "You will receive a fixed penalty notice.",
+    "A court date has been set for your case.",
+    "We have issued a parking fine for your vehicle.",
+  ])("reads the body %s as an official notice", (text) => {
+    const scored = score("Ihr Schreiben", text);
+    expect(scored.matchedRuleIds).toContain("risk-authority-text");
+    expect(scored.category).toBe("risk-escalation");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    "Sie können sich innerhalb von zwei Wochen nach Zugang dieses Schreibens äußern.",
+    "Bitte antworten Sie binnen eines Monats nach Bekanntgabe.",
+    "Ihre Antwort erwarten wir innerhalb von 14 Tagen nach Zustellung.",
+  ])("reads the formal response window %s as a deadline", (text) => {
+    expect(score("Ihr Schreiben", text).matchedRuleIds).toContain("risk-deadline-text");
+  });
+
+  it.each([
+    ["Kurze Info", "Gib mir bitte kurz Bescheid, ob du kommst."],
+    ["Danke", "Sie war immer sehr bescheiden."],
+    ["Einladung zum Sommerfest", "Wir freuen uns auf euch."],
+    ["Thanks", "Looking forward to hearing from you. That's fine with me."],
+    ["Ihr Auto", "Die Ladung Ihres Fahrzeugs ist abgeschlossen."],
+    ["Hallo", "Registergericht: Amtsgericht Musterstadt, HRB 1234. Geschäftsführer: Max Muster."],
+    ["Ihre Sendung", "Bitte holen Sie die Sendung innerhalb von 7 Tagen ab."],
+    ["Ihre Bestellung", "Sie können innerhalb von 14 Tagen nach Erhalt der Ware zurückgeben."],
+  ])("does not read the look-alike %s as an official notice", (subject, text) => {
+    const scored = score(subject, text);
+    expect(scored.matchedRuleIds).not.toContain("risk-authority-subject");
+    expect(scored.matchedRuleIds).not.toContain("risk-authority-text");
+    expect(scored.candidate).toBe(false);
+  });
+
+  it("keeps a newsletter about a public hearing and the fines catalogue below the candidate threshold", () => {
+    // The words match, as they would in a real notice; the bulk headers carry
+    // the newsletter below the threshold.
+    const scored = score(
+      "Anhörung im Landtag: Der neue Bußgeldkatalog",
+      "Was sich beim Bußgeld für Raser ändert, lesen Sie in unserem Ratgeber.",
+      { headers: bulkHeaders },
+    );
+    expect(scored.matchedRuleIds).toEqual(
+      expect.arrayContaining(["risk-authority-subject", "risk-authority-text"]),
+    );
+    expect(scored.candidate).toBe(false);
+  });
+});
+
+describe("default-rules.json: rent and contract change requests", () => {
+  it.each([
+    "Mieterhöhungsverlangen",
+    "Zustimmung zur Mieterhöhung",
+    "Mietanpassung zum 1. März",
+    "Beitragsanpassung Ihrer Versicherung",
+    "Tarifänderung ab Januar",
+    "Your rent increase",
+    "Price change for your plan",
+    "Lease renewal for Flat 3",
+    "Changes to your contract",
+  ])("reads the subject %s as a financial change", (subject) => {
+    const scored = score(subject, "Guten Tag.");
+    expect(scored.matchedRuleIds).toContain("financial-invoice-subject");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    "Wir kündigen hiermit eine Mieterhöhung an.",
+    "Die Erhöhung der Nettokaltmiete erfolgt zum 1. Februar.",
+    "Ab Januar gilt eine Preisanpassung.",
+    "Die Änderung unserer Allgemeinen Geschäftsbedingungen tritt in Kraft.",
+    "Your monthly rent increase takes effect in March.",
+    "There will be an increase in your monthly premium.",
+  ])("reads the body %s as a financial change", (text) => {
+    const scored = score("Ihre Wohnung", text);
+    expect(scored.matchedRuleIds).toContain("financial-change-text");
+    expect(scored.category).toBe("financial-relevance");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    "Wir bitten Sie, der neuen Miete zuzustimmen.",
+    "Bitte erklären Sie bis Ende März Ihre Zustimmung. Sie können die Zustimmung schriftlich erteilen.",
+    "Sie haben bis Ende März Zeit, Ihre Zustimmung zu erklären.",
+    "We need your written consent to the new terms.",
+    "Please confirm you agree to the updated terms.",
+    "Please accept the revised terms before 1 March.",
+  ])("reads the consent request %s as a decision", (text) => {
+    const scored = score("Ihr Vertrag", text);
+    expect(scored.matchedRuleIds).toContain("decision-question-text");
+  });
+
+  it.each([
+    ["Gehaltserhöhung", "Herzlichen Glückwunsch zur Gehaltserhöhung!"],
+    ["Danke", "Vielen Dank für Ihre Zustimmung zum Newsletter. Sie haben Ihre Zustimmung erteilt."],
+    ["Reichweite", "Die Erhöhung der Reichweite hat geklappt. Da kann ich nur zustimmen."],
+    ["Movie night", "Rent the latest movies tonight."],
+    ["Thanks", "Thank you for your consent. Please accept our apologies for the delay."],
+  ])("does not read the look-alike %s as a rent or contract change", (subject, text) => {
+    const scored = score(subject, text);
+    expect(scored.matchedRuleIds).not.toContain("financial-change-text");
+    expect(scored.matchedRuleIds).not.toContain("decision-question-text");
+    expect(scored.candidate).toBe(false);
+  });
+
+  it("keeps a tenants' newsletter about rent increases below the candidate threshold", () => {
+    const scored = score(
+      "Mieterhöhung: Was Mieter jetzt wissen müssen",
+      "Eine Mieterhöhung ist nur in Grenzen erlaubt. Unser Ratgeber erklärt die Preisanpassung.",
+      { headers: bulkHeaders },
+    );
+    expect(scored.matchedRuleIds).toEqual(
+      expect.arrayContaining(["financial-invoice-subject", "financial-change-text"]),
+    );
+    expect(scored.candidate).toBe(false);
+  });
+});
+
+describe("default-rules.json: heating and utility outages", () => {
+  it.each([
+    "Störungsmeldung Heizung",
+    "Heizungsausfall im 2. OG",
+    "Stromausfall in der Musterstraße",
+    "Power cut on Friday",
+    "Heating failure in block B",
+  ])("reads the subject %s as a risk notice", (subject) => {
+    const scored = score(subject, "Hallo.");
+    expect(scored.matchedRuleIds).toContain("risk-notice-subject");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    "In der Nacht ist die Heizungsanlage im 2. OG ausgefallen.",
+    "Die Heizung ist seit gestern ausgefallen.",
+    "Der Strom fällt immer wieder aus.",
+    "Seit heute früh haben wir kein Warmwasser.",
+    "Es gibt kein warmes Wasser und keine Heizung.",
+    "Die Heizkörper bleiben kalt.",
+    "Die Therme geht schon wieder nicht.",
+    "Die Heizung funktioniert leider immer noch nicht.",
+    "Am Dienstag wird das Wasser von 8 bis 12 Uhr abgestellt.",
+    "Wegen einer Versorgungsunterbrechung gibt es kein Gas.",
+    "Im Keller gab es einen Wasserrohrbruch.",
+    "The boiler has broken down.",
+    "We have no hot water since Monday.",
+    "There is a power failure in the building.",
+  ])("reads the outage report %s as a risk candidate", (text) => {
+    const scored = score("Hallo", text);
+    expect(scored.matchedRuleIds).toContain("risk-defect-text");
+    expect(scored.category).toBe("risk-escalation");
+    expect(scored.relevant).toBe(true);
+  });
+
+  it.each([
+    ["Geschenkideen", "Ausgefallene Geschenkideen für die ganze Familie."],
+    ["Teamrunde", "Das Meeting ist leider ausgefallen, wir holen es nach."],
+    ["Bestätigung", "Funktioniert der Link nicht? Kopieren Sie ihn in den Browser."],
+    ["Ihre Stadtwerke", "Störungshotline rund um die Uhr: 0800 123 456."],
+    ["Energie sparen", "We have no power over the weather, but no heating bills either."],
+  ])("does not read the look-alike %s as an outage", (subject, text) => {
+    const scored = score(subject, text);
+    expect(scored.matchedRuleIds).not.toContain("risk-defect-text");
+    expect(scored.matchedRuleIds).not.toContain("risk-notice-subject");
+    expect(scored.candidate).toBe(false);
+  });
+
+  it("keeps a utility newsletter about outages below the candidate threshold", () => {
+    const scored = score(
+      "Stromausfall? So sind Sie vorbereitet",
+      "Kein Strom, kein Warmwasser: unsere Tipps für den Notfall.",
+      { headers: bulkHeaders },
+    );
+    expect(scored.matchedRuleIds).toEqual(
+      expect.arrayContaining(["risk-notice-subject", "risk-defect-text"]),
+    );
+    expect(scored.candidate).toBe(false);
+  });
+});
