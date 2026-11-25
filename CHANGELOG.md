@@ -14,6 +14,13 @@ Individual bot packages (under `bots/`) carry their own version field in each
 `sovereign-bot.json`. Those versions evolve independently of this catalog-level
 version.
 
+## [2.8.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.7.0...v2.8.0) (2026-11-25)
+
+
+### Features
+
+* **mail-sentinel:** read official notices, rent and contract changes, and heating or supply outages as keyword signals ([#204](https://github.com/ndee/sovereign-ai-bots/issues/204)) ([5651b31](https://github.com/ndee/sovereign-ai-bots/commit/5651b310de913b093e418c5be0ed1337c8d7bf19)), closes [#203](https://github.com/ndee/sovereign-ai-bots/issues/203)
+
 ## [2.7.0](https://github.com/ndee/sovereign-ai-bots/compare/v2.6.0...v2.7.0) (2026-11-24)
 
 
