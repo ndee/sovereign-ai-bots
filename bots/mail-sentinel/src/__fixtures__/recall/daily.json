@@ -1,0 +1,180 @@
+[
+  {
+    "id": "daily-wetterbericht",
+    "why": "automated weather forecast for today",
+    "message": {
+      "uid": 3001,
+      "messageId": "<wx-20261125@wetterdienst.example>",
+      "from": ["Wetterdienst <wetter@wetterdienst.example>"],
+      "to": ["empfaenger@post.example"],
+      "subject": "Ihr Wetter für Musterstadt am Mittwoch, 25.11.",
+      "date": "2026-11-25T05:00:00+01:00",
+      "text": "Guten Morgen!\n\nHeute: bewölkt, später Regen, 3 bis 7 °C, Wind aus Südwest mit 20 km/h.\nMorgen: Schneeregen möglich, 1 bis 4 °C.\nDonnerstag: freundlicher, 2 bis 6 °C.\n\nGlätte in der Nacht zu Donnerstag ist nicht ausgeschlossen.\n\nIhr Wetterdienst",
+      "headers": [
+        { "key": "From", "value": "Wetterdienst <wetter@wetterdienst.example>" },
+        { "key": "To", "value": "empfaenger@post.example" },
+        { "key": "Subject", "value": "Ihr Wetter für Musterstadt am Mittwoch, 25.11." },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 05:00:00 +0100" },
+        { "key": "Message-ID", "value": "<wx-20261125@wetterdienst.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://wetterdienst.example/abbestellen>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-tagesuebersicht-kalender",
+    "why": "calendar's daily agenda",
+    "message": {
+      "uid": 3002,
+      "messageId": "<agenda-20261125@kalender.example>",
+      "from": ["Kalender <kalender-noreply@kalender.example>"],
+      "to": ["geschaeftsleitung@musterbau-gmbh.example"],
+      "subject": "Tagesübersicht für Mittwoch, 25. November 2026",
+      "date": "2026-11-25T06:00:00+01:00",
+      "text": "Ihre Termine heute:\n\n08:30 – 09:00 Jour fixe Bauleitung\n11:00 – 12:00 Telefonat Kunde Beispiel GmbH\n14:00 – 15:30 Baustellenbegehung Hallendach\n\nMorgen: 2 Termine\n\nKalender öffnen: https://kalender.example",
+      "headers": [
+        { "key": "From", "value": "Kalender <kalender-noreply@kalender.example>" },
+        { "key": "To", "value": "geschaeftsleitung@musterbau-gmbh.example" },
+        { "key": "Subject", "value": "Tagesübersicht für Mittwoch, 25. November 2026" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 06:00:00 +0100" },
+        { "key": "Message-ID", "value": "<agenda-20261125@kalender.example>" },
+        { "key": "Auto-Submitted", "value": "auto-generated" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-nachrichten-am-morgen",
+    "why": "morning news digest",
+    "message": {
+      "uid": 3003,
+      "messageId": "<briefing-20261125@zeitung-am-morgen.example>",
+      "from": ["Zeitung am Morgen <briefing@zeitung-am-morgen.example>"],
+      "to": ["empfaenger@mail.example"],
+      "subject": "Der Morgen: Was heute wichtig ist",
+      "date": "2026-11-25T06:15:00+01:00",
+      "text": "Guten Morgen,\n\ndas Wichtigste heute in Kürze:\n\n– Der Landtag berät heute über den Haushalt 2027.\n– Bahnstreik: Die Gewerkschaft droht mit Warnstreiks ab Montag.\n– Sport: Der Stadtverein gewinnt das Pokalspiel am Dienstagabend.\n\nEinen guten Tag wünscht Ihnen\nIhre Redaktion\n\nNewsletter abbestellen: https://zeitung-am-morgen.example/abbestellen",
+      "headers": [
+        { "key": "From", "value": "Zeitung am Morgen <briefing@zeitung-am-morgen.example>" },
+        { "key": "To", "value": "empfaenger@mail.example" },
+        { "key": "Subject", "value": "Der Morgen: Was heute wichtig ist" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 06:15:00 +0100" },
+        { "key": "Message-ID", "value": "<briefing-20261125@zeitung-am-morgen.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://zeitung-am-morgen.example/abbestellen?u=4471>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-backup-report",
+    "why": "nightly backup job report from the office server",
+    "message": {
+      "uid": 3004,
+      "messageId": "<backup-20261125.0300@nas.agentur-blau.example>",
+      "from": ["Backup NAS <backup@nas.agentur-blau.example>"],
+      "to": ["office@agentur-blau.example"],
+      "subject": "[NAS] Backup-Aufgabe „Nachtsicherung“ erfolgreich abgeschlossen",
+      "date": "2026-11-25T03:12:40+01:00",
+      "text": "Die Backup-Aufgabe „Nachtsicherung“ wurde am 25.11.2026 um 03:12 erfolgreich abgeschlossen.\n\nGesicherte Daten: 12,4 GB\nDauer: 11 Minuten\nNächste Ausführung: morgen, 03:00",
+      "headers": [
+        { "key": "From", "value": "Backup NAS <backup@nas.agentur-blau.example>" },
+        { "key": "To", "value": "office@agentur-blau.example" },
+        { "key": "Subject", "value": "[NAS] Backup-Aufgabe „Nachtsicherung“ erfolgreich abgeschlossen" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 03:12:40 +0100" },
+        { "key": "Message-ID", "value": "<backup-20261125.0300@nas.agentur-blau.example>" },
+        { "key": "Auto-Submitted", "value": "auto-generated" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-kontostand",
+    "why": "bank's daily balance notification",
+    "message": {
+      "uid": 3005,
+      "messageId": "<saldo-20261125-551@bank-am-markt.example>",
+      "from": ["Bank am Markt <benachrichtigung@bank-am-markt.example>"],
+      "to": ["kontoinhaber@mail.example"],
+      "subject": "Ihr täglicher Kontostand",
+      "date": "2026-11-25T07:00:00+01:00",
+      "text": "Guten Tag,\n\nIhr Kontostand am 25.11.2026, 07:00 Uhr:\n\nGirokonto ****4471: 2.184,33 €\n\nSeit gestern 3 neue Umsätze. Details finden Sie im Online-Banking.\n\nIhre Bank am Markt",
+      "headers": [
+        { "key": "From", "value": "Bank am Markt <benachrichtigung@bank-am-markt.example>" },
+        { "key": "To", "value": "kontoinhaber@mail.example" },
+        { "key": "Subject", "value": "Ihr täglicher Kontostand" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 07:00:00 +0100" },
+        { "key": "Message-ID", "value": "<saldo-20261125-551@bank-am-markt.example>" },
+        { "key": "Auto-Submitted", "value": "auto-generated" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-schrittzaehler",
+    "why": "fitness app's daily activity summary",
+    "message": {
+      "uid": 3006,
+      "messageId": "<act-20261124@fit-app.example>",
+      "from": ["FitApp <no-reply@fit-app.example>"],
+      "to": ["empfaenger@haushalt-beispiel.example"],
+      "subject": "Dein Tag: 9.412 Schritte",
+      "date": "2026-11-24T22:00:00+01:00",
+      "text": "Super!\n\nHeute bist du 9.412 Schritte gegangen und hast 412 kcal verbrannt. Das sind 6 % mehr als am Montag.\n\nMorgen schaffst du die 10.000!\n\nDeine FitApp",
+      "headers": [
+        { "key": "From", "value": "FitApp <no-reply@fit-app.example>" },
+        { "key": "To", "value": "empfaenger@haushalt-beispiel.example" },
+        { "key": "Subject", "value": "Dein Tag: 9.412 Schritte" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 22:00:00 +0100" },
+        { "key": "Message-ID", "value": "<act-20261124@fit-app.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://fit-app.example/unsubscribe>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-boersenbericht",
+    "why": "end-of-day stock market report",
+    "message": {
+      "uid": 3007,
+      "messageId": "<markt-20261124@finanzportal.example>",
+      "from": ["Finanzportal <marktbericht@finanzportal.example>"],
+      "to": ["empfaenger@mail.example"],
+      "subject": "Marktbericht am Abend: Index schließt leicht im Plus",
+      "date": "2026-11-24T18:30:00+01:00",
+      "text": "Der Leitindex schloss am Dienstag 0,4 % fester. Gefragt waren vor allem Industriewerte, Versorger gaben nach.\n\nIhr Depot: +0,7 % heute.\n\nMorgen im Fokus: Ifo-Geschäftsklima und Quartalszahlen aus dem Einzelhandel.\n\nAbbestellen: https://finanzportal.example/abbestellen",
+      "headers": [
+        { "key": "From", "value": "Finanzportal <marktbericht@finanzportal.example>" },
+        { "key": "To", "value": "empfaenger@mail.example" },
+        { "key": "Subject", "value": "Marktbericht am Abend: Index schließt leicht im Plus" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 18:30:00 +0100" },
+        { "key": "Message-ID", "value": "<markt-20261124@finanzportal.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://finanzportal.example/abbestellen?u=19>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "daily-ticket-digest-english",
+    "why": "English daily digest of a helpdesk queue",
+    "message": {
+      "uid": 3008,
+      "messageId": "<digest-20261125@helpdesk.agentur-blau.example>",
+      "from": ["Helpdesk <helpdesk@helpdesk.agentur-blau.example>"],
+      "to": ["office@agentur-blau.example"],
+      "subject": "Daily summary: 4 open tickets",
+      "date": "2026-11-25T07:30:00+01:00",
+      "text": "Good morning,\n\nhere is your daily summary for Wednesday:\n\n- 4 open tickets (1 new since yesterday)\n- 2 tickets waiting for the customer\n- 0 tickets past their SLA\n\nOpen the helpdesk: https://helpdesk.agentur-blau.example",
+      "headers": [
+        { "key": "From", "value": "Helpdesk <helpdesk@helpdesk.agentur-blau.example>" },
+        { "key": "To", "value": "office@agentur-blau.example" },
+        { "key": "Subject", "value": "Daily summary: 4 open tickets" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 07:30:00 +0100" },
+        { "key": "Message-ID", "value": "<digest-20261125@helpdesk.agentur-blau.example>" },
+        { "key": "Auto-Submitted", "value": "auto-generated" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  }
+]

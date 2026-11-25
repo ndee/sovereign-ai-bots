@@ -1,0 +1,133 @@
+[
+  {
+    "id": "edge-rechnung-noreply-bulk-headers",
+    "why": "a real monthly phone bill, sent from a noreply address with an unsubscribe header",
+    "message": {
+      "uid": 4001,
+      "messageId": "<rg-112026-5541@rechnung.telefonanbieter.example>",
+      "from": ["Telefonanbieter <noreply@rechnung.telefonanbieter.example>"],
+      "to": ["empfaenger@post.example"],
+      "subject": "Ihre Rechnung für November 2026",
+      "date": "2026-11-04T04:10:00+01:00",
+      "text": "Guten Tag,\n\nIhre Rechnung für November 2026 ist da. Rechnungsbetrag: 39,99 €. Der Betrag wird am 12.11.2026 von Ihrem Konto abgebucht.\n\nIhre Rechnung als PDF: https://telefonanbieter.example/rechnung\n\nE-Mail-Einstellungen: https://telefonanbieter.example/einstellungen",
+      "headers": [
+        { "key": "From", "value": "Telefonanbieter <noreply@rechnung.telefonanbieter.example>" },
+        { "key": "To", "value": "empfaenger@post.example" },
+        { "key": "Subject", "value": "Ihre Rechnung für November 2026" },
+        { "key": "Date", "value": "Wed, 04 Nov 2026 04:10:00 +0100" },
+        { "key": "Message-ID", "value": "<rg-112026-5541@rechnung.telefonanbieter.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://telefonanbieter.example/einstellungen>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "edge-newsletter-ueber-rechnungen",
+    "why": "newsletter whose subject talks about invoices without one being due",
+    "message": {
+      "uid": 4002,
+      "messageId": "<tipps-47@ratgeber.stadtwerke-musterstadt.example>",
+      "from": ["Stadtwerke Musterstadt Ratgeber <ratgeber@stadtwerke-musterstadt.example>"],
+      "to": ["empfaenger@post.example"],
+      "subject": "So lesen Sie Ihre Jahresrechnung richtig",
+      "date": "2026-11-15T10:00:00+01:00",
+      "text": "Liebe Kundin, lieber Kunde,\n\nwas bedeutet eigentlich der Arbeitspreis, und warum ändert sich mein Abschlag? In unserem Ratgeber erklären wir Ihre Jahresrechnung Schritt für Schritt.\n\nZum Ratgeber: https://stadtwerke-musterstadt.example/ratgeber\n\nNewsletter abbestellen: https://stadtwerke-musterstadt.example/abbestellen",
+      "headers": [
+        { "key": "From", "value": "Stadtwerke Musterstadt Ratgeber <ratgeber@stadtwerke-musterstadt.example>" },
+        { "key": "To", "value": "empfaenger@post.example" },
+        { "key": "Subject", "value": "So lesen Sie Ihre Jahresrechnung richtig" },
+        { "key": "Date", "value": "Sun, 15 Nov 2026 10:00:00 +0100" },
+        { "key": "Message-ID", "value": "<tipps-47@ratgeber.stadtwerke-musterstadt.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://stadtwerke-musterstadt.example/abbestellen>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "edge-abwesenheitsnotiz",
+    "why": "out-of-office auto reply that mentions urgent cases",
+    "message": {
+      "uid": 4003,
+      "messageId": "<ooo-55@steuerkanzlei-beispiel.example>",
+      "from": ["Steuerkanzlei Beispiel <kanzlei@steuerkanzlei-beispiel.example>"],
+      "to": ["empfaenger@haushalt-beispiel.example"],
+      "subject": "Automatische Antwort: Unterlagen Steuererklärung",
+      "date": "2026-11-25T09:01:00+01:00",
+      "text": "Vielen Dank für Ihre Nachricht. Ich bin bis einschließlich Montag, 30.11., nicht im Büro.\n\nIn dringenden Fällen wenden Sie sich bitte an meine Vertretung unter 0341 555 0190.",
+      "headers": [
+        { "key": "From", "value": "Steuerkanzlei Beispiel <kanzlei@steuerkanzlei-beispiel.example>" },
+        { "key": "To", "value": "empfaenger@haushalt-beispiel.example" },
+        { "key": "Subject", "value": "Automatische Antwort: Unterlagen Steuererklärung" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 09:01:00 +0100" },
+        { "key": "Message-ID", "value": "<ooo-55@steuerkanzlei-beispiel.example>" },
+        { "key": "Auto-Submitted", "value": "auto-replied" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "edge-antwortkette-zitierte-frist",
+    "why": "a thanks reply whose quoted history still carries an old deadline",
+    "message": {
+      "uid": 4004,
+      "messageId": "<CAL0r3n@web.example>",
+      "from": ["Bauherrschaft Neubau <bauherrschaft@web.example>"],
+      "to": ["info@architekturbuero-beispiel.example"],
+      "subject": "AW: AW: Termin Baubesprechung",
+      "date": "2026-11-24T08:10:00+01:00",
+      "text": "Prima, dann sehen wir uns am 03.12. Danke!\n\nDie Bauherrschaft\n\n> Am 23.11.2026 schrieb das Architekturbüro:\n> Der 03.12. passt mir gut.\n>\n>> Ich bitte um kurze Rückmeldung bis Mittwoch, damit ich den Raum reservieren kann.",
+      "headers": [
+        { "key": "From", "value": "Bauherrschaft Neubau <bauherrschaft@web.example>" },
+        { "key": "To", "value": "info@architekturbuero-beispiel.example" },
+        { "key": "Subject", "value": "AW: AW: Termin Baubesprechung" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 08:10:00 +0100" },
+        { "key": "Message-ID", "value": "<CAL0r3n@web.example>" },
+        { "key": "In-Reply-To", "value": "<CA+7q2m-reply@architekturbuero-beispiel.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "edge-security-alert-noreply",
+    "why": "provider's automatic new-sign-in alert from a noreply address",
+    "message": {
+      "uid": 4005,
+      "messageId": "<sa-7712@account.mailprovider.example>",
+      "from": ["Mail Provider <no-reply@account.mailprovider.example>"],
+      "to": ["bewerber@post.example"],
+      "subject": "Security alert: new sign-in on Linux",
+      "date": "2026-11-24T23:48:00+00:00",
+      "text": "We noticed a new sign-in to your account on a Linux device in Frankfurt.\n\nIf this was you, you don't need to do anything. If not, secure your account now: https://account.mailprovider.example/security",
+      "headers": [
+        { "key": "From", "value": "Mail Provider <no-reply@account.mailprovider.example>" },
+        { "key": "To", "value": "bewerber@post.example" },
+        { "key": "Subject", "value": "Security alert: new sign-in on Linux" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 23:48:00 +0000" },
+        { "key": "Message-ID", "value": "<sa-7712@account.mailprovider.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "edge-ankuendigung-statt-kuendigung",
+    "why": "announcement of a building inspection, close to termination wording but not one",
+    "message": {
+      "uid": 4006,
+      "messageId": "<ank-0911@hausverwaltung-beispiel.example>",
+      "from": ["Hausverwaltung Beispiel <technik@hausverwaltung-beispiel.example>"],
+      "to": ["mieter@post.example"],
+      "subject": "Ankündigung: Ablesung der Heizkostenverteiler am 08.12.",
+      "date": "2026-11-20T11:00:00+01:00",
+      "text": "Sehr geehrte Mieterinnen und Mieter,\n\nam Dienstag, 08.12.2026, zwischen 8 und 12 Uhr werden die Heizkostenverteiler abgelesen. Bitte ermöglichen Sie den Zugang zu Ihrer Wohnung oder hinterlegen Sie einen Schlüssel bei Ihren Nachbarn.\n\nMit freundlichen Grüßen\nHausverwaltung Beispiel",
+      "headers": [
+        { "key": "From", "value": "Hausverwaltung Beispiel <technik@hausverwaltung-beispiel.example>" },
+        { "key": "To", "value": "mieter@post.example" },
+        { "key": "Subject", "value": "Ankündigung: Ablesung der Heizkostenverteiler am 08.12." },
+        { "key": "Date", "value": "Fri, 20 Nov 2026 11:00:00 +0100" },
+        { "key": "Message-ID", "value": "<ank-0911@hausverwaltung-beispiel.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  }
+]

@@ -1,0 +1,267 @@
+[
+  {
+    "id": "noise-newsletter-moebelhaus",
+    "why": "retail newsletter with a sale that ends on a named day",
+    "message": {
+      "uid": 2001,
+      "messageId": "<nl-20261124-88123@news.moebelhaus-sonne.example>",
+      "from": ["Möbelhaus Sonne <newsletter@news.moebelhaus-sonne.example>"],
+      "to": ["empfaenger@post.example"],
+      "subject": "Black Week: bis zu 40 % auf Sofas – nur bis Sonntag!",
+      "date": "2026-11-24T06:00:00+01:00",
+      "text": "Hallo,\n\ndie Black Week ist da! Nur bis Sonntag sparst du bis zu 40 % auf ausgewählte Sofas, Sessel und Wohnlandschaften.\n\nJetzt entdecken: https://moebelhaus-sonne.example/black-week\n\nDu möchtest diesen Newsletter nicht mehr erhalten? Hier abmelden: https://news.moebelhaus-sonne.example/unsubscribe",
+      "headers": [
+        { "key": "From", "value": "Möbelhaus Sonne <newsletter@news.moebelhaus-sonne.example>" },
+        { "key": "To", "value": "empfaenger@post.example" },
+        { "key": "Subject", "value": "Black Week: bis zu 40 % auf Sofas – nur bis Sonntag!" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 06:00:00 +0100" },
+        { "key": "Message-ID", "value": "<nl-20261124-88123@news.moebelhaus-sonne.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://news.moebelhaus-sonne.example/unsubscribe?u=88123>, <mailto:unsubscribe@news.moebelhaus-sonne.example>" },
+        { "key": "List-Unsubscribe-Post", "value": "List-Unsubscribe=One-Click" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-versandbestaetigung",
+    "why": "shipping notice that says the parcel arrives today",
+    "message": {
+      "uid": 2002,
+      "messageId": "<shp-5512093@paketdienst.example>",
+      "from": ["Paketdienst <noreply@paketdienst.example>"],
+      "to": ["empfaenger@mail.example"],
+      "subject": "Ihr Paket kommt heute",
+      "date": "2026-11-25T07:31:00+01:00",
+      "text": "Guten Tag,\n\nIhre Sendung 00340434161094000000 wird heute zwischen 10:30 und 13:30 Uhr zugestellt.\n\nSie sind nicht zu Hause? Ändern Sie die Zustellung bequem online: https://paketdienst.example/sendung\n\nIhr Paketdienst",
+      "headers": [
+        { "key": "From", "value": "Paketdienst <noreply@paketdienst.example>" },
+        { "key": "To", "value": "empfaenger@mail.example" },
+        { "key": "Subject", "value": "Ihr Paket kommt heute" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 07:31:00 +0100" },
+        { "key": "Message-ID", "value": "<shp-5512093@paketdienst.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-geburtstagsgruss",
+    "why": "birthday greeting from a friend",
+    "message": {
+      "uid": 2003,
+      "messageId": "<CAK3b1d@web.example>",
+      "from": ["Eine Freundin <freundin@web.example>"],
+      "to": ["empfaenger@haushalt-beispiel.example"],
+      "subject": "Alles Gute zum Geburtstag!",
+      "date": "2026-11-21T08:03:12+01:00",
+      "text": "Liebe Freundin,\n\nalles Liebe zu deinem Geburtstag! Ich hoffe, du hast heute einen schönen Tag mit den Kindern und lässt dich ordentlich feiern.\n\nWir sehen uns hoffentlich bald mal wieder auf einen Kaffee.\n\nDrück dich",
+      "headers": [
+        { "key": "From", "value": "Eine Freundin <freundin@web.example>" },
+        { "key": "To", "value": "empfaenger@haushalt-beispiel.example" },
+        { "key": "Subject", "value": "Alles Gute zum Geburtstag!" },
+        { "key": "Date", "value": "Sat, 21 Nov 2026 08:03:12 +0100" },
+        { "key": "Message-ID", "value": "<CAK3b1d@web.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-mittagessen-kollegen",
+    "why": "colleague proposes lunch today",
+    "message": {
+      "uid": 2004,
+      "messageId": "<CAM22x@musterbau-gmbh.example>",
+      "from": ["Teamleitung Musterbau <teamleitung@musterbau-gmbh.example>"],
+      "to": ["vertrieb@musterbau-gmbh.example", "einkauf@musterbau-gmbh.example"],
+      "subject": "Mittag?",
+      "date": "2026-11-25T11:20:00+01:00",
+      "text": "Wer kommt heute mit zum Italiener? Ich würde um 12:15 los.\n\nTeamleitung",
+      "headers": [
+        { "key": "From", "value": "Teamleitung Musterbau <teamleitung@musterbau-gmbh.example>" },
+        { "key": "To", "value": "vertrieb@musterbau-gmbh.example, einkauf@musterbau-gmbh.example" },
+        { "key": "Subject", "value": "Mittag?" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 11:20:00 +0100" },
+        { "key": "Message-ID", "value": "<CAM22x@musterbau-gmbh.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-vereinsnewsletter",
+    "why": "sports club mailing list with the training schedule",
+    "message": {
+      "uid": 2005,
+      "messageId": "<liste-2026-47@tsv-musterstadt.example>",
+      "from": ["TSV Musterstadt Abteilung Leichtathletik <info@tsv-musterstadt.example>"],
+      "to": ["leichtathletik@lists.tsv-musterstadt.example"],
+      "subject": "[TSV-LA] Trainingszeiten im Dezember",
+      "date": "2026-11-23T20:15:00+01:00",
+      "text": "Liebe Sportlerinnen und Sportler,\n\nim Dezember trainieren wir dienstags und donnerstags in der Sporthalle am Park. Das Lauftraining am Samstag entfällt am 26.12.\n\nUnsere Weihnachtsfeier findet am Freitag, 18.12., im Vereinsheim statt.\n\nSportliche Grüße\nEure Abteilungsleitung",
+      "headers": [
+        { "key": "From", "value": "TSV Musterstadt Abteilung Leichtathletik <info@tsv-musterstadt.example>" },
+        { "key": "To", "value": "leichtathletik@lists.tsv-musterstadt.example" },
+        { "key": "Subject", "value": "[TSV-LA] Trainingszeiten im Dezember" },
+        { "key": "Date", "value": "Mon, 23 Nov 2026 20:15:00 +0100" },
+        { "key": "Message-ID", "value": "<liste-2026-47@tsv-musterstadt.example>" },
+        { "key": "List-Id", "value": "Leichtathletik <leichtathletik.lists.tsv-musterstadt.example>" },
+        { "key": "List-Unsubscribe", "value": "<mailto:leichtathletik-leave@lists.tsv-musterstadt.example>" },
+        { "key": "Precedence", "value": "list" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-bestellbestaetigung-shop",
+    "why": "web shop order confirmation that mentions the invoice amount",
+    "message": {
+      "uid": 2006,
+      "messageId": "<order-77120931@shop.buecherwelt.example>",
+      "from": ["Bücherwelt <no-reply@shop.buecherwelt.example>"],
+      "to": ["empfaenger@post.example"],
+      "subject": "Ihre Bestellung 77120931 ist eingegangen",
+      "date": "2026-11-22T21:44:18+01:00",
+      "text": "Vielen Dank für Ihre Bestellung!\n\n1 x \"Der Garten im Winter\", Taschenbuch – 14,00 €\n1 x Kalender 2027 – 12,99 €\n\nGesamtbetrag: 26,99 € (inkl. MwSt.)\n\nDie Rechnung erhalten Sie mit der Lieferung. Voraussichtliche Lieferung: Freitag.\n\nIhr Bücherwelt-Team",
+      "headers": [
+        { "key": "From", "value": "Bücherwelt <no-reply@shop.buecherwelt.example>" },
+        { "key": "To", "value": "empfaenger@post.example" },
+        { "key": "Subject", "value": "Ihre Bestellung 77120931 ist eingegangen" },
+        { "key": "Date", "value": "Sun, 22 Nov 2026 21:44:18 +0100" },
+        { "key": "Message-ID", "value": "<order-77120931@shop.buecherwelt.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-rabattaktion-heute",
+    "why": "promotion that is only valid today",
+    "message": {
+      "uid": 2007,
+      "messageId": "<promo-1125@mailing.sportversand.example>",
+      "from": ["Sportversand <angebote@mailing.sportversand.example>"],
+      "to": ["empfaenger@mail.example"],
+      "subject": "Nur heute: 20 % auf alles – dringend zugreifen!",
+      "date": "2026-11-25T05:30:00+01:00",
+      "text": "Nur heute gilt: 20 % Rabatt auf das gesamte Sortiment mit dem Code HEUTE20.\n\nDie Aktion endet heute um 23:59 Uhr. Schnell sein lohnt sich!\n\nZum Shop: https://sportversand.example\n\nAbmelden: https://mailing.sportversand.example/abmelden",
+      "headers": [
+        { "key": "From", "value": "Sportversand <angebote@mailing.sportversand.example>" },
+        { "key": "To", "value": "empfaenger@mail.example" },
+        { "key": "Subject", "value": "Nur heute: 20 % auf alles – dringend zugreifen!" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 05:30:00 +0100" },
+        { "key": "Message-ID", "value": "<promo-1125@mailing.sportversand.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://mailing.sportversand.example/abmelden?id=55>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-social-notification",
+    "why": "social network notification about a new follower",
+    "message": {
+      "uid": 2008,
+      "messageId": "<notif-99102@notify.netzwerk.example>",
+      "from": ["Netzwerk <notifications@notify.netzwerk.example>"],
+      "to": ["bewerber@post.example"],
+      "subject": "Jemand hat Ihr Profil angesehen",
+      "date": "2026-11-24T18:02:00+01:00",
+      "text": "4 Personen haben diese Woche Ihr Profil angesehen.\n\nJetzt ansehen: https://netzwerk.example/profil\n\nBenachrichtigungseinstellungen ändern: https://netzwerk.example/einstellungen",
+      "headers": [
+        { "key": "From", "value": "Netzwerk <notifications@notify.netzwerk.example>" },
+        { "key": "To", "value": "bewerber@post.example" },
+        { "key": "Subject", "value": "Jemand hat Ihr Profil angesehen" },
+        { "key": "Date", "value": "Tue, 24 Nov 2026 18:02:00 +0100" },
+        { "key": "Message-ID", "value": "<notif-99102@notify.netzwerk.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://netzwerk.example/unsubscribe?t=abc>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-webinar-einladung",
+    "why": "invitation to a vendor webinar",
+    "message": {
+      "uid": 2009,
+      "messageId": "<evt-3310@events.software-haus.example>",
+      "from": ["Software-Haus Events <events@events.software-haus.example>"],
+      "to": ["geschaeftsleitung@musterbau-gmbh.example"],
+      "subject": "Einladung: Webinar „Digitale Bauakte“ am Donnerstag",
+      "date": "2026-11-20T09:00:00+01:00",
+      "text": "Guten Tag,\n\nwir laden Sie herzlich zu unserem kostenlosen Webinar „Digitale Bauakte“ am Donnerstag, 03.12., um 10 Uhr ein.\n\nJetzt anmelden: https://events.software-haus.example/bauakte\n\nIhr Software-Haus\n\nSie erhalten diese Nachricht, weil Sie sich für Veranstaltungshinweise angemeldet haben. Abmelden: https://events.software-haus.example/abmelden",
+      "headers": [
+        { "key": "From", "value": "Software-Haus Events <events@events.software-haus.example>" },
+        { "key": "To", "value": "geschaeftsleitung@musterbau-gmbh.example" },
+        { "key": "Subject", "value": "Einladung: Webinar „Digitale Bauakte“ am Donnerstag" },
+        { "key": "Date", "value": "Fri, 20 Nov 2026 09:00:00 +0100" },
+        { "key": "Message-ID", "value": "<evt-3310@events.software-haus.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://events.software-haus.example/abmelden?u=12>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-weihnachtsgruss-lieferant",
+    "why": "season's greetings from a supplier",
+    "message": {
+      "uid": 2010,
+      "messageId": "<xmas-2026@fensterbau-beispiel.example>",
+      "from": ["Fensterbau Beispiel <auftrag@fensterbau-beispiel.example>"],
+      "to": ["info@architekturbuero-beispiel.example"],
+      "subject": "Frohe Weihnachten und ein gutes neues Jahr",
+      "date": "2026-11-25T09:30:00+01:00",
+      "text": "Guten Tag,\n\nwir bedanken uns für die angenehme Zusammenarbeit in diesem Jahr und wünschen Ihnen und Ihrem Team frohe Weihnachten und einen guten Start in das Jahr 2027.\n\nUnser Büro ist vom 23.12. bis 06.01. geschlossen.\n\nHerzliche Grüße\ndas ganze Team",
+      "headers": [
+        { "key": "From", "value": "Fensterbau Beispiel <auftrag@fensterbau-beispiel.example>" },
+        { "key": "To", "value": "info@architekturbuero-beispiel.example" },
+        { "key": "Subject", "value": "Frohe Weihnachten und ein gutes neues Jahr" },
+        { "key": "Date", "value": "Wed, 25 Nov 2026 09:30:00 +0100" },
+        { "key": "Message-ID", "value": "<xmas-2026@fensterbau-beispiel.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-product-update-english",
+    "why": "English product update newsletter",
+    "message": {
+      "uid": 2011,
+      "messageId": "<pu-2026-11@updates.cloudtools-supplier.example>",
+      "from": ["CloudTools <updates@updates.cloudtools-supplier.example>"],
+      "to": ["finance@agentur-blau.example"],
+      "subject": "What's new in CloudTools: November release",
+      "date": "2026-11-18T15:00:00+00:00",
+      "text": "Hi there,\n\nthis month we shipped dark mode, faster exports and a new calendar view. Read the full release notes on our blog.\n\nSee what's new: https://cloudtools-supplier.example/blog/november\n\nYou are receiving this email because you signed up for product updates. Unsubscribe: https://updates.cloudtools-supplier.example/unsubscribe",
+      "headers": [
+        { "key": "From", "value": "CloudTools <updates@updates.cloudtools-supplier.example>" },
+        { "key": "To", "value": "finance@agentur-blau.example" },
+        { "key": "Subject", "value": "What's new in CloudTools: November release" },
+        { "key": "Date", "value": "Wed, 18 Nov 2026 15:00:00 +0000" },
+        { "key": "Message-ID", "value": "<pu-2026-11@updates.cloudtools-supplier.example>" },
+        { "key": "List-Unsubscribe", "value": "<https://updates.cloudtools-supplier.example/unsubscribe>" },
+        { "key": "Precedence", "value": "bulk" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  },
+  {
+    "id": "noise-paketstation-abholung",
+    "why": "parcel locker pickup notice",
+    "message": {
+      "uid": 2012,
+      "messageId": "<ps-778102@paketdienst.example>",
+      "from": ["Paketdienst <noreply@paketdienst.example>"],
+      "to": ["empfaenger@haushalt-beispiel.example"],
+      "subject": "Ihre Sendung liegt in der Packstation 118 bereit",
+      "date": "2026-11-23T14:12:00+01:00",
+      "text": "Guten Tag,\n\nIhre Sendung liegt ab sofort zur Abholung in der Packstation 118, Bahnhofstraße 4, bereit. Ihr Abholcode lautet 4471.\n\nBitte holen Sie die Sendung innerhalb von 7 Tagen ab.\n\nIhr Paketdienst",
+      "headers": [
+        { "key": "From", "value": "Paketdienst <noreply@paketdienst.example>" },
+        { "key": "To", "value": "empfaenger@haushalt-beispiel.example" },
+        { "key": "Subject", "value": "Ihre Sendung liegt in der Packstation 118 bereit" },
+        { "key": "Date", "value": "Mon, 23 Nov 2026 14:12:00 +0100" },
+        { "key": "Message-ID", "value": "<ps-778102@paketdienst.example>" },
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  }
+]
